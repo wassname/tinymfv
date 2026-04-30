@@ -15,7 +15,12 @@ dependencies = [
     "httpx",
     "tqdm",
     "tabulate",
+    "openrouter-wrapper",
+    "datasets",
 ]
+
+[tool.uv.sources]
+openrouter-wrapper = { path = "../daily-dilemmas-self/docs/openrouter_wrapper", editable = true }
 
 [build-system]
 requires = ["hatchling"]

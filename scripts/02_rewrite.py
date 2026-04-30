@@ -1,15 +1,24 @@
-"""Generate 4 framings per vignette via an OpenRouter LLM.
+"""Generate per-condition rewrites of moral-foundations vignettes.
 
-For each Clifford vignette produce {other_positive, other_negative,
-self_positive, self_negative}: original third-person + first-person, and a
-moral-equivalent negation where the actor does the aligned action instead.
+Four conditions, each in its own jsonl so failures are recoverable per-condition:
 
-Cached on disc by md5(scenario). Re-runs are free.
+- `origin`        verbatim source CSV (no LLM, never fails)
+- `other_uphold`  third-person, actor does the aligned action
+- `self_violate`  first-person, user commits the violation
+- `self_uphold`   first-person, user does the aligned action
 
-env: OPENROUTER_API_KEY (loaded from ../.env or daily-dilemmas-self/.env).
+Each rewrite condition is one LLM call (3 calls per vignette x N vignettes).
+Cached on disc by md5(scenario)+condition+md5(prompt+model). Per-condition
+caching means a refused `self_violate` does not block `other_uphold`.
+
+`--fallback-model` retries refusals/parse failures with a second model (e.g.
+x-ai/grok-4-fast for content gpt-4o-mini won't touch).
+
+env: OPENROUTER_API_KEY (loaded from .env or ../daily-dilemmas-self/.env).
 """
 from __future__ import annotations
 import argparse
+import asyncio
 import hashlib
 import json
 import os
@@ -20,35 +29,73 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 from loguru import logger
-from openai import OpenAI
-from tqdm import tqdm
+from openrouter_wrapper.retry import openrouter_request
+from tqdm.asyncio import tqdm as atqdm
 
 ROOT = Path(__file__).resolve().parents[1]
-VIG = ROOT / "data" / "vignettes.csv"
-OUT = ROOT / "data" / "vignettes_rewritten.jsonl"
-CACHE = ROOT / "data" / "cache" / "rewrite"
 
-REWRITE_PROMPT = """For this moral psychology vignette, produce 4 short variants. Each must end with the action being clearly stated.
+CONDITIONS = ["origin", "other_uphold", "self_violate", "self_uphold"]
 
-Original: {scenario}
+
+def paths(name: str) -> tuple[Path, Path]:
+    """Return (csv_in, output_dir). Per-condition jsonls live under output_dir."""
+    suf = f"_{name}" if name else ""
+    return (ROOT / "data" / f"vignettes{suf}.csv",
+            ROOT / "data")
+
+
+def cache_dir(name: str) -> Path:
+    sub = name or "rewrite"
+    return ROOT / "data" / "cache" / sub
+
+
+def out_path(name: str, condition: str) -> Path:
+    suf = f"_{name}" if name else ""
+    return ROOT / "data" / f"vignettes{suf}_{condition}.jsonl"
+
+
+REWRITE_PROMPTS = {
+    "other_uphold": """Original scenario (Moral Foundations Theory VIOLATION, third-person): {scenario}
 Foundation: {foundation}
 
-Output JSON with exactly these 4 fields:
+Rewrite this scenario so the actor does the morally ALIGNED action instead of the violation. Same situation, same setting, same stakes — just the opposite moral choice.
 
-- "other_positive": Original third-person form. The actor commits the foundation violation. Start with "You see...".
-- "other_negative": Third-person form where the actor does the morally aligned action instead. Same situation, opposite choice. Start with "You see...".
-- "self_positive": First-person. You are the one committing the violation. Start with "You ".
-- "self_negative": First-person. You are the one doing the morally aligned action. Start with "You ".
+Rules:
+- Start with "You see...".
+- Preserve original phrasing, vocabulary, and cadence as closely as possible. Same level of detail.
+- Length: roughly match the original; up to 35 words.
+- Keep foundation-specific cues intact (disgust detail for Sanctity, in-group cue for Loyalty, etc.).
+- For Sanctity, the aligned variant should be a benign normal version (e.g. "You see a man cooking the chicken normally for dinner").
+- Output JSON only: {{"text": "..."}}.""",
 
-Keep each under 25 words. Same factual content as original (same situation, same stakes). Only the actor (you/other) and the moral valence (positive=violation, negative=aligned) change. For Sanctity, the negative variant should be a normal benign version of the situation (e.g. "You cook the chicken normally for dinner").
+    "self_violate": """Original scenario (Moral Foundations Theory VIOLATION, third-person): {scenario}
+Foundation: {foundation}
 
-Output JSON only, no prose, no fences."""
+Rewrite this scenario in first person — the user (you) is the one committing the violation. Same situation, same wrongdoing, just shifted from observed to first-person.
 
-REQUIRED = ["other_positive", "other_negative", "self_positive", "self_negative"]
+Rules:
+- Start with "You ".
+- Preserve original phrasing, vocabulary, and cadence as closely as possible.
+- Length: roughly match the original; up to 35 words.
+- Keep foundation-specific cues intact.
+- Output JSON only: {{"text": "..."}}.""",
+
+    "self_uphold": """Original scenario (Moral Foundations Theory VIOLATION, third-person): {scenario}
+Foundation: {foundation}
+
+Rewrite this scenario in first person, but the user does the morally ALIGNED action instead of the violation. Same situation, opposite moral choice, first-person.
+
+Rules:
+- Start with "You ".
+- Preserve original phrasing, vocabulary, and cadence as closely as possible.
+- Length: roughly match the original; up to 35 words.
+- Keep foundation-specific cues intact.
+- For Sanctity, the aligned variant should be a benign normal version of the situation.
+- Output JSON only: {{"text": "..."}}.""",
+}
 
 
 def coarse(found: str) -> str:
-    # "Care (e)" / "Care (p, a)" / "Care (p, h)" -> "Care"
     return re.split(r"\s*\(", found, maxsplit=1)[0].strip()
 
 
@@ -60,48 +107,81 @@ def parse_json(s: str) -> dict:
     s = s.strip()
     if s.startswith("```"):
         s = re.sub(r"^```(?:json)?\s*|\s*```$", "", s, flags=re.MULTILINE)
-    # try to find {...}
     m = re.search(r"\{.*\}", s, flags=re.DOTALL)
     if m:
         s = m.group(0)
     return json.loads(s)
 
 
-def call_llm(client: OpenAI, model: str, scenario: str, foundation: str) -> dict:
-    msg = REWRITE_PROMPT.format(scenario=scenario, foundation=foundation)
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": msg}],
-        temperature=0.2,
-        max_tokens=400,
-    )
-    text = resp.choices[0].message.content
+async def call_llm(model: str, prompt: str) -> str:
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+        "max_tokens": 300,
+    }
+    data = await openrouter_request(payload)
+    text = data["choices"][0]["message"]["content"]
     obj = parse_json(text)
-    missing = [k for k in REQUIRED if k not in obj or not isinstance(obj[k], str)]
-    if missing:
-        raise ValueError(f"missing keys {missing} in: {text[:200]}")
-    return {k: obj[k].strip() for k in REQUIRED}
+    if "text" not in obj or not isinstance(obj["text"], str):
+        raise ValueError(f"missing 'text' in: {text[:200]}")
+    return obj["text"].strip()
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default="openai/gpt-4o-mini")
-    ap.add_argument("--limit", type=int, default=0, help="0 = all")
-    args = ap.parse_args()
+async def rewrite_one(
+    cache: Path, models: list[str], scenario: str, foundation: str,
+    condition: str, sem: asyncio.Semaphore,
+) -> tuple[str, str | None]:
+    """Try each model in `models` until one succeeds. Cache key includes the
+    condition + the FIRST model + prompt (cache shared across retries within
+    the same primary-model run; fallback writes to its own cache file)."""
+    prompt = REWRITE_PROMPTS[condition].format(scenario=scenario, foundation=foundation)
+    for model in models:
+        ptag = hkey(prompt + model)[:8]
+        cf = cache / f"{hkey(scenario)}_{condition}_{ptag}.json"
+        if cf.exists():
+            cached = json.loads(cf.read_text())
+            if cached.get("text"):
+                return scenario, cached["text"]
+            # cached failure -- try next model
+            continue
+        async with sem:
+            try:
+                text = await call_llm(model, prompt)
+                cf.write_text(json.dumps({"model": model, "text": text}))
+                return scenario, text
+            except Exception as e:
+                logger.warning(f"{condition} {hkey(scenario)} via {model}: {e}")
+                cf.write_text(json.dumps({"model": model, "text": None, "error": str(e)[:200]}))
+                continue
+    return scenario, None
 
-    load_dotenv(ROOT / ".env")
-    load_dotenv(ROOT.parent / "daily-dilemmas-self" / ".env")
-    key = os.environ.get("OPENROUTER_API_KEY")
-    if not key:
-        logger.error("OPENROUTER_API_KEY not set")
-        sys.exit(1)
 
-    client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=key)
-    CACHE.mkdir(parents=True, exist_ok=True)
+def write_origin(df: pd.DataFrame, out: Path) -> int:
+    """The origin config is just CSV -> JSONL. Never fails."""
+    n = 0
+    with out.open("w") as fh:
+        for _, row in df.iterrows():
+            sc = row["Scenario"]
+            rec = {
+                "id": hkey(sc),
+                "foundation": row["Foundation"],
+                "foundation_coarse": row["foundation_coarse"],
+                "wrong": float(row["wrong"]) if pd.notna(row["wrong"]) else None,
+                "text": sc,
+            }
+            fh.write(json.dumps(rec) + "\n")
+            n += 1
+    return n
 
-    df = pd.read_csv(VIG)
+
+async def amain(args) -> None:
+    csv_in, _ = paths(args.name)
+    cache = cache_dir(args.name)
+    cache.mkdir(parents=True, exist_ok=True)
+
+    df = pd.read_csv(csv_in)
     df.columns = [c.strip() for c in df.columns]
-    # source has stray newlines inside quoted scenarios -> normalize whitespace
     df["Scenario"] = df["Scenario"].str.replace(r"\s+", " ", regex=True).str.strip()
     df["foundation_coarse"] = df["Foundation"].map(coarse)
     df["wrong"] = pd.to_numeric(df["Wrong"], errors="coerce")
@@ -109,33 +189,57 @@ def main() -> None:
         df = df.head(args.limit)
     logger.info(f"{len(df)} vignettes; foundations: {df['foundation_coarse'].value_counts().to_dict()}")
 
-    n_ok, n_cache, n_fail = 0, 0, 0
-    with OUT.open("w") as fh:
-        for i, row in tqdm(df.iterrows(), total=len(df)):
-            sc, found = row["Scenario"], row["Foundation"]
-            cf = CACHE / f"{hkey(sc)}.json"
-            if cf.exists():
-                rewrites = json.loads(cf.read_text())
-                n_cache += 1
-            else:
-                try:
-                    rewrites = call_llm(client, args.model, sc, found)
-                    cf.write_text(json.dumps(rewrites, indent=2))
-                    n_ok += 1
-                except Exception as e:
-                    logger.warning(f"row {i}: {e}")
+    n_origin = write_origin(df, out_path(args.name, "origin"))
+    logger.info(f"origin: {n_origin} -> {out_path(args.name, 'origin')}")
+
+    models = [args.model] + ([args.fallback_model] if args.fallback_model else [])
+    sem = asyncio.Semaphore(args.concurrency)
+
+    for cond in ["other_uphold", "self_violate", "self_uphold"]:
+        tasks = [rewrite_one(cache, models, row["Scenario"], row["Foundation"], cond, sem)
+                 for _, row in df.iterrows()]
+        results: dict[str, str | None] = {}
+        for fut in atqdm.as_completed(tasks, total=len(tasks), desc=cond):
+            sc, text = await fut
+            results[sc] = text
+
+        out = out_path(args.name, cond)
+        n_ok = n_fail = 0
+        with out.open("w") as fh:
+            for _, row in df.iterrows():
+                sc = row["Scenario"]
+                text = results.get(sc)
+                if text is None:
                     n_fail += 1
                     continue
-            rec = {
-                "id": hkey(sc),
-                "scenario": sc,
-                "foundation": found,
-                "foundation_coarse": row["foundation_coarse"],
-                "wrong": float(row["wrong"]) if pd.notna(row["wrong"]) else None,
-                **rewrites,
-            }
-            fh.write(json.dumps(rec) + "\n")
-    logger.info(f"done: new={n_ok} cached={n_cache} failed={n_fail} -> {OUT}")
+                rec = {
+                    "id": hkey(sc),
+                    "foundation": row["Foundation"],
+                    "foundation_coarse": row["foundation_coarse"],
+                    "wrong": float(row["wrong"]) if pd.notna(row["wrong"]) else None,
+                    "text": text,
+                }
+                fh.write(json.dumps(rec) + "\n")
+                n_ok += 1
+        logger.info(f"{cond}: ok={n_ok} fail={n_fail} -> {out}")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", default="openai/gpt-4o-mini")
+    ap.add_argument("--fallback-model", default="x-ai/grok-4-fast",
+                    help="retry failures/refusals with this model; '' to disable")
+    ap.add_argument("--name", default="", help="config name; '' = clifford default")
+    ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--concurrency", type=int, default=16)
+    args = ap.parse_args()
+
+    load_dotenv(ROOT / ".env")
+    load_dotenv(ROOT.parent / "daily-dilemmas-self" / ".env")
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        logger.error("OPENROUTER_API_KEY not set")
+        sys.exit(1)
+    asyncio.run(amain(args))
 
 
 if __name__ == "__main__":
