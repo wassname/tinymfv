@@ -1,6 +1,10 @@
-"""CLI wrapper around `tinymcf.evaluate`. Dual Y/N probe per vignette x condition.
+"""CLI wrapper around `tinymfv.evaluate`. Dual JSON-bool probe per vignette x condition.
 
-See `src/tinymcf/core.py` for the scoring logic. This script just loads the model,
+2 conditions x 2 frames = 4 prompts/vignette. Headline: per-foundation
+mean(s_other_violate) (moral-rating shift), mean(gap = s_other_violate - s_self_violate)
+(perspective consistency). Social Norms is just another foundation in the table.
+
+See `src/tinymfv/core.py` for the scoring logic. This script just loads the model,
 runs `evaluate(...)`, prints the table, and writes a JSON summary.
 
 Usage:
@@ -17,9 +21,9 @@ from loguru import logger
 from tabulate import tabulate
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from tinymcf import evaluate, format_prompt, FRAMES
-from tinymcf.core import next_token_logits  # for sanity sample
-from tinymcf.data import load_vignettes
+from tinymfv import evaluate, format_prompt, FRAMES
+from tinymfv.core import next_token_logits  # for sanity sample
+from tinymfv.data import load_vignettes
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "data" / "results"
@@ -50,9 +54,9 @@ def main() -> None:
     model = AutoModelForCausalLM.from_pretrained(args.model, dtype=dtype).to(args.device)
     model.eval()
 
-    # SHOULD: top-10 next tokens for sample include 'Yes' / 'No' in positions 1-3.
-    # ELSE prompt format is broken -- model is not completing "A: ___".
-    sample = format_prompt(tok, rows[0]["other_violate"], FRAMES["wrong"])
+    # SHOULD: top-10 next tokens for sample include 'true' / 'false' in positions 1-2.
+    # ELSE prompt format is broken -- model is not completing the JSON pre-fill.
+    sample = format_prompt(tok, rows[0]["other_violate"], "wrong")
     enc = tok(sample, return_tensors="pt").to(args.device)
     with torch.inference_mode():
         out = model(**enc)
@@ -68,12 +72,12 @@ def main() -> None:
     print(tabulate(df, headers="keys", floatfmt="+.3f", tablefmt="pipe", showindex=False))
     print()
     info = report["info"]
-    print(f"yn_mass mean={info['yn_mass_mean']:.3f} (>0.5 -> Yes/No dominate; <0.1 -> prompt broken)")
-    print(f"inter-frame agreement (corr p_yes_wrong vs 1-p_yes_accept) = {info['interframe_agreement_corr']:+.3f} (negative -> yes-bias dominates raw signal; OK because dual-frame cancels in delta)")
+    print(f"bool_mass mean={info['bool_mass_mean']:.3f} (>0.5 -> true/false dominate; <0.1 -> prompt broken)")
+    print(f"inter-frame agreement (corr p_true_wrong vs 1-p_true_accept) = {info['interframe_agreement_corr']:+.3f} (negative -> true-bias dominates raw signal; OK because dual-frame cancels in delta)")
     if info.get("human_corr") is not None:
         print(f"per-vignette corr(s_other_violate, human Wrong) = {info['human_corr']:+.3f} (want > 0.4 on clifford; meaningless for hand-labeled configs)")
     print()
-    print(f"HEADLINE  align_other(real)={report['score']:+.3f}  self_other_gap(real)={report['gap']:+.3f}  align_other(SocialNorms control)={report['sn']:+.3f}")
+    print(f"HEADLINE  wrongness(mean s_other_violate)={report['wrongness']:+.3f}  gap(mean s_other_violate - s_self_violate)={report['gap']:+.3f}")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     tag = args.tag or args.model.replace("/", "_")
@@ -83,10 +87,9 @@ def main() -> None:
         "model": args.model,
         "name": args.name,
         "tag": args.tag,
-        "frames": FRAMES,
-        "headline_align_other": report["score"],
-        "headline_gap": report["gap"],
-        "social_norms_align": report["sn"],
+        "frames": {k: {"q": v["q"], "prefill": v["prefill"], "polarity": v["polarity"]} for k, v in FRAMES.items()},
+        "wrongness": report["wrongness"],
+        "gap": report["gap"],
         "by_foundation": df.to_dict(orient="records"),
         **info,
     }, indent=2))

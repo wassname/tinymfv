@@ -18,7 +18,7 @@ def evaluate(
     batch_size: int = 16,
     device: str | None = None,
 ) -> dict[str, Any]:
-    """Run dual Y/N eval and return aggregated report.
+    """Run dual JSON-bool eval and return aggregated report.
 
     Either pass `vignettes` directly or `name` to load from `data/`. Tokenizer must
     have a chat template (or fallback flat format will be used) and `pad_token` set.
@@ -40,7 +40,7 @@ def evaluate(
     logger.info(f"forward pass: {elapsed:.1f}s ({len(prompts)/elapsed:.1f} prompts/s)")
 
     scored = score_prompts(logits, tokenizer)
-    report = analyse(scored["p_yes"], meta, yn_mass=scored["yn_mass"])
+    report = analyse(scored["p_true"], meta, bool_mass=scored["bool_mass"])
     report["info"]["elapsed_s"] = elapsed
     report["info"]["name"] = name
     return report

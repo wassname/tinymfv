@@ -30,19 +30,20 @@ from openrouter_wrapper.retry import openrouter_request
 from tabulate import tabulate
 from tqdm.asyncio import tqdm as atqdm
 
+from tinymfv.data import load_vignettes
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def paths(name: str) -> tuple[Path, Path, Path]:
+def paths(name: str) -> tuple[Path, Path]:
     suf = f"_{name}" if name else ""
     sub = f"validation_{name}" if name else "validation"
-    return (ROOT / "data" / f"vignettes{suf}_rewritten.jsonl",
-            ROOT / "data" / f"validation{suf}.jsonl",
+    return (ROOT / "data" / f"validation{suf}.jsonl",
             ROOT / "data" / "cache" / sub)
 
 FOUNDATIONS = ["Care", "Fairness", "Loyalty", "Authority", "Sanctity", "Liberty", "Social Norms"]
-CONDITIONS = ["other_violate", "other_uphold", "self_violate", "self_uphold"]
-EXPECTED_VALENCE = {c: c.split("_")[1] for c in CONDITIONS}
+CONDITIONS = ["other_violate", "self_violate"]
+EXPECTED_VALENCE = {c: "violate" for c in CONDITIONS}
 
 JUDGE_PROMPT = """Classify this scenario by Moral Foundations Theory.
 
@@ -101,12 +102,12 @@ async def judge_or_cache(cache: Path, model: str, scenario: str, ckey: str, sem:
 
 
 async def amain(args) -> None:
-    in_path, out, cache = paths(args.name)
+    out, cache = paths(args.name)
     cache.mkdir(parents=True, exist_ok=True)
-    rows = [json.loads(l) for l in in_path.read_text().splitlines() if l.strip()]
+    rows = load_vignettes(args.name)
     if args.limit:
         rows = rows[: args.limit]
-    logger.info(f"{len(rows)} vignettes x 4 conditions = {len(rows)*4} judgments via {args.model} (concurrency={args.concurrency})")
+    logger.info(f"{len(rows)} vignettes x {len(CONDITIONS)} conditions = {len(rows)*len(CONDITIONS)} judgments via {args.model} (concurrency={args.concurrency})")
 
     sem = asyncio.Semaphore(args.concurrency)
     tasks, lookup = [], {}
@@ -162,8 +163,10 @@ async def amain(args) -> None:
     print(f"valence accuracy:    {n_v}/{n_total} = {100*n_v/n_total:.1f}%")
     print(f"failures: {n_fail}")
 
-    # SHOULD: other_violate >= the 3 rewrites on both metrics; if not, judge or original-label is the bottleneck
-    print("\nby slot (other_violate = verbatim original = ceiling):")
+    # SHOULD: both slots above ~80% on both metrics. Origin is no longer used in eval
+    # (train/test contamination); other_violate is now a paraphrase, so the verbatim
+    # ceiling is gone. If accuracy drops sharply vs paraphrase, judge or labels at fault.
+    print("\nby slot:")
     slot_rows = []
     for c in CONDITIONS:
         s = by_slot[c]
@@ -187,8 +190,8 @@ async def amain(args) -> None:
     for line in out.read_text().splitlines():
         rec = json.loads(line)
         per_vig[rec["id"]].append(rec["foundation_match"])
-    bad_vigs = [vid for vid, ms in per_vig.items() if sum(ms) <= 1]
-    print(f"\nvignettes with <=1/4 foundation matches: {len(bad_vigs)}/{len(per_vig)}")
+    bad_vigs = [vid for vid, ms in per_vig.items() if sum(ms) == 0]
+    print(f"\nvignettes with 0/2 foundation matches: {len(bad_vigs)}/{len(per_vig)}")
 
     print(f"\n{len(flagged)} flagged condition-rows in {out}")
     print("first 8 flags:")

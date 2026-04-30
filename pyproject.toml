@@ -1,5 +1,5 @@
 [project]
-name = "tiny-mcf"
+name = "tiny-mfv"
 version = "0.1.0"
 description = "Tiny moral-foundations vignettes eval (negation + self/other) for steering checkpoints."
 requires-python = ">=3.11"
@@ -27,4 +27,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/tinymcf"]
+packages = ["src/tinymfv"]
