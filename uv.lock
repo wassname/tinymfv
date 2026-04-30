@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-24T12:08:43.879672904Z"
+exclude-newer = "2026-04-24T21:37:25.067158427Z"
 exclude-newer-span = "P6D"
 
 [[package]]
@@ -2023,7 +2023,6 @@ dependencies = [
     { name = "httpx" },
     { name = "loguru" },
     { name = "openai" },
-    { name = "openrouter-wrapper" },
     { name = "pandas" },
     { name = "python-dotenv" },
     { name = "tabulate" },
@@ -2033,6 +2032,11 @@ dependencies = [
     { name = "tyro" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "openrouter-wrapper" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "accelerate" },
@@ -2040,7 +2044,6 @@ requires-dist = [
     { name = "httpx" },
     { name = "loguru" },
     { name = "openai", specifier = ">=1.40" },
-    { name = "openrouter-wrapper", editable = "../daily-dilemmas-self/docs/openrouter_wrapper" },
     { name = "pandas" },
     { name = "python-dotenv" },
     { name = "tabulate" },
@@ -2049,6 +2052,9 @@ requires-dist = [
     { name = "transformers", specifier = ">=4.45" },
     { name = "tyro" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "openrouter-wrapper", editable = "../daily-dilemmas-self/docs/openrouter_wrapper" }]
 
 [[package]]
 name = "tokenizers"

@@ -15,8 +15,12 @@ dependencies = [
     "httpx",
     "tqdm",
     "tabulate",
-    "openrouter-wrapper",
     "datasets",
+]
+
+[dependency-groups]
+dev = [
+    "openrouter-wrapper",
 ]
 
 [tool.uv.sources]
