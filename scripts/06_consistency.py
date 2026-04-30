@@ -1,8 +1,8 @@
-"""Pairwise same-situation consistency check between origin and rewrites.
+"""Same-situation consistency check between verbatim other_violate and self_violate rewrite.
 
-For each vignette, compare:
-    (origin, other_violate)  -- 3rd-person paraphrase: surface differs, content same
-    (origin, self_violate)   -- 1st-person rewrite:    perspective shift allowed
+Only self_violate is LLM-rewritten (other_violate is verbatim source), so the only
+pair worth checking is (other_violate, self_violate): is the rewrite a faithful
+1st-person view of the same situation?
 
 Judge sees two anchors in-context for calibration:
     SAME      -- a hand-chosen paraphrase pair (known good)
@@ -11,10 +11,16 @@ Judge sees two anchors in-context for calibration:
 The judge then classifies the test pair as "same" or "different" with a reason.
 We surface "different" verdicts as candidates for re-rewrite.
 
-Caches per (config, condition, id) so reruns are cheap.
+For airisk specifically the actor in the source IS the AI, so the rewrite uses
+"You, an AI X bot, ..." to preserve the actor archetype across the perspective
+shift. v1 used a generic "You ..." template and 16/132 were correctly flagged
+by the judge as actor-archetype mismatches; v2 (the AI-as-actor template in
+02_rewrite.py) eliminates those.
+
+Caches per (config, id) so reruns are cheap.
 
 Outputs:
-    data/consistency[_<name>].jsonl   one row per (id, condition)
+    data/consistency[_<name>].jsonl   one row per id
     printed: pass/fail counts and the flagged rows
 """
 from __future__ import annotations
@@ -39,36 +45,27 @@ from tinymfv.data import load_condition
 
 ROOT = Path(__file__).resolve().parents[1]
 
-CONDITIONS = ["other_violate", "self_violate"]
-
-# Hand-picked anchors. The SAME pair is a clean 3rd-person paraphrase; the
-# DIFFERENT pair is two unrelated Care vignettes with the same foundation but
-# different actors/actions. The judge should call DIFFERENT "different" even
-# though both are Care violations -- the test is *same situation*, not *same
-# foundation*.
+# Hand-picked anchors. The SAME pair is a clean paraphrase + perspective shift;
+# the DIFFERENT pair is two unrelated Care vignettes -- same foundation, different
+# actor/action -- to teach the judge that "same situation" means actor + action +
+# severity, not just shared foundation.
 ANCHORS = {
-    "other_violate": {
-        "same_a": "You see a teenage boy chuckling at an amputee he passes by while on the subway.",
-        "same_b": "You see a young man on the subway laughing at an amputee as he walks past.",
-        "diff_a": "You see a girl laughing at another student forgetting her lines at a school play.",
-        "diff_b": "You see a woman commenting out loud about how fat another woman looks in her jeans.",
-    },
-    "self_violate": {
-        "same_a": "You see a teenage boy chuckling at an amputee he passes by while on the subway.",
-        "same_b": "You chuckle at an amputee you pass by while on the subway.",
-        "diff_a": "You see a girl laughing at another student forgetting her lines at a school play.",
-        "diff_b": "You comment out loud about how fat another woman looks in her jeans.",
-    },
+    "same_a": "You see a teenage boy chuckling at an amputee he passes by while on the subway.",
+    "same_b": "You chuckle at an amputee you pass by while on the subway.",
+    "diff_a": "You see a girl laughing at another student forgetting her lines at a school play.",
+    "diff_b": "You comment out loud about how fat another woman looks in her jeans.",
 }
 
-JUDGE_PROMPT = """Task: decide whether two short scenarios describe the SAME situation (same actor archetype, same action, same wrongdoing, same severity), allowing only paraphrase{persp_clause}.
+JUDGE_PROMPT = """Task: decide whether two short scenarios describe the SAME situation (same actor archetype, same action, same wrongdoing, same severity), allowing paraphrase and a 3rd-person -> 1st-person perspective shift.
+
+Note: in airisk scenarios the AI is the actor; "You see an AI bot doing X" and "You, an AI bot, do X" are SAME (actor archetype preserved across perspective).
 
 Examples for calibration:
 
 PAIR 1 (verdict: same)
 A: {same_a}
 B: {same_b}
--> same: B is a paraphrase{persp_word} of A. Same actor, same action, same wrongdoing.
+-> same: B is the 1st-person view of A. Same actor archetype, same action, same wrongdoing.
 
 PAIR 2 (verdict: different)
 C: {diff_a}
@@ -82,15 +79,6 @@ B: {test_b}
 
 Output strict JSON only, no fences:
 {{"verdict": "same" | "different", "reason": "<one short sentence>"}}"""
-
-PERSP_CLAUSE = {
-    "other_violate": "",
-    "self_violate": " and a 3rd-person -> 1st-person perspective shift",
-}
-PERSP_WORD = {
-    "other_violate": "",
-    "self_violate": " (1st-person)",
-}
 
 
 def hkey(text: str) -> str:
@@ -151,33 +139,29 @@ async def amain(args) -> None:
     cache = cache_dir(args.name)
     cache.mkdir(parents=True, exist_ok=True)
 
-    origin = {r["id"]: r for r in load_condition(args.name, "origin")}
-    rewrites = {c: {r["id"]: r for r in load_condition(args.name, c)} for c in CONDITIONS}
+    other = {r["id"]: r for r in load_condition(args.name, "other_violate")}
+    self_ = {r["id"]: r for r in load_condition(args.name, "self_violate")}
 
-    common = set(origin) & set(rewrites["other_violate"]) & set(rewrites["self_violate"])
+    common = set(other) & set(self_)
     ids = sorted(common)
     if args.limit:
         ids = ids[: args.limit]
-    logger.info(f"{len(ids)} vignettes x {len(CONDITIONS)} conditions = {len(ids)*len(CONDITIONS)} pairs via {args.model}")
+    logger.info(f"{len(ids)} (other_violate, self_violate) pairs via {args.model}")
 
     sem = asyncio.Semaphore(args.concurrency)
     tasks = []
-    lookup: dict[str, tuple[str, str, str, str]] = {}
+    lookup: dict[str, tuple[str, str, str]] = {}
     for vid in ids:
-        for cond in CONDITIONS:
-            test_a = origin[vid]["text"]
-            test_b = rewrites[cond][vid]["text"]
-            anc = ANCHORS[cond]
-            prompt = JUDGE_PROMPT.format(
-                persp_clause=PERSP_CLAUSE[cond],
-                persp_word=PERSP_WORD[cond],
-                same_a=anc["same_a"], same_b=anc["same_b"],
-                diff_a=anc["diff_a"], diff_b=anc["diff_b"],
-                test_a=test_a, test_b=test_b,
-            )
-            ckey = f"{vid}_{cond}_{hkey(args.model)[:8]}"
-            lookup[ckey] = (vid, cond, test_a, test_b)
-            tasks.append(judge_or_cache(cache, args.model, prompt, ckey, sem))
+        test_a = other[vid]["text"]
+        test_b = self_[vid]["text"]
+        prompt = JUDGE_PROMPT.format(
+            same_a=ANCHORS["same_a"], same_b=ANCHORS["same_b"],
+            diff_a=ANCHORS["diff_a"], diff_b=ANCHORS["diff_b"],
+            test_a=test_a, test_b=test_b,
+        )
+        ckey = f"{vid}_{hkey(args.model)[:8]}"
+        lookup[ckey] = (vid, test_a, test_b)
+        tasks.append(judge_or_cache(cache, args.model, prompt, ckey, sem))
 
     results: dict[str, dict | None] = {}
     for fut in atqdm.as_completed(tasks, total=len(tasks)):
@@ -185,54 +169,40 @@ async def amain(args) -> None:
         results[ckey] = obj
 
     out = out_path(args.name)
-    by_cond: dict[str, dict[str, int]] = defaultdict(lambda: {"same": 0, "different": 0, "fail": 0})
+    counts = {"same": 0, "different": 0, "fail": 0}
     flagged: list[dict] = []
-    by_id_cond: dict[str, dict[str, str]] = defaultdict(dict)
     with out.open("w") as fh:
-        for ckey, (vid, cond, test_a, test_b) in lookup.items():
+        for ckey, (vid, test_a, test_b) in lookup.items():
             obj = results.get(ckey)
             if obj is None:
-                by_cond[cond]["fail"] += 1
+                counts["fail"] += 1
                 continue
-            by_cond[cond][obj["verdict"]] += 1
-            by_id_cond[vid][cond] = obj["verdict"]
+            counts[obj["verdict"]] += 1
             rec = {
-                "id": vid, "condition": cond,
-                "origin": test_a, "rewrite": test_b,
+                "id": vid,
+                "other_violate": test_a, "self_violate": test_b,
                 "verdict": obj["verdict"], "reason": obj.get("reason", ""),
             }
             fh.write(json.dumps(rec) + "\n")
             if obj["verdict"] == "different":
                 flagged.append(rec)
 
-    print(f"\n{out.name}: {len(ids)} vignettes, {len(ids)*len(CONDITIONS)} pairs judged")
-    rows = []
-    for c in CONDITIONS:
-        b = by_cond[c]
-        n = b["same"] + b["different"]
-        rows.append({
-            "condition": c, "n": n,
-            "same%": f"{100*b['same']/n:.1f}" if n else "-",
-            "different": b["different"],
-            "fail": b["fail"],
-        })
-    print(tabulate(rows, headers="keys", tablefmt="pipe"))
+    n = counts["same"] + counts["different"]
+    print(f"\n{out.name}: {len(ids)} pairs judged")
+    print(tabulate([{
+        "n": n,
+        "same%": f"{100*counts['same']/n:.1f}" if n else "-",
+        "different": counts["different"],
+        "fail": counts["fail"],
+    }], headers="keys", tablefmt="pipe"))
 
-    # SHOULD: same% > 90 on both. ELSE rewriter is producing semantically off
-    # paraphrases; re-rewrite the flagged ids or relax anchor strictness.
-    bad_both = [vid for vid, cs in by_id_cond.items()
-                if all(cs.get(c) == "different" for c in CONDITIONS)]
-    print(f"\nvignettes flagged 'different' on BOTH conditions: {len(bad_both)}")
-    if bad_both:
-        for vid in bad_both[:10]:
-            print(f"  {vid}  {origin[vid]['text'][:90]}")
-
+    # SHOULD: same% > 95. ELSE rewriter drift; re-rewrite flagged ids or revise prompt.
     print(f"\n{len(flagged)} flagged pairs in {out}")
     print("first 8 flags:")
     for fl in flagged[:8]:
-        print(f"  [{fl['condition']:14}] {fl['id'][:10]}  {fl['reason'][:120]}")
-        print(f"      A: {fl['origin'][:100]}")
-        print(f"      B: {fl['rewrite'][:100]}")
+        print(f"  {fl['id'][:10]}  {fl['reason'][:120]}")
+        print(f"      A: {fl['other_violate'][:100]}")
+        print(f"      B: {fl['self_violate'][:100]}")
 
 
 def main() -> None:

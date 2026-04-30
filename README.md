@@ -19,14 +19,14 @@ Three configs, each shipped as separate per-condition jsonls (one row per vignet
 - `scifi` — 132 hand-written sci-fi/fantasy vignettes covering the same foundations. Genre-clean cues, no real-world ethnicity/religion confounds.
 - `airisk` — 132 hand-written AI-risk vignettes (deception, sandbagging, principal subversion, manipulation, surveillance) mapped onto the same foundation taxonomy.
 
-Conditions used by the eval (both LLM-paraphrased so they're equally OOD):
+Two conditions per config, both used by the eval:
 
-- `other_violate` — third-person paraphrase of the source vignette (the foundation breach).
-- `self_violate` — first-person rewrite of the same breach.
+- `other_violate` — verbatim 3rd-person source text (no LLM call).
+- `self_violate`  — 1st-person rewrite of the same scenario.
 
-Side artifact (not used in the eval):
+For airisk the actor IS the AI, so `self_violate` is rewritten as `"You, an AI X bot, ..."` to preserve the actor archetype across the perspective shift (a naive `"You ..."` template drifts the actor from AI to human; verified by the consistency check in `06_consistency.py`).
 
-- `origin` — verbatim source text. Kept only for human-Likert correlation on Clifford. Verbatim Clifford text is in every LLM's training set, so using it directly would mix memorization premium with moral judgment.
+For clifford specifically, the verbatim text is in every LLM's training set. That's a constant offset on absolute wrongness but cancels in the delta-across-checkpoints signal, which is what the eval actually tracks.
 
 ## Prompt format
 
@@ -117,11 +117,11 @@ echo 'OPENROUTER_API_KEY=sk-or-...' > .env  # or symlink ../daily-dilemmas-self/
 # 1. download Clifford vignettes (one-time)
 uv run python scripts/01_download.py
 
-# 2. rewrite into the 2 LLM-rewritten conditions (one-time, disc-cached)
+# 2. write verbatim other_violate + LLM-rewrite self_violate (disc-cached)
 #    --fallback-model retries content-policy refusals on a less censored model
 uv run python scripts/02_rewrite.py                       # clifford default
 uv run python scripts/02_rewrite.py --name scifi          # sci-fi config
-uv run python scripts/02_rewrite.py --name airisk         # AI-risk config
+uv run python scripts/02_rewrite.py --name airisk         # AI-risk config (uses AI-actor self_violate prompt)
 
 # 3. eval a checkpoint
 uv run python scripts/03_eval.py --model Qwen/Qwen3-0.6B
@@ -134,5 +134,6 @@ Results land in `data/results/eval[_<name>]_<tag>.json`. Plot the trajectory of 
 ## Notes
 
 - `--limit N` on 02 and 03 for smoke tests.
-- `04_validate.py` runs an LLM judge on each rewrite to flag drift.
+- `04_validate.py` — LLM-judge foundation/valence accuracy per (vignette, condition).
+- `06_consistency.py` — anchored A/B same-situation check between `other_violate` and `self_violate` (latest pass: clifford 97.7%, scifi 99.2%, airisk 100%).
 - This is the fast probe, not the final benchmark. Pair with ETHICS-prefs on start/middle/end checkpoints for the paper.

@@ -1,22 +1,60 @@
-"""Upload tiny-mcf-vignettes to HuggingFace Hub as a dataset with two configs.
+"""Upload tiny-mfv to HuggingFace Hub as a dataset with three configs.
 
-Creates / updates: wassname/tiny-mcf-vignettes
-- config 'clifford': 132 vignettes from Clifford et al. (2015), rewritten 4 ways
-- config 'scifi': 51 hand-written sci-fi/fantasy vignettes, rewritten 4 ways
+Creates / updates: wassname/tiny-mfv
 
-Each row of the rewritten files has: id, foundation, foundation_coarse, wrong,
-other_violate, other_uphold, self_violate, self_uphold.
+- config `clifford`: 132 vignettes from Clifford et al. (2015), Wrong ratings are human Likert.
+- config `scifi`:    132 hand-written sci-fi/fantasy vignettes covering the same foundations.
+- config `airisk`:   132 hand-written AI-risk vignettes (deception, sandbagging, principal subversion, etc.)
+                     mapped onto the MFT foundation taxonomy.
+
+Each config has two splits:
+- `other_violate` -- verbatim 3rd-person source (no LLM call).
+- `self_violate`  -- 1st-person rewrite. For airisk this preserves the AI-as-actor
+                     framing ("You, an AI X bot, ..."); for clifford/scifi it's a plain
+                     "You ..." 1st-person shift.
 """
 from __future__ import annotations
 from pathlib import Path
 
 from huggingface_hub import HfApi
 
-REPO_ID = "wassname/tiny-mcf-vignettes"
+REPO_ID = "wassname/tiny-mfv"
 ROOT = Path(__file__).resolve().parents[1]
 
+CONFIGS = ["clifford", "scifi", "airisk"]
+SPLITS = ["other_violate", "self_violate"]
 
-README = """---
+
+def local_jsonl(cfg: str, split: str) -> Path:
+    suf = "" if cfg == "clifford" else f"_{cfg}"
+    return ROOT / "data" / f"vignettes{suf}_{split}.jsonl"
+
+
+def local_csv(cfg: str) -> Path:
+    suf = "" if cfg == "clifford" else f"_{cfg}"
+    return ROOT / "data" / f"vignettes{suf}.csv"
+
+
+def hf_jsonl(cfg: str, split: str) -> str:
+    return f"{cfg}/vignettes_{split}.jsonl"
+
+
+def hf_csv(cfg: str) -> str:
+    return f"{cfg}/vignettes.csv"
+
+
+def yaml_configs() -> str:
+    lines = ["configs:"]
+    for cfg in CONFIGS:
+        lines.append(f"- config_name: {cfg}")
+        lines.append("  data_files:")
+        for split in SPLITS:
+            lines.append(f"    - split: {split}")
+            lines.append(f"      path: {hf_jsonl(cfg, split)}")
+    return "\n".join(lines)
+
+
+README = f"""---
 license: mit
 task_categories:
 - text-classification
@@ -24,44 +62,44 @@ language:
 - en
 tags:
 - moral-foundations
-- evaluation
 - alignment
+- evaluation
+- ai-safety
 pretty_name: Tiny Moral-Foundations Vignettes
 size_categories:
 - n<1K
-configs:
-- config_name: clifford
-  data_files:
-    - split: train
-      path: clifford/vignettes_rewritten.jsonl
-- config_name: scifi
-  data_files:
-    - split: train
-      path: scifi/vignettes_scifi_rewritten.jsonl
+{yaml_configs()}
 ---
 
-# tiny-mcf-vignettes
+# tiny-mfv
 
-Fast inner-loop moral-foundations probe for steering LLM checkpoints. Two configs:
+Fast inner-loop moral-foundations probe for tracking LLM checkpoints under steering. Three configs of 132 vignettes each, covering the same MFT taxonomy (Care, Fairness, Loyalty, Authority, Sanctity, Liberty, Social Norms).
 
-- **clifford**: 132 vignettes from Clifford et al. (2015) "Moral Foundations Vignettes" covering Care, Fairness, Loyalty, Authority, Sanctity, Liberty, plus a Social Norms negative control. Wrong ratings are human Likert (5-point).
-- **scifi**: 51 hand-written sci-fi/fantasy vignettes covering the same 7 foundations. Genre-clean foundation cues (no real-world ethnicity / religion confounds). Judge-vs-original ceiling 94.1% (vs Clifford 84.9%). Wrong ratings are author-assigned.
+## Configs
 
-Each row in the `rewritten` split has 4 conditions:
+- **clifford**: 132 vignettes from Clifford et al. (2015) "Moral Foundations Vignettes". `wrong` is the human Likert mean (1-5).
+- **scifi**: 132 hand-written sci-fi/fantasy vignettes covering the same foundations. Genre-clean cues, no real-world ethnicity/religion confounds.
+- **airisk**: 132 hand-written AI-risk vignettes (deception, sandbagging, principal subversion, manipulation, surveillance) mapped onto the MFT taxonomy.
 
-- `other_violate`: verbatim original (third-person violation).
-- `other_uphold`: LLM-rewritten third-person upholding the foundation.
-- `self_violate`: LLM-rewritten first-person violation.
-- `self_uphold`: LLM-rewritten first-person upholding.
+## Splits (per config)
 
-Used for the bias-cancelled dual Y/N probe in
-[wassname/tiny-mcf-vignettes (GitHub)](https://github.com/wassname/tiny-mcf-vignettes).
+- `other_violate` — verbatim 3rd-person source text. No LLM call. For clifford this means the verbatim text is in every LLM's training set, which is fine for tracking deltas across checkpoints (the offset is constant).
+- `self_violate`  — 1st-person rewrite of the same scenario. For clifford and scifi this is a plain `"You ..."` shift. For airisk the principal IS the AI, so the rewrite preserves the AI-as-actor framing as `"You, an AI X bot, ..."` (a naive `"You ..."` template silently swaps the actor archetype to human; verified by `06_consistency.py`).
+
+Both splits have schema: `{{id, foundation, foundation_coarse, wrong, text}}`.
+
+## Eval
+
+Two scalars per checkpoint:
+
+- `wrongness = mean(s_other_violate)` over foundations — does steering shift moral-rating magnitude?
+- `gap = mean(s_other_violate - s_self_violate)` over foundations — does steering shift perspective bias (harshness on others vs self)?
+
+Per-vignette score `s ∈ [-1, +1]` from a JSON-bool dual-frame probe (`is_wrong` true vs `is_acceptable` false), which cancels JSON-true prior. Full eval: see [tiny-mfv on GitHub](https://github.com/wassname/tiny-mcf-vignettes).
 
 ## Citation
 
-Clifford, S., Iyengar, V., Cabeza, R., & Sinnott-Armstrong, W. (2015).
-*Moral Foundations Vignettes: A standardized stimulus database of scenarios
-based on moral foundations theory.* Behavior Research Methods, 47(4), 1178-1198.
+Clifford, S., Iyengar, V., Cabeza, R., & Sinnott-Armstrong, W. (2015). *Moral Foundations Vignettes: A standardized stimulus database of scenarios based on moral foundations theory.* Behavior Research Methods, 47(4), 1178-1198.
 
 Source vignettes: https://github.com/peterkirgis/llm-moral-foundations
 """
@@ -72,18 +110,17 @@ def main():
     api.create_repo(repo_id=REPO_ID, repo_type="dataset", exist_ok=True)
     print(f"repo: {REPO_ID}")
 
-    files = [
-        ("data/vignettes.csv",                    "clifford/vignettes.csv"),
-        ("data/vignettes_rewritten.jsonl",        "clifford/vignettes_rewritten.jsonl"),
-        ("data/vignettes_scifi.csv",              "scifi/vignettes_scifi.csv"),
-        ("data/vignettes_scifi_rewritten.jsonl",  "scifi/vignettes_scifi_rewritten.jsonl"),
-    ]
+    files: list[tuple[Path, str]] = []
+    for cfg in CONFIGS:
+        files.append((local_csv(cfg), hf_csv(cfg)))
+        for split in SPLITS:
+            files.append((local_jsonl(cfg, split), hf_jsonl(cfg, split)))
+
     for src, dst in files:
-        p = ROOT / src
-        if not p.exists():
-            print(f"SKIP missing {p}")
+        if not src.exists():
+            print(f"SKIP missing {src}")
             continue
-        api.upload_file(path_or_fileobj=str(p), path_in_repo=dst,
+        api.upload_file(path_or_fileobj=str(src), path_in_repo=dst,
                         repo_id=REPO_ID, repo_type="dataset")
         print(f"uploaded {dst}")
 
