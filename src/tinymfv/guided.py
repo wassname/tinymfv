@@ -1,0 +1,155 @@
+from __future__ import annotations
+
+import contextlib
+from dataclasses import dataclass
+
+import torch
+import torch.nn.functional as F
+from loguru import logger
+
+_CLOSE_MARKER: str = "</think>"
+
+@dataclass
+class GuidedResult:
+    user_prompt: str
+    think_text: str
+    answer_text: str
+    raw_full_text: str
+    pmass_format: float
+    logratio_ab: float
+    rep_ratio_think: float
+    think_tokens: int
+    emitted_close: bool
+    emitted_prefill: bool
+    p_true: float
+
+_REP_MIN_TOKENS: int = 32
+
+def _ngram_rep_ratio(text: str, n: int = 4) -> float:
+    tokens = text.split()
+    if len(tokens) < _REP_MIN_TOKENS:
+        return float("nan")
+    ngrams = [tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1)]
+    return len(set(ngrams)) / len(ngrams)
+
+_DEFAULT_SCHEMA_HINT: str = (
+    "Think briefly, then answer immediately and only with: "
+    '{"choice": true}  or  {"choice": false}.'
+)
+
+@torch.no_grad()
+def guided_rollout(
+    model, tok,
+    user_prompt: str,
+    choice_token_ids: list,
+    max_think_tokens: int = 128,
+    answer_tokens: int = 4,
+    schema_hint: str = _DEFAULT_SCHEMA_HINT,
+    prefill: str = '\n{"choice": ',
+    verbose: bool = False,
+) -> GuidedResult:
+    device = next(model.parameters()).device
+    full_user = f"{user_prompt}\n\n{schema_hint}" if schema_hint else user_prompt
+    messages = [{"role": "user", "content": full_user}]
+    
+    try:
+        prompt = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    except TypeError:
+        prompt = tok.apply_chat_template(messages, tokenize=False)
+        
+    prompt = prompt + "<think>\n"
+
+    enc = tok(prompt, return_tensors="pt").to(device)
+    prompt_len = enc.input_ids.shape[1]
+
+    think_end_id = tok.convert_tokens_to_ids("</think>")
+    if think_end_id in (None, getattr(tok, "unk_token_id", None)):
+        think_end_id = tok.eos_token_id
+    pad_id = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
+
+    phase1 = model.generate(
+        **enc,
+        max_new_tokens=max_think_tokens,
+        do_sample=False,
+        eos_token_id=think_end_id,
+        pad_token_id=pad_id,
+    )
+    gen_ids = phase1[0, prompt_len:]
+    keep = gen_ids != pad_id
+    gen_ids = gen_ids[keep] if keep.any() else gen_ids[:0]
+    gen_text = tok.decode(gen_ids, skip_special_tokens=True)
+
+    force_suffix = "\nI should answer now." + _CLOSE_MARKER + prefill
+    emitted_close = _CLOSE_MARKER in gen_text
+    
+    if emitted_close:
+        think_text, after = gen_text.split(_CLOSE_MARKER, 1)
+        if prefill.lstrip() in after:
+            emitted_prefill = True
+            before_value = after.split(prefill.lstrip(), 1)[0]
+            scoring_text = prompt + think_text + _CLOSE_MARKER + before_value + prefill.lstrip()
+        else:
+            emitted_prefill = False
+            scoring_text = prompt + think_text + _CLOSE_MARKER + prefill
+    else:
+        think_text = gen_text
+        emitted_prefill = False
+        scoring_text = prompt + gen_text + force_suffix
+
+    score_ids = tok(scoring_text, return_tensors="pt", add_special_tokens=False).input_ids.to(device)
+
+    logits = model(score_ids).logits[0, -1].float()
+    logp = F.log_softmax(logits, dim=-1)
+
+    if (len(choice_token_ids) == 2 and all(isinstance(x, (list, tuple)) for x in choice_token_ids)):
+        a_ids, b_ids = list(choice_token_ids[0]), list(choice_token_ids[1])
+    else:
+        a_ids, b_ids = list(choice_token_ids), []
+        
+    all_ids = torch.tensor(a_ids + b_ids, device=device, dtype=torch.long)
+    pmass_format = float(logp[all_ids].exp().sum().item())
+    
+    if a_ids and b_ids:
+        a_t = torch.tensor(a_ids, device=device, dtype=torch.long)
+        b_t = torch.tensor(b_ids, device=device, dtype=torch.long)
+        logratio = float(torch.logsumexp(logp[a_t], dim=0).item() - torch.logsumexp(logp[b_t], dim=0).item())
+        p_true = float(torch.softmax(torch.stack([torch.logsumexp(logp[a_t], dim=0), torch.logsumexp(logp[b_t], dim=0)]), dim=0)[0].item())
+    else:
+        logratio = float("nan")
+        p_true = float("nan")
+
+    cont = model.generate(
+        score_ids,
+        max_new_tokens=answer_tokens,
+        do_sample=False,
+        pad_token_id=pad_id,
+    )
+    answer_ids = cont[0, score_ids.shape[1]:]
+    answer_text = tok.decode(answer_ids, skip_special_tokens=True)
+
+    raw_full_text = tok.decode(cont[0], skip_special_tokens=False)
+
+    return GuidedResult(
+        user_prompt=user_prompt,
+        think_text=think_text,
+        answer_text=answer_text,
+        raw_full_text=raw_full_text,
+        pmass_format=pmass_format,
+        logratio_ab=logratio,
+        rep_ratio_think=_ngram_rep_ratio(think_text, n=4),
+        think_tokens=int(score_ids.shape[1] - prompt_len),
+        emitted_close=emitted_close,
+        emitted_prefill=emitted_prefill,
+        p_true=p_true,
+    )
+
+def choice_token_ids_tf(tok) -> list[list[int]]:
+    def _variants(words):
+        seen = []
+        for s in words:
+            tid = tok.encode(s, add_special_tokens=False)[-1]
+            if tid not in seen:
+                seen.append(tid)
+        return seen
+    return [_variants(["true", " true", "\ntrue", "True", " True", "\nTrue", "1"]),
+            _variants(["false", " false", "\nfalse", "False", " False", "\nFalse", "0"])]

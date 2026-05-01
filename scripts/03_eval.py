@@ -36,6 +36,7 @@ def main() -> None:
     ap.add_argument("--tag", default="", help="label for output file")
     ap.add_argument("--batch-size", type=int, default=16)
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--max-think-tokens", type=int, default=64)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--dtype", default="bfloat16", choices=["float32", "float16", "bfloat16"])
     args = ap.parse_args()
@@ -66,7 +67,11 @@ def main() -> None:
     for p, i in zip(topk.values, topk.indices):
         logger.info(f"  {tok.decode([int(i)])!r:>15}  p={float(p):.3f}")
 
-    report = evaluate(model, tok, name=args.name, vignettes=rows, batch_size=args.batch_size, device=args.device)
+    report = evaluate(
+        model, tok, name=args.name, vignettes=rows,
+        batch_size=args.batch_size, device=args.device,
+        max_think_tokens=args.max_think_tokens
+    )
     df = report["table"]
 
     print(tabulate(df, headers="keys", floatfmt="+.3f", tablefmt="pipe", showindex=False))

@@ -178,19 +178,31 @@ async def rewrite_one(
     return scenario, None
 
 
+def make_rec(row: pd.Series, text: str) -> dict:
+    sc = row["Scenario"]
+    rec = {
+        "id": hkey(sc),
+        "foundation": row["Foundation"],
+        "foundation_coarse": row["foundation_coarse"],
+        "wrong": float(row["wrong"]) if pd.notna(row["wrong"]) else None,
+        "text": text,
+    }
+    for col in row.index:
+        if col not in ["Scenario", "Foundation", "foundation_coarse", "wrong", "Wrong"]:
+            val = row[col]
+            if pd.notna(val):
+                if hasattr(val, "item"):
+                    val = val.item()
+                rec[col] = val
+    return rec
+
+
 def write_verbatim(df: pd.DataFrame, out: Path) -> int:
     """other_violate is the verbatim source -- no LLM, never fails."""
     n = 0
     with out.open("w") as fh:
         for _, row in df.iterrows():
-            sc = row["Scenario"]
-            rec = {
-                "id": hkey(sc),
-                "foundation": row["Foundation"],
-                "foundation_coarse": row["foundation_coarse"],
-                "wrong": float(row["wrong"]) if pd.notna(row["wrong"]) else None,
-                "text": sc,
-            }
+            rec = make_rec(row, row["Scenario"])
             fh.write(json.dumps(rec) + "\n")
             n += 1
     return n
@@ -234,13 +246,7 @@ async def amain(args) -> None:
             if text is None:
                 n_fail += 1
                 continue
-            rec = {
-                "id": hkey(sc),
-                "foundation": row["Foundation"],
-                "foundation_coarse": row["foundation_coarse"],
-                "wrong": float(row["wrong"]) if pd.notna(row["wrong"]) else None,
-                "text": text,
-            }
+            rec = make_rec(row, text)
             fh.write(json.dumps(rec) + "\n")
             n_ok += 1
     logger.info(f"{cond}: ok={n_ok} fail={n_fail} -> {out}")
