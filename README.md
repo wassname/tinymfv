@@ -1,5 +1,7 @@
 # tiny-mfv (tiny moral-foundations vignettes)
 
+[:huggingface:](https://huggingface.co/datasets/wassname/tiny-mfv)
+
 Fast moral eval
 
 Example:
