@@ -214,10 +214,15 @@ def analyse(
     if bool_mass is not None:
         info["bool_mass_mean"] = float(sum(map(float, bool_mass)) / len(bool_mass))
 
+    raw_pmass = (
+        {f"{vid}|{cond}|{frame}": float(b) for (vid, _, cond, frame, _), b in zip(meta, bool_mass)}
+        if bool_mass is not None else {}
+    )
     return {
         "wrongness": float(df["s_other_violate"].mean()),
         "gap": float(df["gap"].mean()),
         "table": df,
         "raw": {f"{vid}|{cond}|{frame}": p for (vid, _, cond, frame, _), p in zip(meta, p_true)},
+        "raw_pmass": raw_pmass,
         "info": info,
     }
