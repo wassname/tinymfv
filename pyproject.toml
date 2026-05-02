@@ -24,7 +24,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-openrouter-wrapper = { path = "../daily-dilemmas-self/docs/openrouter_wrapper", editable = true }
+openrouter-wrapper = { git = "https://github.com/wassname/openrouter_wrapper" }
 
 [build-system]
 requires = ["hatchling"]

@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-24T21:37:25.067158427Z"
+exclude-newer = "2026-04-26T08:50:19.074804301Z"
 exclude-newer-span = "P6D"
 
 [[package]]
@@ -1279,7 +1279,7 @@ wheels = [
 [[package]]
 name = "openrouter-wrapper"
 version = "0.1.0"
-source = { editable = "../daily-dilemmas-self/docs/openrouter_wrapper" }
+source = { git = "https://github.com/wassname/openrouter_wrapper#da9ec349c29e2c91550c04ad1c2f4a984fefbf57" }
 dependencies = [
     { name = "httpx" },
     { name = "loguru" },
@@ -1287,22 +1287,6 @@ dependencies = [
     { name = "polars" },
     { name = "python-dotenv" },
     { name = "stamina" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "loguru", specifier = ">=0.7.3" },
-    { name = "numpy", specifier = ">=2.2.6" },
-    { name = "polars", specifier = ">=1.32.3" },
-    { name = "python-dotenv", specifier = ">=1.1.1" },
-    { name = "stamina", specifier = ">=25.1.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-asyncio", specifier = ">=1.2.0" },
 ]
 
 [[package]]
@@ -2054,7 +2038,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "openrouter-wrapper", editable = "../daily-dilemmas-self/docs/openrouter_wrapper" }]
+dev = [{ name = "openrouter-wrapper", git = "https://github.com/wassname/openrouter_wrapper" }]
 
 [[package]]
 name = "tokenizers"
