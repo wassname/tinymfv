@@ -32,26 +32,28 @@ Both axes are paired-out in `analyse()`:
 from __future__ import annotations
 import json
 from pathlib import Path
+from typing import Literal
 
 ROOT = Path(__file__).resolve().parents[2]
 HF_REPO = "wassname/tiny-mfv"
 CONDITIONS = ["other_violate", "self_violate"]
 
 # Canonical config names and aliases.
-CONFIGS = ("classic", "scifi", "airisk")
+CONFIGS: tuple[str, ...] = ("classic", "scifi", "airisk")
 _ALIASES = {"classic": "clifford", "clifford": "clifford"}  # classic→clifford on disk
+
+ConfigName = Literal["classic", "scifi", "airisk", "all"]
 
 
 def _resolve_name(name: str) -> str:
-    """Map user-facing name to the canonical file/HF key.
+    """Map user-facing name to the file/HF key.
 
-    Accepts 'classic' (preferred) or 'clifford' (legacy).
-    Returns the file-system key ('clifford' → empty suffix, others as-is).
+    'classic' and 'clifford' both resolve to 'clifford' (the on-disk key).
     """
     low = name.lower()
     if low in _ALIASES:
         return _ALIASES[low]
-    return low  # scifi, airisk pass through
+    return low
 
 
 def _local_path(name: str, condition: str) -> Path:
@@ -73,15 +75,17 @@ def load_condition(name: str, condition: str) -> list[dict]:
     return list(load_dataset(HF_REPO, cfg, split=condition))
 
 
-def load_vignettes(name: str | None = None) -> list[dict]:
-    """Inner-join the 2 violate conditions by id.
-
-    Returns rows with `other_violate`, `self_violate` keys plus
-    id / foundation / foundation_coarse / wrong.
+def load_vignettes(name: ConfigName = "all") -> list[dict]:
+    """Load vignettes by config name.
 
     Args:
-        name: One of 'classic' (alias: 'clifford'), 'scifi', 'airisk', or 'all'.
-              Must be specified — calling with no argument raises ValueError.
+        name: ``'classic'`` (Clifford et al. 2015), ``'scifi'``, ``'airisk'``,
+              or ``'all'`` (default — concatenates all three with a ``set`` column).
+              Legacy alias ``'clifford'`` also accepted.
+
+    Returns:
+        List of dicts with keys: ``id``, ``foundation``, ``foundation_coarse``,
+        ``wrong``, ``other_violate``, ``self_violate``, ``set``.
 
     The two condition columns (*cond* axis) contain the scenario text:
         - ``other_violate``: 3rd-person framing ("You see someone doing X")
@@ -91,12 +95,6 @@ def load_vignettes(name: str | None = None) -> list[dict]:
     time in ``format_prompts`` → ``analyse`` to cancel the JSON-true prior
     and measure perspective bias.  See module docstring for details.
     """
-    if name is None:
-        raise ValueError(
-            "load_vignettes() requires a config name. "
-            f"Choose one of: {', '.join(repr(c) for c in CONFIGS)}, or 'all'."
-        )
-
     if name.lower() == "all":
         return load_all_vignettes()
 
@@ -124,10 +122,7 @@ def load_vignettes(name: str | None = None) -> list[dict]:
 
 
 def load_all_vignettes() -> list[dict]:
-    """Load and concatenate all three configs (classic, scifi, airisk).
-
-    Returns the union with a ``set`` column indicating the source config.
-    """
+    """Load and concatenate all three configs with a ``set`` column."""
     all_rows = []
     for cfg in CONFIGS:
         all_rows.extend(load_vignettes(cfg))

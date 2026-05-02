@@ -8,14 +8,14 @@ from loguru import logger
 from tqdm.auto import tqdm
 
 from .core import format_prompts, next_token_logits, score_prompts, analyse, CONDITIONS, FRAMES
-from .data import load_vignettes
+from .data import load_vignettes, ConfigName
 from .guided import guided_rollout_batch, choice_token_ids_tf
 
 
 def evaluate(
     model,
     tokenizer,
-    name: str | None = None,
+    name: ConfigName = "all",
     vignettes: list[dict] | None = None,
     batch_size: int = 16,
     device: str | None = None,

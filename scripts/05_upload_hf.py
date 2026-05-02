@@ -2,7 +2,7 @@
 
 Creates / updates: wassname/tiny-mfv
 
-- config `clifford`: 132 vignettes from Clifford et al. (2015), Wrong ratings are human Likert.
+- config `classic` (alias `clifford`): 132 vignettes from Clifford et al. (2015), Wrong ratings are human Likert.
 - config `scifi`:    132 hand-written sci-fi/fantasy vignettes covering the same foundations.
 - config `airisk`:   132 hand-written AI-risk vignettes (deception, sandbagging, principal subversion, etc.)
                      mapped onto the MFT foundation taxonomy.
@@ -10,7 +10,7 @@ Creates / updates: wassname/tiny-mfv
 Each config has two splits:
 - `other_violate` -- verbatim 3rd-person source (no LLM call).
 - `self_violate`  -- 1st-person rewrite. For airisk this preserves the AI-as-actor
-                     framing ("You, an AI X bot, ..."); for clifford/scifi it's a plain
+                     framing ("You, an AI {X} bot, ..."); for classic/scifi it's a plain
                      "You ..." 1st-person shift.
 """
 from __future__ import annotations
@@ -21,17 +21,24 @@ from huggingface_hub import HfApi
 REPO_ID = "wassname/tiny-mfv"
 ROOT = Path(__file__).resolve().parents[1]
 
-CONFIGS = ["clifford", "scifi", "airisk"]
+# HF config name → local file key (clifford files have no suffix on disk).
+# "classic" is the user-facing name; on HF it's stored under "classic/" directory
+# but we also register a "clifford" alias so existing code doesn't break.
+CONFIGS = {
+    "classic": "",         # vignettes_other_violate.jsonl  (no suffix)
+    "scifi":   "scifi",    # vignettes_scifi_other_violate.jsonl
+    "airisk":  "airisk",   # vignettes_airisk_other_violate.jsonl
+}
 SPLITS = ["other_violate", "self_violate"]
 
 
-def local_jsonl(cfg: str, split: str) -> Path:
-    suf = "" if cfg == "clifford" else f"_{cfg}"
+def local_jsonl(file_key: str, split: str) -> Path:
+    suf = f"_{file_key}" if file_key else ""
     return ROOT / "data" / f"vignettes{suf}_{split}.jsonl"
 
 
-def local_csv(cfg: str) -> Path:
-    suf = "" if cfg == "clifford" else f"_{cfg}"
+def local_csv(file_key: str) -> Path:
+    suf = f"_{file_key}" if file_key else ""
     return ROOT / "data" / f"vignettes{suf}.csv"
 
 
@@ -51,6 +58,12 @@ def yaml_configs() -> str:
         for split in SPLITS:
             lines.append(f"    - split: {split}")
             lines.append(f"      path: {hf_jsonl(cfg, split)}")
+    # Register "clifford" as an alias for "classic" so existing code works.
+    lines.append("- config_name: clifford")
+    lines.append("  data_files:")
+    for split in SPLITS:
+        lines.append(f"    - split: {split}")
+        lines.append(f"      path: {hf_jsonl('classic', split)}")
     return "\n".join(lines)
 
 
@@ -87,14 +100,25 @@ For use with LLMs we make them
 
 ## Configs
 
-- clifford: 132 vignettes from Clifford et al. (2015) "Moral Foundations Vignettes". `wrong` is the human Likert mean (1-5).
-- scifi: 132 hand-written sci-fi/fantasy vignettes covering the same foundations. Genre-clean cues, no real-world ethnicity/religion confounds.
-- airisk: 132 hand-written AI-risk vignettes (deception, sandbagging, principal subversion, manipulation, surveillance) mapped onto the MFT taxonomy.
+- **classic** (alias: clifford): 132 vignettes from Clifford et al. (2015) "Moral Foundations Vignettes". `wrong` is the human Likert mean (1-5).
+- **scifi**: 132 hand-written sci-fi/fantasy vignettes covering the same foundations. Genre-clean cues, no real-world ethnicity/religion confounds.
+- **airisk**: 132 hand-written AI-risk vignettes (deception, sandbagging, principal subversion, manipulation, surveillance) mapped onto the MFT taxonomy.
 
 ## Splits (per config)
 
-- `other_violate` — verbatim 3rd-person source text. No LLM call. For clifford this means the verbatim text is in every LLM's training set, which is fine for tracking deltas across checkpoints (the offset is constant).
-- `self_violate`  — 1st-person rewrite of the same scenario. For clifford and scifi this is a plain `"You ..."` shift. For airisk the principal IS the AI, so the rewrite preserves the AI-as-actor framing as `"You, an AI X bot, ..."` (a naive `"You ..."` template silently swaps the actor archetype to human; verified by `06_consistency.py`).
+- `other_violate` — verbatim 3rd-person source text. No LLM call. For classic this means the verbatim text is in every LLM's training set, which is fine for tracking deltas across checkpoints (the offset is constant).
+- `self_violate`  — 1st-person rewrite of the same scenario. For classic and scifi this is a plain `"You ..."` shift. For airisk the principal IS the AI, so the rewrite preserves the AI-as-actor framing as `"You, an AI X bot, ..."` (a naive `"You ..."` template silently swaps the actor archetype to human; verified by `06_consistency.py`).
+
+## Dual axis: `cond` × `frame`
+
+Each vignette produces 4 prompts from two independent binary axes:
+
+| Axis | Values | What it controls |
+|------|--------|-----------------|
+| **cond** (scenario framing) | `other_violate` / `self_violate` | Which text variant the model reads |
+| **frame** (question framing) | `wrong` / `accept` | How the JSON probe is phrased |
+
+The two **frames** cancel the additive JSON-true prior. The two **conds** measure perspective bias (gap between judging others vs self).
 
 ## Eval
 
@@ -114,10 +138,10 @@ def main():
     print(f"repo: {REPO_ID}")
 
     files: list[tuple[Path, str]] = []
-    for cfg in CONFIGS:
-        files.append((local_csv(cfg), hf_csv(cfg)))
+    for cfg, file_key in CONFIGS.items():
+        files.append((local_csv(file_key), hf_csv(cfg)))
         for split in SPLITS:
-            files.append((local_jsonl(cfg, split), hf_jsonl(cfg, split)))
+            files.append((local_jsonl(file_key, split), hf_jsonl(cfg, split)))
 
     for src, dst in files:
         if not src.exists():
