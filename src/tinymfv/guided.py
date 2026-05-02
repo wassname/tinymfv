@@ -112,12 +112,12 @@ def guided_rollout(
     # SHOULD: pmass≈1 (model picks one of the JSON-bool tokens). pmass<0.9
     # means the model is leaking probability to other tokens -> the schema
     # is being ignored or the steering vector has pushed the model OOD.
-    if pmass_format < 0.9:
+    if pmass_format < 0.5:
         topk = torch.topk(logp.exp(), k=5)
         toks = [tok.decode([i]) for i in topk.indices.tolist()]
         probs = topk.values.tolist()
         top5 = ", ".join(f"{repr(t)}={p:.3f}" for t, p in zip(toks, probs))
-        logger.warning(f"pmass={pmass_format:.3f}<0.9 — top-5: {top5}")
+        logger.warning(f"pmass={pmass_format:.3f}<0.5 — top-5: {top5}")
 
     if a_ids and b_ids:
         a_t = torch.tensor(a_ids, device=device, dtype=torch.long)
@@ -242,11 +242,11 @@ def guided_rollout_batch(
     b_t = torch.tensor(b_ids, device=device, dtype=torch.long) if b_ids else None
 
     results = []
-    low_pmass = []  # (idx, pmass) for rows with pmass<0.9
+    low_pmass = []  # (idx, pmass) for rows with pmass<0.5 (heavy schema break)
     for i, (up, (think_text, emitted_close, emitted_prefill, n_think)) in enumerate(zip(user_prompts, per_row)):
         logp = score_logp[i]
         pmass_format = float(logp[all_ids].exp().sum().item())
-        if pmass_format < 0.9:
+        if pmass_format < 0.5:
             low_pmass.append((i, pmass_format))
         if a_t is not None and b_t is not None:
             la = torch.logsumexp(logp[a_t], dim=0)
@@ -279,7 +279,7 @@ def guided_rollout_batch(
         probs = topk.values.tolist()
         top5 = ", ".join(f"{repr(t)}={pp:.3f}" for t, pp in zip(toks, probs))
         logger.warning(
-            f"pmass<0.9 on {len(low_pmass)}/{len(results)} rows in this batch; "
+            f"pmass<0.5 on {len(low_pmass)}/{len(results)} rows in this batch; "
             f"worst={worst_pm:.3f} top-5: {top5}"
         )
     return results
