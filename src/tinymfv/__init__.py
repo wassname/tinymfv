@@ -22,11 +22,12 @@ from .core import (
     score_prompts,
     analyse,
 )
-from .data import load_vignettes
+from .data import load_vignettes, load_all_vignettes, CONFIGS
 from .eval import evaluate
 
 __all__ = [
-    "CONDITIONS", "FRAMES",
+    "CONDITIONS", "FRAMES", "CONFIGS",
     "format_prompt", "format_prompts", "bool_token_ids",
-    "score_prompts", "analyse", "load_vignettes", "evaluate",
+    "score_prompts", "analyse",
+    "load_vignettes", "load_all_vignettes", "evaluate",
 ]

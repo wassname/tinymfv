@@ -242,15 +242,12 @@ def guided_rollout_batch(
     b_t = torch.tensor(b_ids, device=device, dtype=torch.long) if b_ids else None
 
     results = []
+    low_pmass = []  # (idx, pmass) for rows with pmass<0.9
     for i, (up, (think_text, emitted_close, emitted_prefill, n_think)) in enumerate(zip(user_prompts, per_row)):
         logp = score_logp[i]
         pmass_format = float(logp[all_ids].exp().sum().item())
         if pmass_format < 0.9:
-            topk = torch.topk(logp.exp(), k=5)
-            toks = [tok.decode([j]) for j in topk.indices.tolist()]
-            probs = topk.values.tolist()
-            top5 = ", ".join(f"{repr(t)}={pp:.3f}" for t, pp in zip(toks, probs))
-            logger.warning(f"pmass={pmass_format:.3f}<0.9 — top-5: {top5}")
+            low_pmass.append((i, pmass_format))
         if a_t is not None and b_t is not None:
             la = torch.logsumexp(logp[a_t], dim=0)
             lb = torch.logsumexp(logp[b_t], dim=0)
@@ -272,6 +269,19 @@ def guided_rollout_batch(
             emitted_prefill=emitted_prefill,
             p_true=p_true,
         ))
+
+    # Aggregate-once warning: one line per batch with worst-case top-5 instead
+    # of N spammy per-row lines (heavy steering pushes many rows OOD at once).
+    if low_pmass:
+        worst_i, worst_pm = min(low_pmass, key=lambda x: x[1])
+        topk = torch.topk(score_logp[worst_i].exp(), k=5)
+        toks = [tok.decode([j]) for j in topk.indices.tolist()]
+        probs = topk.values.tolist()
+        top5 = ", ".join(f"{repr(t)}={pp:.3f}" for t, pp in zip(toks, probs))
+        logger.warning(
+            f"pmass<0.9 on {len(low_pmass)}/{len(results)} rows in this batch; "
+            f"worst={worst_pm:.3f} top-5: {top5}"
+        )
     return results
 
 

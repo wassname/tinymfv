@@ -15,7 +15,7 @@ from .guided import guided_rollout_batch, choice_token_ids_tf
 def evaluate(
     model,
     tokenizer,
-    name: str = "",
+    name: str | None = None,
     vignettes: list[dict] | None = None,
     batch_size: int = 16,
     device: str | None = None,
@@ -23,13 +23,15 @@ def evaluate(
 ) -> dict[str, Any]:
     """Run dual JSON-bool eval and return aggregated report.
 
-    Either pass `vignettes` directly or `name` to load from `data/`. Tokenizer must
-    have a chat template (or fallback flat format will be used) and `pad_token` set.
+    Either pass `vignettes` directly or `name` (one of 'classic', 'scifi',
+    'airisk', 'all') to load from `data/`. Tokenizer must have a chat template
+    (or fallback flat format will be used) and `pad_token` set.
     Side-effects: sets `tokenizer.padding_side='left'` and `tokenizer.pad_token` if
     missing -- both required for batched left-padded eval.
     """
     if vignettes is None:
         vignettes = load_vignettes(name)
+
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
