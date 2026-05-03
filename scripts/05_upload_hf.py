@@ -85,8 +85,7 @@ size_categories:
 ---
 
 # tiny-mfv
-**GitHub**: [wassname/tinymfv](https://github.com/wassname/tinymfv)  
-**HuggingFace**: [wassname/tiny-mfv](https://huggingface.co/datasets/wassname/tiny-mfv)
+[:octocat:](https://github.com/wassname/tinymfv)
 
 Fast moral eval
 

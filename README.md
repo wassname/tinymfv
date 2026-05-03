@@ -1,7 +1,6 @@
 # tiny-mfv (tiny moral-foundations vignettes)
 
-**GitHub**: [wassname/tinymfv](https://github.com/wassname/tinymfv)  
-**HuggingFace**: [wassname/tiny-mfv](https://huggingface.co/datasets/wassname/tiny-mfv)
+[:huggingface:](https://huggingface.co/datasets/wassname/tiny-mfv)
 
 Fast moral eval
 
