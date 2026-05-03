@@ -106,10 +106,11 @@ def load_vignettes(name: ConfigName = "all") -> list[dict]:
     common = set.intersection(*[set(d) for d in by_cond.values()])
     rows = []
     anchor = by_cond["other_violate"]
+    _CORE_KEYS = {"id", "foundation", "foundation_coarse", "wrong", "text"}
     for vid, ov in anchor.items():
         if vid not in common:
             continue
-        rows.append({
+        row = {
             "id": vid,
             "foundation": ov["foundation"],
             "foundation_coarse": ov["foundation_coarse"],
@@ -117,7 +118,12 @@ def load_vignettes(name: ConfigName = "all") -> list[dict]:
             "other_violate": ov["text"],
             "self_violate": by_cond["self_violate"][vid]["text"],
             "set": name.lower() if name.lower() != "clifford" else "classic",
-        })
+        }
+        # Pass through extra keys (e.g. human rater % columns)
+        for k, v in ov.items():
+            if k not in _CORE_KEYS and k not in row:
+                row[k] = v
+        rows.append(row)
     return rows
 
 
