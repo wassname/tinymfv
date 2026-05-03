@@ -135,8 +135,6 @@ Each vignette row includes LLM-generated multi-label ratings across all 7 founda
 
 | Column pattern | Scale | Description |
 |---|---|---|
-| `llm_Care`, `llm_Fairness`, … | 1–5 | Z-score-averaged Likert from forward + reverse frames |
-| `llm_wrongness` | 1–5 | Overall wrongness rating |
 | `llm_dominant` | string | Foundation with highest LLM score (argmax) |
 | `calibrated_Care`, `calibrated_Fairness`, … | 0–100% | LLM scores linearly mapped to human rater % scale |
 | `calibrated_wrongness` | 1–5 | Wrongness mapped to human scale |

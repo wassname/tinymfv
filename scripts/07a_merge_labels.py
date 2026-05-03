@@ -35,7 +35,7 @@ def main() -> None:
         for row in ml_lines:
             extra = {}
             for k, v in row.items():
-                if k.startswith("llm_") or k.startswith("calibrated_"):
+                if k.startswith("calibrated_") or k == "llm_dominant":
                     extra[k] = v
             extra_by_id[row["id"]] = extra
             
