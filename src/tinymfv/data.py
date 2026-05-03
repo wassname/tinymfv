@@ -9,7 +9,6 @@ Side artifact (not used by eval, kept for human-correlation sanity check):
     data/vignettes[_<name>]_origin.jsonl          (verbatim source, train-set risk)
 
 Each row: {id, foundation, foundation_coarse, wrong, text}.
-Falls back to HuggingFace `wassname/tiny-mfv` if local files absent.
 
 Dual-axis design
 ================
@@ -68,11 +67,9 @@ def _load_jsonl(p: Path) -> list[dict]:
 def load_condition(name: str, condition: str) -> list[dict]:
     """Load one condition file."""
     p = _local_path(name, condition)
-    if p.exists():
-        return _load_jsonl(p)
-    from datasets import load_dataset
-    cfg = name or "clifford"
-    return list(load_dataset(HF_REPO, cfg, split=condition))
+    if not p.exists():
+        raise FileNotFoundError(f"Missing required data file: {p}")
+    return _load_jsonl(p)
 
 
 def load_vignettes(name: ConfigName = "all") -> list[dict]:
