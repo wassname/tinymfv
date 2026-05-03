@@ -117,7 +117,7 @@ def guided_rollout(
         toks = [tok.decode([i]) for i in topk.indices.tolist()]
         probs = topk.values.tolist()
         top5 = ", ".join(f"{repr(t)}={p:.3f}" for t, p in zip(toks, probs))
-        logger.warning(f"pmass={pmass_format:.3f}<0.5 — top-5: {top5}")
+        logger.warning(f"pmass={pmass_format:.3f}<0.5 — top-5 ans tokens: {top5}. This could be a format issue")
 
     if a_ids and b_ids:
         a_t = torch.tensor(a_ids, device=device, dtype=torch.long)
