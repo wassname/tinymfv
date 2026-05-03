@@ -1,6 +1,7 @@
 # tiny-mfv (tiny moral-foundations vignettes)
 
-[:huggingface:](https://huggingface.co/datasets/wassname/tiny-mfv)
+**GitHub**: [wassname/tinymfv](https://github.com/wassname/tinymfv)  
+**HuggingFace**: [wassname/tiny-mfv](https://huggingface.co/datasets/wassname/tiny-mfv)
 
 Fast moral eval
 
@@ -102,5 +103,5 @@ vigs = load_vignettes("classic")   # or "scifi", "airisk"
 > **Note:** The legacy name `"clifford"` still works as an alias for `"classic"`.
 
 ### 5. Link & Citation
-GitHub: [wassname/tiny-mcf-vignettes](https://github.com/wassname/tiny-mcf-vignettes)
+GitHub: [wassname/tinymfv](https://github.com/wassname/tinymfv)
 

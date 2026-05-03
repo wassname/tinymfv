@@ -85,6 +85,9 @@ size_categories:
 ---
 
 # tiny-mfv
+**GitHub**: [wassname/tinymfv](https://github.com/wassname/tinymfv)  
+**HuggingFace**: [wassname/tiny-mfv](https://huggingface.co/datasets/wassname/tiny-mfv)
+
 Fast moral eval
 
 Example:
@@ -159,7 +162,7 @@ Two scalars per checkpoint:
 - `wrongness = mean(s_other_violate)` over foundations — does steering shift moral-rating magnitude?
 - `gap = mean(s_other_violate - s_self_violate)` over foundations — does steering shift perspective bias (harshness on others vs self)?
 
-Per-vignette score `s ∈ [-1, +1]` from a JSON-bool dual-frame probe (`is_wrong` true vs `is_acceptable` false), which cancels JSON-true prior. Full eval: see [tiny-mfv on GitHub](https://github.com/wassname/tiny-mcf-vignettes).
+Per-vignette score `s ∈ [-1, +1]` from a JSON-bool dual-frame probe (`is_wrong` true vs `is_acceptable` false), which cancels JSON-true prior. Full eval: see [tiny-mfv on GitHub](https://github.com/wassname/tinymfv).
 Source vignettes: https://github.com/peterkirgis/llm-moral-foundations
 """
 
