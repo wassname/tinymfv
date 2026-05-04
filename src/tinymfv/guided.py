@@ -22,6 +22,11 @@ class GuidedResult:
     emitted_close: bool
     emitted_prefill: bool
     p_true: float
+    # Mean negative-log-likelihood per token over the scoring text (prompt +
+    # think + JSON-prefix). Free: we already compute full-sequence logits,
+    # just gather instead of slicing [:, -1]. Higher = model less coherent
+    # on this prompt under whatever steering is attached.
+    prompt_nll: float = float("nan")
 
 _REP_MIN_TOKENS: int = 32
 
@@ -98,8 +103,14 @@ def guided_rollout(
 
     score_ids = tok(scoring_text, return_tensors="pt", add_special_tokens=False).input_ids.to(device)
 
-    logits = model(score_ids).logits[0, -1].float()
-    logp = F.log_softmax(logits, dim=-1)
+    full_logits = model(score_ids).logits[0].float()  # [T, V]
+    # Per-token NLL over the scoring text. Predicting position t from t-1.
+    full_logp = F.log_softmax(full_logits, dim=-1)
+    target_ids = score_ids[0, 1:]
+    pred_logp = full_logp[:-1].gather(-1, target_ids.unsqueeze(-1)).squeeze(-1)
+    prompt_nll = float(-pred_logp.mean().item()) if pred_logp.numel() else float("nan")
+    logits = full_logits[-1]
+    logp = full_logp[-1]
 
     if (len(choice_token_ids) == 2 and all(isinstance(x, (list, tuple)) for x in choice_token_ids)):
         a_ids, b_ids = list(choice_token_ids[0]), list(choice_token_ids[1])
@@ -151,6 +162,7 @@ def guided_rollout(
         emitted_close=emitted_close,
         emitted_prefill=emitted_prefill,
         p_true=p_true,
+        prompt_nll=prompt_nll,
     )
 
 @torch.no_grad()
@@ -230,8 +242,15 @@ def guided_rollout_batch(
 
     score_enc = tok(scoring_texts, return_tensors="pt", padding=True,
                     add_special_tokens=False).to(device)
-    score_logits = model(**score_enc).logits[:, -1].float()
-    score_logp = F.log_softmax(score_logits, dim=-1)
+    full_logits = model(**score_enc).logits.float()  # [B, T, V]
+    full_logp = F.log_softmax(full_logits, dim=-1)
+    # Per-row mean NLL over non-pad positions of the scoring text. Free
+    # coherence proxy under whatever steering is attached.
+    target_ids = score_enc.input_ids[:, 1:]
+    pred_logp = full_logp[:, :-1].gather(-1, target_ids.unsqueeze(-1)).squeeze(-1)
+    mask = (target_ids != pad_id).float()
+    nll_per_row = (-pred_logp * mask).sum(-1) / mask.sum(-1).clamp(min=1)
+    score_logp = full_logp[:, -1]
 
     if (len(choice_token_ids) == 2 and all(isinstance(x, (list, tuple)) for x in choice_token_ids)):
         a_ids, b_ids = list(choice_token_ids[0]), list(choice_token_ids[1])
@@ -268,6 +287,7 @@ def guided_rollout_batch(
             emitted_close=emitted_close,
             emitted_prefill=emitted_prefill,
             p_true=p_true,
+            prompt_nll=float(nll_per_row[i].item()),
         ))
 
     # Aggregate-once warning: one line per batch with worst-case top-5 instead
