@@ -96,7 +96,11 @@ def evaluate(
                     pbar.update(len(chunk))
 
         elapsed = time.time() - t0
-        logger.info(f"guided eval: {elapsed:.1f}s ({len(p_true_list)/elapsed:.1f} prompts/s)")
+        pmass_mean = sum(bool_mass_list) / len(bool_mass_list)
+        logger.info(
+            f"guided eval: {elapsed:.1f}s ({len(p_true_list)/elapsed:.1f} prompts/s) "
+            f"pmass={pmass_mean:.3f}"
+        )
 
         report = analyse(p_true_list, meta, bool_mass=bool_mass_list)
         
