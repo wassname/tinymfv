@@ -153,7 +153,6 @@ def analyse(
     p_true: torch.Tensor | list[float],
     meta: list[tuple],
     bool_mass: torch.Tensor | list[float] | None = None,
-    prompt_nll: list[float] | None = None,
 ) -> dict[str, Any]:
     """Aggregate raw p_true per (vid, cond, frame) into per-foundation scores.
 
@@ -214,17 +213,10 @@ def analyse(
     }
     if bool_mass is not None:
         info["bool_mass_mean"] = float(sum(map(float, bool_mass)) / len(bool_mass))
-    if prompt_nll is not None:
-        nlls = list(map(float, prompt_nll))
-        info["prompt_nll_mean"] = float(sum(nlls) / len(nlls))
 
     raw_pmass = (
         {f"{vid}|{cond}|{frame}": float(b) for (vid, _, cond, frame, _), b in zip(meta, bool_mass)}
         if bool_mass is not None else {}
-    )
-    raw_nll = (
-        {f"{vid}|{cond}|{frame}": float(n) for (vid, _, cond, frame, _), n in zip(meta, prompt_nll)}
-        if prompt_nll is not None else {}
     )
     return {
         "wrongness": float(df["s_other_violate"].mean()),
@@ -232,6 +224,5 @@ def analyse(
         "table": df,
         "raw": {f"{vid}|{cond}|{frame}": p for (vid, _, cond, frame, _), p in zip(meta, p_true)},
         "raw_pmass": raw_pmass,
-        "raw_nll": raw_nll,
         "info": info,
     }
