@@ -42,24 +42,44 @@ _DEFAULT_SCHEMA_HINT: str = (
 )
 
 
+_ASSISTANT_SENTINEL: str = "ZZUNIQ_ASSISTANT_SENTINEL_ZZ"
+
+
+def _assistant_close(tok) -> str:
+    """Probe the chat template for whatever closes an assistant turn (e.g. `<|im_end|>\\n`
+    on Qwen/ChatML, `<|eot_id|>` on Llama3). Tokenizer-agnostic: mimics what a chat UI
+    emits when a human stops a partial assistant turn before sending the next user message.
+
+    We find a unique sentinel inside a closed assistant turn and return what follows it.
+    Probing via opened-vs-closed-prefix-diff doesn't work on Qwen3 because the template
+    auto-injects an empty `<think></think>` block in non-generation-prompt mode."""
+    closed = tok.apply_chat_template(
+        [{"role": "user", "content": "_"},
+         {"role": "assistant", "content": _ASSISTANT_SENTINEL}],
+        tokenize=False,
+    )
+    assert _ASSISTANT_SENTINEL in closed, f"sentinel not found in template output: {closed!r}"
+    return closed.split(_ASSISTANT_SENTINEL, 1)[1]
+
+
 def _scoring_text(tok, prompt: str, think_text: str, prefill: str) -> str:
     """Build scoring text by manual concat: phase-1 prompt (which already ends with
-    `<think>\\n`) + think_text + `</think>` (mid-assistant-turn) + `<|im_end|>\\n` (close
-    turn) + new user nudge + new assistant prefill (via apply_chat_template).
+    `<think>\\n`) + think_text + `</think>` (mid-assistant-turn) + assistant-turn-close
+    (probed from chat template) + new user nudge + new assistant prefill.
 
     Why manual instead of round-tripping through messages: Qwen3's chat template strips
     <think>...</think> from non-final assistant messages, so passing [user, assistant_with_
     think, user(nudge), assistant(prefill)] would drop the think entirely. Keeping the think
-    in place mid-turn and closing cleanly with <|im_end|> matches the multibool prefix
-    pattern -- chat-tuned data has plenty of interrupted-then-renudged exchanges, so the
-    turn-boundary close is on-policy where the prior `\\nI should answer now.</think>`
-    splice was OOD. Hardcoded <|im_end|> matches Qwen3 / ChatML format."""
+    in place mid-turn and closing cleanly via the probed close marker matches what a chat UI
+    emits when a human interrupts a partial assistant turn -- on-policy in chat-tuned data,
+    where the prior `\\nI should answer now.</think>` splice was OOD."""
+    close = _assistant_close(tok)
     suffix = tok.apply_chat_template(
         [{"role": "user",      "content": _NUDGE},
          {"role": "assistant", "content": prefill}],
         tokenize=False, continue_final_message=True,
     )
-    return prompt + think_text + _CLOSE_MARKER + "<|im_end|>\n" + suffix
+    return prompt + think_text + _CLOSE_MARKER + close + suffix
 
 
 def _split_choice_ids(choice_token_ids: list) -> tuple[list[int], list[int]]:
@@ -77,6 +97,7 @@ def guided_rollout(
     answer_tokens: int = 4,
     schema_hint: str = _DEFAULT_SCHEMA_HINT,
     prefill: str = '{"choice": ',
+    verbose: bool = False,
 ) -> GuidedResult:
     device = next(model.parameters()).device
     full_user = f"{user_prompt}\n\n{schema_hint}" if schema_hint else user_prompt
@@ -111,6 +132,8 @@ def guided_rollout(
     think_text = gen_text.split(_CLOSE_MARKER, 1)[0] if emitted_close else gen_text
 
     scoring_text = _scoring_text(tok, prompt, think_text, prefill)
+    if verbose:
+        logger.info(f"--- scoring_text ---\n{scoring_text}\n--- end ---")
     score_ids = tok(scoring_text, return_tensors="pt", add_special_tokens=False).input_ids.to(device)
 
     full_logits = model(score_ids).logits[0].float()  # [T, V]
