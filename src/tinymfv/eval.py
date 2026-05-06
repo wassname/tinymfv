@@ -1,6 +1,5 @@
 """High-level entrypoint: model + tokenizer + vignettes -> report."""
 from __future__ import annotations
-import math
 import time
 from typing import Any
 
@@ -71,7 +70,7 @@ def evaluate(
             f"batch_size={batch_size}. If OOM, lower batch_size."
         )
 
-        p_true_list, meta, bool_mass_list, nll_list = [], [], [], []
+        p_true_list, meta, bool_mass_list = [], [], []
         total = sum(len(v) for v in items_per_frame.values())
         with tqdm(total=total, desc="Evaluating") as pbar:
             for frame, items in items_per_frame.items():
@@ -94,18 +93,16 @@ def evaluate(
                         p_true_list.append(res.p_true)
                         meta.append((vid, found, cond, fr_name, wrong))
                         bool_mass_list.append(res.pmass_format)
-                        nll_list.append(res.prompt_nll)
                     pbar.update(len(chunk))
 
         elapsed = time.time() - t0
         pmass_mean = sum(bool_mass_list) / len(bool_mass_list)
-        nll_mean = sum(nll_list) / len(nll_list)
         logger.info(
             f"guided eval: {elapsed:.1f}s ({len(p_true_list)/elapsed:.1f} prompts/s) "
-            f"pmass={pmass_mean:.3f} ppl={math.exp(nll_mean):.2f} (nll={nll_mean:.3f})"
+            f"pmass={pmass_mean:.3f}"
         )
 
-        report = analyse(p_true_list, meta, bool_mass=bool_mass_list, prompt_nll=nll_list)
+        report = analyse(p_true_list, meta, bool_mass=bool_mass_list)
         
     else:
         logger.info("Using standard batched next_token_logits")
