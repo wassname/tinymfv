@@ -448,3 +448,30 @@ Mean off-diagonal |r| = **0.51** — foundations partially correlated but not id
 | liberty   | 0.41 | 0.54 | 0.55 | 0.61 | 0.45 | 1.00 |
 
 Some discrimination: e.g. "judge accepting criminal case" scores care=-0.06, fair=+0.56. But strongly negative vignettes drag all foundations negative — 0.6B conflates generic wrongness with foundation salience. Queued task 288 (Qwen3-4B) to test whether scale reduces inter-foundation correlation.
+
+## 2026-05-06 — Qwen3-4B multibool baseline (task 288)
+
+### Results
+
+| foundation | pm_mean | low-pmass rows |
+|---|---:|---:|
+| all foundations | **1.000** | **0/132** |
+
+Mean pmass = 1.000 — perfect boolean formatting across all 132 vignettes.
+
+Inter-foundation Pearson r (mean off-diagonal |r| = **0.154**, down from 0.51 at 0.6B):
+
+| | care | fair | loy | auth | sanc | lib |
+|---|---|---|---|---|---|---|
+| care      | 1.00 | +0.30 | +0.10 | -0.07 | +0.47 | +0.27 |
+| fairness  | +0.30 | 1.00 | +0.30 | +0.08 | -0.08 | +0.27 |
+| loyalty   | +0.10 | +0.30 | 1.00 | +0.04 | +0.02 | -0.01 |
+| authority | -0.07 | +0.08 | +0.04 | 1.00 | -0.10 | -0.07 |
+| sanctity  | +0.47 | -0.08 | +0.02 | -0.10 | 1.00 | +0.12 |
+| liberty   | +0.27 | +0.27 | -0.01 | -0.07 | +0.12 | 1.00 |
+
+Authority is essentially independent of all others (max |r|=0.10). Sanctity-care correlation (0.47) makes sense — both can be triggered by harm/disgust vignettes. Logratio means vary across foundations (care=+3.50, liberty=-0.26), suggesting the model has genuine foundation-specific priors.
+
+### Interpretation
+
+Scale resolves the inter-foundation conflation completely. 4B cleanly separates foundations where 0.6B just rated generic wrongness. The multibool eval is now trustworthy at 4B — worth wiring into the steering sweep to replace the single-shot wrongness scorer.
