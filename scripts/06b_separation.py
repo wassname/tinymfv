@@ -1,8 +1,8 @@
 """Panel separation check: do decorrelated cheap LLMs identify a single
 moral foundation per item, and does the panel agree on which one?
 
-Run on `classic` (Clifford), `scifi`, and `clifford_ai` to compare separation.
-The hypothesis: classic and clifford_ai should look similar (both single-
+Run on `classic`, `scifi`, and `ai-actor` to compare separation.
+The hypothesis: classic and ai-actor should look similar (both single-
 foundation by construction); the deprecated `airisk` set was multi-foundation
 and judges disagreed.
 
@@ -267,7 +267,7 @@ async def run_config(name: str, args, panel: tuple[str, ...]) -> dict:
 
 async def amain(args) -> None:
     panel = tuple(args.panel.split(",")) if args.panel else DEFAULT_PANEL
-    names = args.names or ["classic", "scifi", "clifford_ai"]
+    names = args.names or ["classic", "scifi", "ai-actor"]
     summaries = []
     for name in names:
         try:
@@ -303,7 +303,7 @@ async def amain(args) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--names", nargs="*", default=None,
-                    help="configs to evaluate (default: classic scifi clifford_ai)")
+                    help="configs to evaluate (default: classic scifi ai-actor)")
     ap.add_argument("--panel", default="",
                     help="comma-separated OR model ids; empty = default 4-judge panel")
     ap.add_argument("--limit", type=int, default=0)

@@ -1,0 +1,14 @@
+2026-05-08 15:35:27.661 | INFO     | __main__:main:51 - loaded 132 classic vignettes
+2026-05-08 15:35:27.662 | INFO     | __main__:main:54 - loading Qwen/Qwen3-4B on cuda dtype=bfloat16
+Loading weights:   0%|          | 0/398 [00:00<?, ?it/s]Loading weights:  46%|████▌     | 184/398 [00:00<00:00, 1838.51it/s]Loading weights:  96%|█████████▋| 384/398 [00:00<00:00, 1929.19it/s]Loading weights: 100%|██████████| 398/398 [00:00<00:00, 1962.51it/s]
+
+=== first-token resolution ===
+          'care' ->  10506 'care'  (full: [10506])
+      'fairness' ->  40900 'fair'  (full: [40900, 2090])
+       'loyalty' ->   1989 'loy'  (full: [1989, 10026])
+     'authority' ->  84454 'authority'  (full: [84454])
+      'sanctity' ->  33082 'san'  (full: [33082, 302, 487])
+       'liberty' ->   2740 'lib'  (full: [2740, 1344])
+        'social' ->  22386 'social'  (full: [22386])
+forced-choice classic:   0%|          | 0/264 [00:00<?, ?it/s][transformers] The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+forced-choice classic:   3%|▎         | 8/264 [00:19<10:33,  2.48s/it]forced-choice classic:   6%|▌         | 16/264 [00:39<10:09,  2.46s/it]forced-choice classic:   9%|▉         | 24/264 [01:04<11:09,  2.79s/it]forced-choice classic:  12%|█▏        | 32/264 [01:30<11:25,  2.95s/it]

@@ -11,7 +11,7 @@ Judge sees two anchors in-context for calibration:
 The judge then classifies the test pair as "same" or "different" with a reason.
 We surface "different" verdicts as candidates for re-rewrite.
 
-For clifford_ai specifically the actor in the source IS the AI, so the rewrite uses
+For ai-actor specifically the actor in the source IS the AI, so the rewrite uses
 "You, an AI X bot, ..." to preserve the actor archetype across the perspective
 shift. v1 used a generic "You ..." template and 16/132 were correctly flagged
 by the judge as actor-archetype mismatches; v2 (the AI-as-actor template in
@@ -58,7 +58,7 @@ ANCHORS = {
 
 JUDGE_PROMPT = """Task: decide whether two short scenarios describe the SAME situation (same actor archetype, same action, same wrongdoing, same severity), allowing paraphrase and a 3rd-person -> 1st-person perspective shift.
 
-Note: in clifford_ai scenarios the AI is the actor; "You see an AI bot doing X" and "You, an AI bot, do X" are SAME (actor archetype preserved across perspective).
+Note: in ai-actor scenarios the AI is the actor; "You see an AI bot doing X" and "You, an AI bot, do X" are SAME (actor archetype preserved across perspective).
 
 Examples for calibration:
 
@@ -208,7 +208,7 @@ async def amain(args) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="x-ai/grok-4-fast")
-    ap.add_argument("--name", default="", help="config; '' = clifford default")
+    ap.add_argument("--name", default="classic", choices=["classic", "scifi", "ai-actor"])
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--concurrency", type=int, default=16)
     args = ap.parse_args()

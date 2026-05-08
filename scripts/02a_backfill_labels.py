@@ -1,4 +1,4 @@
-"""Backfill rater-distribution columns from clifford into scifi.
+"""Backfill rater-distribution columns from classic into scifi.
 
 The Clifford et al. 2015 vignettes carry per-foundation rater % columns
 (Care, Fairness, Loyalty, Authority, Sanctity, Liberty, Not Wrong) from the
@@ -6,8 +6,8 @@ original survey. The scifi variant is a 1:1 port (132 rows, same
 order, same coarse foundation per row), so we copy the rater distribution
 across by row index. Each variant keeps its own `Wrong` (different scale).
 
-Note: clifford_ai also has matching rater columns -- but those are produced
-directly by 02b_transcribe_clifford_ai.py from the source rows, so it does
+Note: ai-actor also has matching rater columns -- but those are produced
+directly by 02b_transcribe_ai_actor.py from the source rows, so it does
 not need a backfill step.
 
 Updates two derived layers:
@@ -31,7 +31,7 @@ import pandas as pd
 from loguru import logger
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "data" / "vignettes.csv"
+SRC = ROOT / "data" / "vignettes_classic.csv"
 NAMES = ["scifi"]
 CONDITIONS = ["other_violate", "self_violate"]
 COPY_COLS = ["Care", "Fairness", "Loyalty", "Authority", "Sanctity", "Liberty", "Not Wrong"]
@@ -47,13 +47,13 @@ def hkey(text: str) -> str:
 
 def patch_csv(src: pd.DataFrame, tgt_path: Path) -> pd.DataFrame:
     tgt = pd.read_csv(tgt_path)
-    assert len(tgt) == len(src), f"{tgt_path.name}: {len(tgt)} rows, clifford has {len(src)}"
+    assert len(tgt) == len(src), f"{tgt_path.name}: {len(tgt)} rows, classic has {len(src)}"
     src_coarse = src["Foundation"].map(coarse)
     tgt_coarse = tgt["Foundation"].map(coarse)
     bad = [(i, src_coarse[i], tgt_coarse[i]) for i in range(len(src)) if src_coarse[i] != tgt_coarse[i]]
     if bad:
         for b in bad[:10]:
-            logger.error(f"{tgt_path.name} row {b[0]}: clifford={b[1]!r} target={b[2]!r}")
+            logger.error(f"{tgt_path.name} row {b[0]}: classic={b[1]!r} target={b[2]!r}")
         raise ValueError(f"{tgt_path.name}: {len(bad)} foundation_coarse mismatches")
 
     for col in COPY_COLS:
@@ -88,7 +88,7 @@ def patch_jsonl(tgt: pd.DataFrame, jsonl_path: Path) -> None:
 
 def main() -> None:
     src = pd.read_csv(SRC)
-    assert all(c in src.columns for c in COPY_COLS), f"clifford missing cols: {set(COPY_COLS) - set(src.columns)}"
+    assert all(c in src.columns for c in COPY_COLS), f"classic missing cols: {set(COPY_COLS) - set(src.columns)}"
 
     for name in NAMES:
         tgt_csv = ROOT / "data" / f"vignettes_{name}.csv"

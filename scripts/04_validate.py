@@ -204,7 +204,7 @@ async def amain(args) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="x-ai/grok-4-fast")
-    ap.add_argument("--name", default="", help="config name; '' = clifford default, else reads vignettes_<name>_rewritten.jsonl")
+    ap.add_argument("--name", default="classic", choices=["classic", "scifi", "ai-actor"])
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--concurrency", type=int, default=16)
     args = ap.parse_args()
