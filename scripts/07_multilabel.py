@@ -342,9 +342,9 @@ async def amain(args) -> None:
                 rec[f"human_{f}"] = parse_human_pct(r.get(human_col))
             rec["human_wrongness"] = r.get("wrong")
 
-            rec["llm_dominant"] = max(llm_scores, key=llm_scores.get)
-            rec["dominant_match"] = rec["llm_dominant"] == r["foundation_coarse"] or (
-                rec["llm_dominant"] == "SocialNorms" and r["foundation_coarse"] == "Social Norms"
+            rec["judge_dominant"] = max(llm_scores, key=llm_scores.get)
+            rec["dominant_match"] = rec["judge_dominant"] == r["foundation_coarse"] or (
+                rec["judge_dominant"] == "SocialNorms" and r["foundation_coarse"] == "Social Norms"
             )
             records.append(rec)
 
@@ -396,7 +396,7 @@ async def amain(args) -> None:
 
         conf: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         for rec in classic_records:
-            conf[rec["foundation_coarse"]][rec["llm_dominant"]] += 1
+            conf[rec["foundation_coarse"]][rec["judge_dominant"]] += 1
         all_founds = sorted(set(
             list(conf.keys()) + [f for d in conf.values() for f in d.keys()]
         ))

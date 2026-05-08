@@ -590,3 +590,67 @@ Qwen3-4B, mean_diff, 20-round iterated steer, vignettes=clifford (132 Clifford e
 ### Conclusion
 
 mean_diff iterated steering on Qwen3-4B does not achieve foundation-selective axis rotation regardless of vignette set. The persona pairs (good-AI vs deferential-AI) co-vary all foundations simultaneously. To get selective Authority steering, need contrastive pairs that vary Authority while holding Care, Sanctity, and Fairness fixed — e.g., scenarios where defying authority is clearly harm-neutral, or authority compliance clearly causes harm.
+
+## 2026-05-08 — forced-choice foundation probe replaces bool/multibool eval
+
+### Change
+
+Deleted the old JSON-bool and multibool eval path from the public package. The
+canonical eval is now a 7-way forced-choice probe over:
+
+```
+care, fairness, loyalty, authority, sanctity, liberty, social
+```
+
+For each scenario, score the first token of each option, run the enum order both
+forward and reversed, average log-probs, then softmax. This gives one foundation
+distribution per row. The reversal is important: it cancels most position bias
+without adding another objective or another loss-like score.
+
+### Data/schema cleanup
+
+- Canonical configs are now `classic`, `scifi`, and `ai-actor`.
+- `classic` is the only name for the source set; the old alias is gone and now
+    fails loudly.
+- `human_*` is the eval target. For `classic`, these are the Clifford et al.
+    human percentages. For `scifi` and `ai-actor`, they are inherited from the
+    parent `classic` item because the rewrite preserves the intended violated
+    foundation.
+- `ai_*` is diagnostic metadata from the grok-4-fast multi-label judge, post-hoc
+    rescaled on `classic`. It is not the target used by `evaluate()`.
+- Final jsonls no longer expose `llm_*` or `calibrated_*` schema columns.
+
+### Validation evidence
+
+Qwen3-4B on `classic` with the forced-choice probe:
+
+| check | result | why it matters |
+|---|---:|---|
+| top-1 vs human argmax | 82.6% | chance is 14.3% |
+| mean JS(model, human) | 0.16 nats | bounded by ln 2 = 0.69 |
+| median JS(model, human) | 0.10 nats | typical row is close |
+| median top-1 probability | 1.00 | model usually commits to one foundation |
+
+Per-class recall: Care 0.97, Fairness 1.00, Sanctity 1.00, Authority 0.88,
+SocialNorms 0.69, Loyalty 0.56, Liberty 0.53.
+
+Fresh smoke after the rename: `load_vignettes()` returns 132 rows for all three
+configs and emits numeric `human_*` columns. `load_vignettes("clifford")` raises
+`ValueError`. A Qwen3-0.6B smoke on the first four `ai-actor` items returned
+8/8 labelled rows, `top1_acc=0.75`, `mean_js=0.179`.
+
+### Factor-collapse check
+
+Cross-foundation correlations do not show one generic badness axis. Human labels,
+grok labels, and Qwen3-4B predictions all had mean off-diagonal correlation about
+-0.16, as expected for a mutually-exclusive 7-way distribution. The notable
+positive was Grok Loyalty-Authority (+0.23), which matches the standard
+binding-foundations cluster rather than a probe failure.
+
+### Interpretation
+
+The old bool/multibool paths measured generic wrongness too easily. Forced-choice
+matches the human target better because it asks the same question the labels
+answer: which foundation is most salient here? The remaining weak spots (Liberty,
+Loyalty, SocialNorms) are useful model diagnostics rather than evidence that the
+probe collapsed.

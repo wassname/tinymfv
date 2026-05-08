@@ -9,3 +9,4 @@ data/*.csv
 dist/
 build/
 results/
+logs_*.log
