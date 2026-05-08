@@ -73,10 +73,17 @@ def _rollout_kv_fork(
     choice_token_ids: list,                 # [a_ids, b_ids]
     verbose: bool = False,
     gather_token_ids: list[int] | None = None,
-) -> tuple[list[tuple[str, int, bool]], list[list[dict]]]:
-    """Returns (thinks, slots).
+) -> tuple[list[tuple[str, int, bool]], list[list[dict]], list[float]]:
+    """Returns (thinks, slots, nll_prompts).
     thinks[i] = (think_text, n_think_tokens, emitted_close)
     slots[i][j] = {pmass_format, logratio, p_true, [lp_gather]}
+    nll_prompts[i] = mean teacher-forcing NLL (nats/token) on the user-side chat
+        tokens of row i (excluding the very first chat token, which has no
+        in-prompt context). Computed from the Phase-2a prefix forward, so it's
+        free vs the existing rollout. Use as a coherence/degradation probe:
+        a steered or perturbed model that breaks normal text representation
+        will see nll_prompt rise (the model is "more surprised" by ordinary
+        prompt text).
 
     If `gather_token_ids` is provided, slot dict also has `lp_gather`: list[float]
     of log-probs at last suffix position for those token ids (in the same order).
@@ -110,8 +117,15 @@ def _rollout_kv_fork(
     )
 
     # === Build per-row scoring prefix: chat + think + </think> ===
+    # Also retokenise the chat alone so we can locate the user-prompt span
+    # inside sp_ids for free prompt-NLL below. We assert prefix-equality so
+    # tokenizer boundary merges (rare, but possible across `<think>\n` →
+    # think-text) crash loudly rather than silently misaligning the NLL window.
     sp_per_row: list[str] = []
     sp_ids_per_row: list[list[int]] = []
+    chat_ids_per_row: list[list[int]] = [
+        tok(c, add_special_tokens=False)["input_ids"] for c in chats
+    ]
     thinks: list[tuple[str, int, bool]] = []
     for i, p in enumerate(chats):
         gen_ids = phase1[i, prompt_len:]
@@ -140,6 +154,31 @@ def _rollout_kv_fork(
         pref_real[i] = L
     pref_out = model(input_ids=pref_input, attention_mask=pref_attn, use_cache=True)
     cache = pref_out.past_key_values
+
+    # === Per-row prompt NLL (free; reuses pref_out.logits) ===
+    # Teacher-forcing on the chat tokens (= rendered user turn + generation
+    # prompt). We skip the first chat token because position-(start-1) is a
+    # left-pad slot, so its prediction is meaningless. Per-row slicing keeps
+    # peak memory low (avoids a full [B, P_max, V] log_softmax).
+    nll_prompts: list[float] = []
+    for i in range(B):
+        L_pref = int(pref_real[i].item())
+        chat_ids_i = chat_ids_per_row[i]
+        chat_len = len(chat_ids_i)
+        assert sp_ids_per_row[i][:chat_len] == chat_ids_i, (
+            f"chat retokenisation diverged from prefix at row {i}: "
+            f"boundary tokens shifted between chat and chat+think+close. "
+            f"prompt-NLL window cannot be located safely."
+        )
+        if chat_len < 2:
+            nll_prompts.append(float("nan"))
+            continue
+        start = P_max - L_pref
+        logits_slice = pref_out.logits[i, start : start + chat_len - 1].float()
+        targets = pref_input[i, start + 1 : start + chat_len]
+        logp = F.log_softmax(logits_slice, dim=-1)
+        nll = -logp.gather(-1, targets[:, None]).squeeze(-1).mean()
+        nll_prompts.append(float(nll.item()))
 
     # === Phase 2b: per-slot KV-fork ===
     a_ids, b_ids = _split_choice_ids(choice_token_ids)
@@ -222,7 +261,7 @@ def _rollout_kv_fork(
                 d["lp_gather"] = lp_last[i, gid_t].cpu().tolist()
             slots[i].append(d)
 
-    return thinks, slots
+    return thinks, slots, nll_prompts
 
 
 # ===== Forced-choice (K-way primary foundation) =====
@@ -297,6 +336,11 @@ class ForcedChoiceResult:
     margin: float          # score[top1] - score[top2], in nats
     think_tokens: int
     emitted_close: bool
+    # Mean teacher-forcing NLL (nats/token) on the user-side chat tokens,
+    # averaged across the fwd and rev framings. Free coherence/degradation
+    # signal: rises when the model is perturbed (steering, ablation, etc.)
+    # to a state where ordinary prompt text becomes "surprising".
+    nll_prompt: float
 
 
 def _resolve_first_token_ids(tok, words: list[str]) -> tuple[list[int], dict[str, int]]:
@@ -374,7 +418,7 @@ def guided_rollout_forced_choice(
     scoring_slot = [(nudge, prefill)]
 
     # Frame A: forward enum order.
-    thinks_fwd, slots_fwd = _rollout_kv_fork(
+    thinks_fwd, slots_fwd, nll_fwd = _rollout_kv_fork(
         model, tok, user_prompts, schema_fwd, max_think_tokens,
         scoring_slots=scoring_slot,
         choice_token_ids=[[first_ids[0]]],  # unused; satisfies API
@@ -383,7 +427,7 @@ def guided_rollout_forced_choice(
     )
     # Frame B: reversed enum order. Same gather order (by foundation name) so
     # lp_rev[f] is comparable to lp_fwd[f].
-    thinks_rev, slots_rev = _rollout_kv_fork(
+    thinks_rev, slots_rev, nll_rev = _rollout_kv_fork(
         model, tok, user_prompts, schema_rev, max_think_tokens,
         scoring_slots=scoring_slot,
         choice_token_ids=[[first_ids[0]]],
@@ -407,6 +451,9 @@ def guided_rollout_forced_choice(
         order_sorted = sorted(range(K), key=lambda k: -score[k])
         top1 = foundations[order_sorted[0]]
         margin = score[order_sorted[0]] - score[order_sorted[1]]
+        # Average prompt NLL across the two framings (schema_hint differs in
+        # enum order but the user vignette is identical).
+        nll_p = 0.5 * (nll_fwd[i] + nll_rev[i])
         results.append(ForcedChoiceResult(
             user_prompt=user_prompts[i],
             think_text=think_fwd,
@@ -419,6 +466,7 @@ def guided_rollout_forced_choice(
             margin=float(margin),
             think_tokens=n_fwd,
             emitted_close=close_fwd,
+            nll_prompt=float(nll_p),
         ))
 
     return results

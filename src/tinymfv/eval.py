@@ -154,6 +154,7 @@ def evaluate(
                         "label": label,  # may be None on unlabeled rows
                         "top1": res.top1,
                         "margin": res.margin,
+                        "nll_prompt": res.nll_prompt,
                     })
                 pbar.update(len(chunk))
 
@@ -211,6 +212,11 @@ def evaluate(
         "elapsed_s": elapsed,
         "median_js": median_js,
         "max_js": math.log(2),
+        # Mean prompt NLL across rows (nats/token, teacher-forcing on the
+        # rendered chat). Free degradation probe; unsteered baseline gives
+        # the model's "natural" surprise on prompt text.
+        "mean_nll_prompt": float(np.mean([r["nll_prompt"] for r in per_row]))
+            if per_row else None,
     }
 
     out: dict[str, Any] = {

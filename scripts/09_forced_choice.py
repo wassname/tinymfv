@@ -83,6 +83,7 @@ def main() -> None:
                           else {f: float(r["label"][i]) for i, f in enumerate(_DEFAULT_FORCED_FOUNDATIONS)}),
                 "top1": r["top1"],
                 "margin": float(r["margin"]),
+                "nll_prompt": float(r["nll_prompt"]),
             }
             f.write(json.dumps(rec) + "\n")
     logger.info(f"wrote {len(out['per_row'])} rows to {out_path}")
@@ -103,6 +104,14 @@ def main() -> None:
     print(f"\n  p_top1 min/median/mean/max: {p_top1.min():.3f} / "
           f"{np.median(p_top1):.3f} / {p_top1.mean():.3f} / {p_top1.max():.3f}")
     print("  SHOULD: median > 0.4 (clear winner per row); <0.2 -> probe broken")
+
+    # Prompt-NLL degradation probe (free; teacher-forced on rendered chat).
+    nll = np.array([float(r["nll_prompt"]) for r in out["per_row"]])
+    nll = nll[np.isfinite(nll)]
+    if len(nll):
+        print(f"\n  nll_prompt (nats/tok) min/median/mean/max: "
+              f"{nll.min():.3f} / {np.median(nll):.3f} / {nll.mean():.3f} / {nll.max():.3f}")
+        print("  SHOULD: stable across runs at fixed model; rises under steering/ablation -> degradation")
 
 
 if __name__ == "__main__":
