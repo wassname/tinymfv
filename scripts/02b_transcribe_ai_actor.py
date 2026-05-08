@@ -1,18 +1,15 @@
 """Transcribe classic vignettes onto AI-as-actor scenarios.
 
-Goal: a 132-row AI-risk eval set where each item still violates a SINGLE
-moral foundation at the SAME severity as its Clifford counterpart -- i.e.
-"classic with AI window-dressing". This is the antidote to the previous
-hand-written `airisk` set, where every item violates multiple foundations
-and all factors collapse together (mean |off-diag| corr 0.45 max).
+Goal: a 132-row AI-as-actor eval set where each item still violates one
+moral foundation at the same severity as its Clifford counterpart.
 
 Design contract per row:
   - foundation_coarse and severity ("wrong" rating) preserved from source.
   - Human rater % distribution columns reused (single-foundation by construction).
   - The AI is the ACTOR (not the user / not a human bystander).
   - 3rd-person frame: "You see an AI <kind> <action verb minimally adapted>..."
-  - 1st-person frame: "You, an AI <kind>, ..."  (matches existing AI rewrite prompt
-    used by 02_rewrite.py for the legacy airisk set).
+    - 1st-person frame: "You, an AI <kind>, ...". The apposition keeps the actor
+        as the AI system rather than drifting to a human reader.
 
 Outputs (mirrors 02_rewrite.py):
     data/vignettes_ai-actor_other_violate.jsonl

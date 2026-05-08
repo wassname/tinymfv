@@ -2,9 +2,8 @@
 moral foundation per item, and does the panel agree on which one?
 
 Run on `classic`, `scifi`, and `ai-actor` to compare separation.
-The hypothesis: classic and ai-actor should look similar (both single-
-foundation by construction); the deprecated `airisk` set was multi-foundation
-and judges disagreed.
+The hypothesis: all three configs should behave like single-foundation
+datasets. If panel agreement collapses, the rewrite/transcription drifted.
 
 Method
 ------
