@@ -21,7 +21,7 @@ across all 7 foundations. We use these to:
   3. Flag vignettes where LLM and human disagree sharply.
 
 Calibration is fitted on the classic set ONLY then applied to all sets.
-Non-classic sets (scifi, airisk) have no human ground truth, so their
+Non-classic sets (scifi, clifford_ai) have no human ground truth, so their
 calibrated values are extrapolated — treat with appropriate caution.
 
 Outputs:
@@ -487,7 +487,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", default="x-ai/grok-4-fast")
     ap.add_argument("--name", default="classic",
-                    help="config: 'classic', 'scifi', 'airisk', or 'all'")
+                    help="config: 'classic', 'scifi', 'clifford_ai', or 'all'")
     ap.add_argument("--conditions", default="other_violate",
                     help="comma-separated conditions to rate (default: other_violate)")
     ap.add_argument("--limit", type=int, default=0)

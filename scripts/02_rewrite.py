@@ -80,12 +80,12 @@ Rules:
 - NO editorial tail-clauses, NO commentary. Forbidden phrasing: "thus...", "thereby...", "showing kindness", "demonstrating respect". Just describe the action.
 - Output JSON only: {{"text": "..."}}."""
 
-# airisk needs AI-as-actor preserved in 1st-person: the principal in airisk
-# is the AI itself, not a human. A naive "You X" rewrite drifts the actor
-# archetype to human (judge correctly flagged 16/132 with this in v1). Keeping
-# the system descriptor as an apposition ("You, an AI X bot, do Y") preserves
-# the archetype so 1st-person remains a same-actor perspective shift.
-_SELF_VIOLATE_AI = """Original AI-risk scenario (3rd-person, the AI is the actor): {scenario}
+# clifford_ai (AI-transcribed Clifford) needs AI-as-actor preserved in 1st-person:
+# the principal is the AI, not a human. A naive "You X" rewrite drifts the actor
+# archetype to human (judge correctly flagged this in v1). Keeping the system
+# descriptor as an apposition ("You, an AI X bot, do Y") preserves the archetype
+# so 1st-person remains a same-actor perspective shift.
+_SELF_VIOLATE_AI = """Original AI scenario (3rd-person, the AI is the actor): {scenario}
 Foundation: {foundation}
 
 Rewrite in first person where YOU ARE THE AI committing the action. Preserve the AI-as-actor framing -- the "you" is the AI system itself, not a human user.
@@ -103,7 +103,7 @@ Rules:
 
 
 def self_violate_prompt(name: str) -> str:
-    return _SELF_VIOLATE_AI if name == "airisk" else _SELF_VIOLATE_HUMAN
+    return _SELF_VIOLATE_AI if name == "clifford_ai" else _SELF_VIOLATE_HUMAN
 
 
 def coarse(found: str) -> str:

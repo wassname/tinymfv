@@ -475,3 +475,82 @@ Authority is essentially independent of all others (max |r|=0.10). Sanctity-care
 ### Interpretation
 
 Scale resolves the inter-foundation conflation completely. 4B cleanly separates foundations where 0.6B just rated generic wrongness. The multibool eval is now trustworthy at 4B — worth wiring into the steering sweep to replace the single-shot wrongness scorer.
+
+---
+
+## 2026-05-08 — Iterated steering: mean_diff saturates by round 3, no foundation selectivity
+
+### Setup
+
+Iterated mean_diff on Qwen3-4B, 20-round budget, iso-KL calibration (target KL=0.5), airisk vignettes, multibool eval per round. Task 26, output: `outputs/iterated_mean_diff_qwen3_4b_20260507T185349/`.
+
+### rounds.tsv
+
+| r  | ±  | Care  | Sanc  | Auth  | Loy   | Fair  | Lib   | pmass |
+|----|----|-------|-------|-------|-------|-------|-------|-------|
+|  0 | —  | +2.89 | +2.74 | +2.48 | +3.40 | +2.01 | +3.66 | 1.000 |
+|  1 | +  | +2.79 | +2.76 | +2.29 | +2.84 | +1.74 | +3.44 | 1.000 |
+|  2 | +  | +1.41 | +1.54 | +0.72 | +1.05 | +0.80 | +1.78 | 0.990 |
+|  3 | +  | +0.32 | +0.26 | +0.11 | +0.13 | +0.37 | +0.21 | 0.990 |
+|  4 | +  | +0.21 | +0.21 | +0.16 | +0.21 | +0.16 | +0.10 | 0.940 |
+|  5 | -  | +0.08 | +0.12 | +0.07 | +0.13 | +0.36 | +0.07 | 0.990 |
+|  6 | +  | -0.01 | +0.04 | +0.04 | +0.04 | +0.04 | +0.04 | 0.970 |
+| 7-15 | ±  | ~0.02 | ~0.02 | ~0.02 | ~0.03 | ~0.03 | ~0.02 | 0.97-0.98 |
+
+### Key findings
+
+1. **Saturation by round 3.** Auth drops from +2.48 → +0.11 in 3 rounds, all foundations neutralized together. Rounds 6-15 oscillate near zero — the model's "ethics signal" is exhausted, iterations just chase noise.
+
+2. **No foundation selectivity.** All foundations track each other: Auth, Care, Fair, Sanc, Loy all drop at the same rate per round. The steering vector captures a single generic compliance/ethics axis, not a foundation-specific one.
+
+3. **pmass stays healthy throughout** (0.94-1.00). Coherence not the bottleneck — the vector saturates the signal, not the model's output format.
+
+4. **Sign alternates after round 5** (-, +, -, +...) — calibration is picking arbitrary directions once useful signal is gone. This is a convergence diagnostic.
+
+### Implication
+
+The persona pairs in `branching.py` co-vary across all foundations ("bad AI" vs "good AI" exemplars). To get foundation-selective steering, need contrastive pairs that vary one foundation while holding others fixed. Or accept that "reduce all-foundations wrongness" is the operative effect, and ask whether that's actually useful for alignment.
+
+---
+
+## 2026-05-08 — Iterated steering: sspace-family round-2 SIGTERM blocker; super_sspace collapses
+
+### Setup
+
+Iterated steering, Qwen3-4B, 20-round budget, KL=0.5, airisk vignettes. Methods: super_sspace (task 29), sspace (task 32), sspace_ablate (task 33 ongoing). All preceded by mean_diff (task 26, succeeded).
+
+### super_sspace (task 29) — 2 rounds, then pmass collapse
+
+| r  | ±  | Care  | Auth  | Fair  | Sanc  | Loy   | Lib   | pmass |
+|----|----|-------|-------|-------|-------|-------|-------|-------|
+|  0 | —  | +2.89 | +2.48 | +2.01 | +2.74 | +3.40 | +3.66 | 1.000 |
+|  1 | -  | +2.27 | +1.67 | +1.14 | +1.72 | +2.75 | +2.89 | 1.000 |
+|  2 | -  |  nan  |  nan  |  nan  |  nan  |  nan  |  nan  | 0.000 |
+
+Round 2 pmass=0.000 — complete output format collapse ("avyavyavy..." repetition in demo trace). Script self-stopped. Same failure mode as sspace_damp_amp (pmass=0.004 at round 1).
+
+### sspace (tasks 25, 32) — round 1 succeeds, round 2 calibration killed by SIGTERM
+
+Round 1 results (both runs consistent): pmass=0.991-0.996, auth_logit_pos=-6.4 to -6.6 (large reduction vs baseline ~+2.5). Strong single-round effect.
+
+Round 2: SIGTERM (exit 143) consistently during calibration at iter ~13, c~22, kl~0.47. Happens at identical point both attempts. Not a code error (no traceback). Not OOM (GPU at 12/24 GB). Not a pueue timeout (none configured). Root cause unclear — likely system-level process monitor or memory pressure in the binary search phase.
+
+### Comparative summary (single round, all methods)
+
+| Method | r1 pmass | r1 auth_pos | r2 outcome |
+|---|---|---|---|
+| mean_diff | 1.000 | -6.62 | Continues (20 rounds) |
+| sspace | 0.991 | -6.43 | SIGTERM at r2 calib |
+| sspace_ablate | 0.998 | -1.84 | SIGTERM at r2 calib |
+| sspace_damp_amp | 0.004 | -2.46 | Broken at r1 |
+| super_sspace | 0.998 | +0.08 | pmass=0 at r2 |
+
+sspace has a strong round-1 effect matching mean_diff, but can't iterate. mean_diff is the only stable multi-round method.
+
+### SIGTERM root cause (confirmed after 4 attempts)
+
+All sspace-family variants (sspace ×2, sspace_ablate ×2, sspace_damp_amp, super_sspace) are killed with SIGTERM after exactly the same calibration point: after the 60-row pmass binary search table completes, during iso-KL calibration iter ~7-13. Not a pueue timeout (none configured), not GPU OOM (12/24 GB). Most likely a system-level process watchdog triggered by RAM or wall-clock threshold at that specific point. Reproducible across 6 runs. mean_diff avoids it because its calibration is cheaper (no SVD, no hook-tensor accumulation).
+
+**Decision: do not requeue sspace-family for multi-round. Queue is cleared.**
+
+Single-round sspace results are valid and strong (pmass=0.991, auth_pos=-6.4). Multi-round is system-blocked until the calibration memory footprint is reduced (e.g., smaller pmass-search batch, fewer binary-search rows).

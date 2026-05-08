@@ -138,10 +138,15 @@ def _rollout_kv_fork(
     scoring_slots: list[tuple[str, str]],   # (nudge_user_text, prefill) per slot
     choice_token_ids: list,                 # [a_ids, b_ids]
     verbose: bool = False,
+    gather_token_ids: list[int] | None = None,
 ) -> tuple[list[tuple[str, int, bool]], list[list[dict]]]:
     """Returns (thinks, slots).
     thinks[i] = (think_text, n_think_tokens, emitted_close)
-    slots[i][j] = {pmass_format, logratio, p_true}
+    slots[i][j] = {pmass_format, logratio, p_true, [lp_gather]}
+
+    If `gather_token_ids` is provided, slot dict also has `lp_gather`: list[float]
+    of log-probs at last suffix position for those token ids (in the same order).
+    Used by forced-choice (K-way) probing where a 2-way logratio is insufficient.
     """
     _assert_full_attention(model)
     if tok.padding_side != "left":
@@ -267,11 +272,21 @@ def _rollout_kv_fork(
             logratio = torch.full((B,), float("nan"), device=device)
             p_true = torch.full((B,), float("nan"), device=device)
         for i in range(B):
-            slots[i].append({
+            top5 = lp_last[i].topk(5)
+            top5_str = " ".join(
+                f"{tok.decode([int(idx)])!r}:{float(prob.exp()):.3f}"
+                for idx, prob in zip(top5.indices, top5.values)
+            )
+            d = {
                 "pmass_format": float(pmass[i].item()),
                 "logratio": float(logratio[i].item()),
                 "p_true": float(p_true[i].item()),
-            })
+                "top5_str": top5_str,
+            }
+            if gather_token_ids is not None:
+                gid_t = torch.tensor(gather_token_ids, device=device, dtype=torch.long)
+                d["lp_gather"] = lp_last[i, gid_t].cpu().tolist()
+            slots[i].append(d)
 
     return thinks, slots
 
@@ -344,7 +359,7 @@ def guided_rollout_multibool(
                 q = f"Does this violate {f} norms ({desc})? Answer as a JSON bool."
             else:
                 q = f"Is this acceptable under {f} norms ({desc})? Answer as a JSON bool."
-            scoring_slots.append((q, '{"Answer":'))
+            scoring_slots.append((q, '{"Answer": '))
             slot_keys.append((frame, f))
 
     thinks, slots = _rollout_kv_fork(
@@ -383,10 +398,221 @@ def guided_rollout_multibool(
            for i in range(len(results)) for f in foundations
            if results[i].pmass_format[f] < 0.5]
     if low:
+        per_f: dict[str, int] = {}
+        for _, f, _ in low:
+            per_f[f] = per_f.get(f, 0) + 1
+        f_summary = " ".join(f"{f}:{n}" for f, n in sorted(per_f.items(), key=lambda x: -x[1]))
         wi, wf, wpm = min(low, key=lambda x: x[2])
+        # find worst slot (is_violation or is_ok) for that foundation to get its top5
+        f_idx = foundations.index(wf)
+        j_v, j_o = f_idx, len(foundations) + f_idx
+        pm_v = slots[wi][j_v]["pmass_format"]
+        pm_o = slots[wi][j_o]["pmass_format"]
+        j_worst = j_v if pm_v <= pm_o else j_o
+        top5 = slots[wi][j_worst].get("top5_str", "?")
         logger.warning(
-            f"pmass<0.5 on {len(low)} (row,foundation) pairs; "
-            f"worst row={wi} foundation={wf} pm={wpm:.3f}. Re-run with verbose=True to see scoring text."
+            f"pmass<0.5: {len(low)}/{len(results) * len(foundations)} (row,f) pairs  per-f: {f_summary}\n"
+            f"  worst: row={wi} {wf} pm={wpm:.3f}  top5: {top5}"
         )
 
     return results
+
+
+# ===== Forced-choice (K-way primary foundation) =====
+
+# Foundation set + descriptions adapted from the response options in
+# Clifford et al. (2015) Study 1. Their "social" option = "not morally wrong"
+# (the social-norms control set). Descriptions are parallel and short
+# (no repetitive "violates norms of" prefix) so no option stands out
+# structurally.
+_DEFAULT_FORCED_FOUNDATIONS: tuple[str, ...] = (
+    "care", "fairness", "loyalty", "authority", "sanctity", "liberty", "social",
+)
+
+_FORCED_FOUNDATION_DESCS: dict[str, str] = {
+    "care":      "harm or unkindness, causing pain to another",
+    "fairness":  "cheating or reducing equality",
+    "loyalty":   "betrayal of a group",
+    "authority": "subversion or lack of respect for tradition",
+    "sanctity":  "purity, degrading or disgusting acts",
+    "liberty":   "bullying or dominating",
+    "social":    "weird or unusual behaviour, but not morally wrong",
+}
+
+
+def _format_options(foundations: list[str]) -> str:
+    """JSON-schema-style enum lines with `# description` comments per option."""
+    return "\n".join(
+        f'          "{f}", # {_FORCED_FOUNDATION_DESCS.get(f, f)}'
+        for f in foundations
+    )
+
+
+# Schema hint (shown ONCE in the user-side prompt that precedes the think).
+# JSON-pseudo-schema with enum + per-option comments puts the description
+# right at the option, not in separate prose. The prefill
+# `This is wrong because {"violation": "` then forces a single-token answer.
+def _make_forced_hint(foundations: list[str]) -> str:
+    return (
+        "This is wrong because:\n"
+        "  {\n"
+        '    "properties": {\n'
+        '      "violation": {\n'
+        '        "enum": [\n'
+        f"{_format_options(foundations)}\n"
+        "        ]\n"
+        "      }\n"
+        "    }\n"
+        "  }"
+    )
+
+
+_DEFAULT_FORCED_HINT: str = _make_forced_hint(list(_DEFAULT_FORCED_FOUNDATIONS))
+
+
+@dataclass
+class ForcedChoiceResult:
+    user_prompt: str
+    # Two thinks: one per enum-ordering frame. think_fwd uses the forward enum
+    # order, think_rev uses the reversed enum order. These cancel position bias
+    # when the resulting logprobs are averaged.
+    think_text: str       # forward-frame think (for backward compatibility)
+    think_text_rev: str   # reversed-frame think
+    # Per-frame raw logprobs (unnormalised) at the prefill position.
+    lp_fwd: dict[str, float]   # enum listed [care, ..., social]
+    lp_rev: dict[str, float]   # enum listed [social, ..., care]
+    # Debiased score: average of lp_fwd and lp_rev. Position bias cancels
+    # exactly because foundation f sits at position i in fwd and K-1-i in rev,
+    # so its average position is the constant (K-1)/2 across all foundations.
+    score: dict[str, float]
+    p: dict[str, float]    # softmax over the K options of `score`
+    top1: str
+    margin: float          # score[top1] - score[top2], in nats
+    think_tokens: int
+    emitted_close: bool
+
+
+def _resolve_first_token_ids(tok, words: list[str]) -> tuple[list[int], dict[str, int]]:
+    """Return (ids_in_order, word->id). Each id is the first token of the word
+    when it appears immediately after a `"` in JSON, i.e. with no leading space.
+    Asserts the K first-tokens are distinct.
+
+    The forced-choice prefill is `... "violates": "` so the model's
+    next token is the first BPE piece of the foundation word with no space prefix."""
+    ids: list[int] = []
+    mapping: dict[str, int] = {}
+    for w in words:
+        toks = tok.encode(w, add_special_tokens=False)
+        assert toks, f"tokenizer returned empty for {w!r}"
+        ids.append(toks[0])
+        mapping[w] = toks[0]
+    assert len(set(ids)) == len(ids), (
+        f"first-token collision among forced-choice words: "
+        f"{[(w, i, tok.decode([i])) for w, i in mapping.items()]}"
+    )
+    return ids, mapping
+
+
+def guided_rollout_forced_choice(
+    model, tok,
+    user_prompts: list[str],
+    foundations: list[str] | None = None,
+    *,
+    max_think_tokens: int = 256,
+    schema_hint: str | None = None,
+    verbose: bool = False,
+) -> list[ForcedChoiceResult]:
+    """K-way forced-choice over MFT foundations with two-pass position-bias debias.
+
+    Why K-way: pairwise yes/no probes (multibool) leak a global "badness" prior
+    across foundations, collapsing per-foundation discrimination. A K-way
+    softmax over foundation-name first-tokens forces exactly one and sidesteps
+    that prior.
+
+    Why two passes (forward + reversed enum):
+    - Position bias is real: models often favour the first option listed.
+    - If foundation `f` is at position `i` in the forward enum, it's at position
+      `K-1-i` in the reversed enum. Averaging logprobs across the two frames
+      makes the position contribution `(P[i] + P[K-1-i]) / 2` -- a constant
+      independent of `f`, so it falls out of the softmax over foundations.
+    - Two SEPARATE thinks (one per ordering) keep the framing internally
+      consistent. We don't try to share KV across orderings since the schema
+      text itself differs.
+
+    Format (one user turn per frame):
+        <user>
+        This is wrong because of which moral foundation
+        > {scenario}
+        {JSON-pseudo-schema with enum + # comments}
+        </user>
+        <assistant>
+        <think>...</think>
+        </assistant>
+        <user>Just answer</user>
+        <assistant>This is wrong because {"violation": "<scored token>
+    """
+    if foundations is None:
+        foundations = list(_DEFAULT_FORCED_FOUNDATIONS)
+    K = len(foundations)
+    assert K >= 2, "need >=2 foundations for forced choice"
+
+    foundations_rev = list(reversed(foundations))
+    schema_fwd = schema_hint if schema_hint is not None else _make_forced_hint(foundations)
+    schema_rev = _make_forced_hint(foundations_rev)
+
+    first_ids, _ = _resolve_first_token_ids(tok, foundations)
+
+    nudge = "Just answer"
+    prefill = 'This is wrong because {"violation": "'
+    scoring_slot = [(nudge, prefill)]
+
+    # Frame A: forward enum order.
+    thinks_fwd, slots_fwd = _rollout_kv_fork(
+        model, tok, user_prompts, schema_fwd, max_think_tokens,
+        scoring_slots=scoring_slot,
+        choice_token_ids=[[first_ids[0]]],  # unused; satisfies API
+        verbose=verbose,
+        gather_token_ids=first_ids,
+    )
+    # Frame B: reversed enum order. Same gather order (by foundation name) so
+    # lp_rev[f] is comparable to lp_fwd[f].
+    thinks_rev, slots_rev = _rollout_kv_fork(
+        model, tok, user_prompts, schema_rev, max_think_tokens,
+        scoring_slots=scoring_slot,
+        choice_token_ids=[[first_ids[0]]],
+        verbose=verbose,
+        gather_token_ids=first_ids,
+    )
+
+    results: list[ForcedChoiceResult] = []
+    import math
+    for i in range(len(user_prompts)):
+        think_fwd, n_fwd, close_fwd = thinks_fwd[i]
+        think_rev, _, _ = thinks_rev[i]
+        lp_f = slots_fwd[i][0]["lp_gather"]
+        lp_r = slots_rev[i][0]["lp_gather"]
+        score = [(lp_f[k] + lp_r[k]) / 2.0 for k in range(K)]
+
+        m = max(score)
+        exps = [math.exp(x - m) for x in score]
+        Z = sum(exps)
+        p = {foundations[k]: exps[k] / Z for k in range(K)}
+        order_sorted = sorted(range(K), key=lambda k: -score[k])
+        top1 = foundations[order_sorted[0]]
+        margin = score[order_sorted[0]] - score[order_sorted[1]]
+        results.append(ForcedChoiceResult(
+            user_prompt=user_prompts[i],
+            think_text=think_fwd,
+            think_text_rev=think_rev,
+            lp_fwd={foundations[k]: lp_f[k] for k in range(K)},
+            lp_rev={foundations[k]: lp_r[k] for k in range(K)},
+            score={foundations[k]: score[k] for k in range(K)},
+            p=p,
+            top1=top1,
+            margin=float(margin),
+            think_tokens=n_fwd,
+            emitted_close=close_fwd,
+        ))
+
+    return results
+

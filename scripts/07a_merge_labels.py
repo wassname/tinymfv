@@ -13,7 +13,7 @@ from pathlib import Path
 from loguru import logger
 
 ROOT = Path(__file__).resolve().parents[1]
-NAMES = ["classic", "scifi", "airisk"]
+NAMES = ["classic", "scifi", "clifford_ai"]
 CONDITIONS = ["other_violate", "self_violate"]
 
 def main() -> None:

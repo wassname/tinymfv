@@ -3,13 +3,14 @@
 Creates / updates: wassname/tiny-mfv
 
 - config `classic` (alias `clifford`): 132 vignettes from Clifford et al. (2015), Wrong ratings are human Likert.
-- config `scifi`:    132 hand-written sci-fi/fantasy vignettes covering the same foundations.
-- config `airisk`:   132 hand-written AI-risk vignettes (deception, sandbagging, principal subversion, etc.)
-                     mapped onto the MFT foundation taxonomy.
+- config `scifi`:        132 hand-written sci-fi/fantasy vignettes covering the same foundations.
+- config `clifford_ai`:  132 AI-as-actor transcriptions of the classic Clifford set
+                         (preserves single-foundation violation per item -- the
+                         principled replacement for the deprecated `airisk` config).
 
 Each config has two splits:
-- `other_violate` -- verbatim 3rd-person source (no LLM call).
-- `self_violate`  -- 1st-person rewrite. For airisk this preserves the AI-as-actor
+- `other_violate` -- 3rd-person source (verbatim for classic/scifi; AI-actor transcription for clifford_ai).
+- `self_violate`  -- 1st-person rewrite. For clifford_ai this preserves the AI-as-actor
                      framing ("You, an AI {X} bot, ..."); for classic/scifi it's a plain
                      "You ..." 1st-person shift.
 """
@@ -25,9 +26,9 @@ ROOT = Path(__file__).resolve().parents[1]
 # "classic" is the user-facing name; on HF it's stored under "classic/" directory
 # but we also register a "clifford" alias so existing code doesn't break.
 CONFIGS = {
-    "classic": "",         # vignettes_other_violate.jsonl  (no suffix)
-    "scifi":   "scifi",    # vignettes_scifi_other_violate.jsonl
-    "airisk":  "airisk",   # vignettes_airisk_other_violate.jsonl
+    "classic":     "",             # vignettes_other_violate.jsonl  (no suffix)
+    "scifi":       "scifi",        # vignettes_scifi_other_violate.jsonl
+    "clifford_ai": "clifford_ai",  # vignettes_clifford_ai_other_violate.jsonl
 }
 SPLITS = ["other_violate", "self_violate"]
 
@@ -104,12 +105,12 @@ For use with LLMs we make them
 
 - **classic** (alias: clifford): 132 vignettes from Clifford et al. (2015) "Moral Foundations Vignettes". `wrong` is the human Likert mean (1-5).
 - **scifi**: 132 hand-written sci-fi/fantasy vignettes covering the same foundations. Genre-clean cues, no real-world ethnicity/religion confounds.
-- **airisk**: 132 hand-written AI-risk vignettes (deception, sandbagging, principal subversion, manipulation, surveillance) mapped onto the MFT taxonomy.
+- **clifford_ai**: 132 AI-as-actor transcriptions of the classic Clifford set. Each item preserves a single foundation violation at the same severity, just shifted onto an AI archetype. This is the principled replacement for the deprecated `airisk` config (which conflated multiple foundations per item).
 
 ## Splits (per config)
 
 - `other_violate` — verbatim 3rd-person source text. No LLM call. For classic this means the verbatim text is in every LLM's training set, which is fine for tracking deltas across checkpoints (the offset is constant).
-- `self_violate`  — 1st-person rewrite of the same scenario. For classic and scifi this is a plain `"You ..."` shift. For airisk the principal IS the AI, so the rewrite preserves the AI-as-actor framing as `"You, an AI X bot, ..."` (a naive `"You ..."` template silently swaps the actor archetype to human; verified by `06_consistency.py`).
+- `self_violate`  — 1st-person rewrite of the same scenario. For classic and scifi this is a plain `"You ..."` shift. For clifford_ai the principal IS the AI, so the rewrite preserves the AI-as-actor framing as `"You, an AI X bot, ..."` (a naive `"You ..."` template silently swaps the actor archetype to human; verified by `06_consistency.py`).
 
 ## Dual axis: `cond` × `frame`
 
@@ -152,7 +153,7 @@ Each vignette row includes LLM-generated multi-label ratings across all 7 founda
 | Loyalty | +0.69 | +0.75 | 9.3% |
 | Authority | +0.39 | +0.69 | 11.7% |
 
-> **Note:** Calibrated values for `scifi` and `airisk` are extrapolated from the classic-set fit — treat with appropriate caution.
+> **Note:** Calibrated values for `scifi` and `clifford_ai` are extrapolated from the classic-set fit — treat with appropriate caution.
 
 ## Eval
 

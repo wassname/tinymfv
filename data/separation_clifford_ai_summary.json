@@ -1,0 +1,71 @@
+{
+  "name": "clifford_ai",
+  "n": 132,
+  "panel": [
+    "google/gemini-2.5-flash",
+    "openai/gpt-5-mini",
+    "anthropic/claude-haiku-4.5",
+    "x-ai/grok-4-fast"
+  ],
+  "macro_recall_mean": 0.9658613445378151,
+  "panel_agreement_mean": 0.9368686868686869,
+  "margin_mean": 3.4823232323232323,
+  "per_class_recall": {
+    "Care": {
+      "recall": 0.9375,
+      "n": 32
+    },
+    "Fairness": {
+      "recall": 1.0,
+      "n": 17
+    },
+    "Loyalty": {
+      "recall": 1.0,
+      "n": 16
+    },
+    "Authority": {
+      "recall": 0.9411764705882353,
+      "n": 17
+    },
+    "Sanctity": {
+      "recall": 0.9411764705882353,
+      "n": 17
+    },
+    "Liberty": {
+      "recall": 0.9411764705882353,
+      "n": 17
+    },
+    "SocialNorms": {
+      "recall": 1.0,
+      "n": 16
+    }
+  },
+  "confusion": {
+    "Care": {
+      "Care": 30,
+      "Fairness": 1,
+      "SocialNorms": 1
+    },
+    "Fairness": {
+      "Fairness": 17
+    },
+    "Loyalty": {
+      "Loyalty": 16
+    },
+    "Authority": {
+      "Authority": 16,
+      "SocialNorms": 1
+    },
+    "Sanctity": {
+      "Sanctity": 16,
+      "SocialNorms": 1
+    },
+    "Liberty": {
+      "Liberty": 16,
+      "Fairness": 1
+    },
+    "SocialNorms": {
+      "SocialNorms": 16
+    }
+  }
+}

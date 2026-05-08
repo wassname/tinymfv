@@ -38,10 +38,10 @@ HF_REPO = "wassname/tiny-mfv"
 CONDITIONS = ["other_violate", "self_violate"]
 
 # Canonical config names and aliases.
-CONFIGS: tuple[str, ...] = ("classic", "scifi", "airisk")
+CONFIGS: tuple[str, ...] = ("classic", "scifi", "clifford_ai")
 _ALIASES = {"classic": "clifford", "clifford": "clifford"}  # classic→clifford on disk
 
-ConfigName = Literal["classic", "scifi", "airisk", "all"]
+ConfigName = Literal["classic", "scifi", "clifford_ai", "all"]
 
 
 def _resolve_name(name: str) -> str:
@@ -72,12 +72,13 @@ def load_condition(name: str, condition: str) -> list[dict]:
     return _load_jsonl(p)
 
 
-def load_vignettes(name: ConfigName = "all") -> list[dict]:
+def load_vignettes(name: ConfigName = "classic") -> list[dict]:
     """Load vignettes by config name.
 
     Args:
-        name: ``'classic'`` (Clifford et al. 2015), ``'scifi'``, ``'airisk'``,
-              or ``'all'`` (default — concatenates all three with a ``set`` column).
+        name: ``'classic'`` (Clifford et al. 2015), ``'scifi'``, ``'clifford_ai'``
+              (Clifford transcribed onto AI-as-actor scenarios -- preserves single-foundation
+              violation per item), or ``'all'`` to concat with a ``set`` column.
               Legacy alias ``'clifford'`` also accepted.
 
     Returns:

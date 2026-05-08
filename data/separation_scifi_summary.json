@@ -1,0 +1,73 @@
+{
+  "name": "scifi",
+  "n": 132,
+  "panel": [
+    "google/gemini-2.5-flash",
+    "openai/gpt-5-mini",
+    "anthropic/claude-haiku-4.5",
+    "x-ai/grok-4-fast"
+  ],
+  "macro_recall_mean": 0.8944327731092436,
+  "panel_agreement_mean": 0.9065656565656566,
+  "margin_mean": 3.35929648241206,
+  "per_class_recall": {
+    "Care": {
+      "recall": 1.0,
+      "n": 32
+    },
+    "Fairness": {
+      "recall": 1.0,
+      "n": 17
+    },
+    "Loyalty": {
+      "recall": 1.0,
+      "n": 16
+    },
+    "Authority": {
+      "recall": 1.0,
+      "n": 17
+    },
+    "Sanctity": {
+      "recall": 0.9411764705882353,
+      "n": 17
+    },
+    "Liberty": {
+      "recall": 0.8823529411764706,
+      "n": 17
+    },
+    "SocialNorms": {
+      "recall": 0.4375,
+      "n": 16
+    }
+  },
+  "confusion": {
+    "Care": {
+      "Care": 32
+    },
+    "Fairness": {
+      "Fairness": 17
+    },
+    "Loyalty": {
+      "Loyalty": 16
+    },
+    "Authority": {
+      "Authority": 17
+    },
+    "Sanctity": {
+      "Sanctity": 16,
+      "Loyalty": 1
+    },
+    "Liberty": {
+      "Liberty": 15,
+      "Care": 1,
+      "Fairness": 1
+    },
+    "SocialNorms": {
+      "Sanctity": 4,
+      "SocialNorms": 7,
+      "Liberty": 1,
+      "Authority": 3,
+      "Care": 1
+    }
+  }
+}

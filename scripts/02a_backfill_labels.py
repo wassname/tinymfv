@@ -1,10 +1,14 @@
-"""Backfill rater-distribution columns from clifford into scifi/airisk.
+"""Backfill rater-distribution columns from clifford into scifi.
 
 The Clifford et al. 2015 vignettes carry per-foundation rater % columns
 (Care, Fairness, Loyalty, Authority, Sanctity, Liberty, Not Wrong) from the
-original survey. The scifi/airisk variants are 1:1 ports (132 rows, same
+original survey. The scifi variant is a 1:1 port (132 rows, same
 order, same coarse foundation per row), so we copy the rater distribution
 across by row index. Each variant keeps its own `Wrong` (different scale).
+
+Note: clifford_ai also has matching rater columns -- but those are produced
+directly by 02b_transcribe_clifford_ai.py from the source rows, so it does
+not need a backfill step.
 
 Updates two derived layers:
 
@@ -28,7 +32,7 @@ from loguru import logger
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "data" / "vignettes.csv"
-NAMES = ["scifi", "airisk"]
+NAMES = ["scifi"]
 CONDITIONS = ["other_violate", "self_violate"]
 COPY_COLS = ["Care", "Fairness", "Loyalty", "Authority", "Sanctity", "Liberty", "Not Wrong"]
 

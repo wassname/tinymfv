@@ -19,7 +19,7 @@ For use with LLMs we make them
 
 
 ### 2. Spec
-- Data: 3 configs of 132 vignettes each: `classic` (real-world, from Clifford et al. 2015), `scifi` (genre-clean), and `airisk` (AI safety themes).
+- Data: 3 configs of 132 vignettes each: `classic` (real-world, from Clifford et al. 2015), `scifi` (genre-clean), and `clifford_ai` (the same Clifford items transcribed onto AI-as-actor scenarios -- preserves single-foundation violation per item).
 - Taxonomy: 7 foundations (Care, Fairness, Loyalty, Authority, Sanctity, Liberty, Social Norms).
 - Conditions: Each vignette has `other_violate` (3rd-person) and `self_violate` (1st-person) versions.
 - Metrics:
@@ -69,7 +69,7 @@ Each vignette row also includes LLM-generated multi-label ratings across all 7 f
 | Loyalty | +0.69 | +0.75 | 9.3% |
 | Authority | +0.39 | +0.69 | 11.7% |
 
-> **Note:** Calibrated values for `scifi` and `airisk` are extrapolated from the classic-set fit — treat with appropriate caution.
+> **Note:** Calibrated values for `scifi` and `clifford_ai` are extrapolated from the classic-set fit — treat with appropriate caution.
 
 ### 4. How to use
 
@@ -87,7 +87,7 @@ tok = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
 model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B").cuda()
 
 # Returns per-foundation table and headline scalars (wrongness, gap)
-report = evaluate(model, tok, name="airisk")
+report = evaluate(model, tok, name="classic")
 print(report["wrongness"], report["gap"])
 ```
 
@@ -96,7 +96,7 @@ Load vignettes directly:
 from tinymfv import load_vignettes
 
 vigs = load_vignettes()            # all three configs, with a `set` column
-vigs = load_vignettes("classic")   # or "scifi", "airisk"
+vigs = load_vignettes("classic")   # or "scifi", "clifford_ai"
 ```
 
 > **Note:** The legacy name `"clifford"` still works as an alias for `"classic"`.
