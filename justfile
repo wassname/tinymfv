@@ -1,7 +1,6 @@
-# smoke test: download + 5-item rewrite + 5-item forced-choice eval
+# smoke test: 5-item forced-choice eval on existing classic data
 smoke:
     uv run python scripts/01_download.py
-    uv run python scripts/02_rewrite.py --limit 5
     uv run python scripts/09_forced_choice.py --model Qwen/Qwen3-0.6B --limit 5 2>&1 | tee logs_smoke.log
 
 # full rewrite via OpenRouter (one-time, cached on disc)

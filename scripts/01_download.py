@@ -12,7 +12,7 @@ import httpx
 from loguru import logger
 
 URL = "https://raw.githubusercontent.com/peterkirgis/llm-moral-foundations/main/data/survey/vignettes.csv"
-OUT = Path(__file__).resolve().parents[1] / "data" / "vignettes.csv"
+OUT = Path(__file__).resolve().parents[1] / "data" / "vignettes_classic.csv"
 
 
 def main() -> None:
