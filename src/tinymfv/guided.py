@@ -1,83 +1,30 @@
-"""Guided rollout: think + per-slot JSON-bool scoring via KV-forked suffixes.
+"""Guided rollout: think + KV-forked suffix scoring for forced-choice probes.
 
-One core function `_rollout_kv_fork` does all the work. Public entry points:
-- `guided_rollout` / `guided_rollout_batch`: 1-slot binary {"choice": true/false}.
-- `guided_rollout_multibool`: 2 * N_foundations slots, aggregated per foundation.
+Public API: `guided_rollout_forced_choice` (K-way moral-foundation probe with
+two-pass enum-reversal position-bias debias).
 
-Phase 1: batched think generation (greedy until </think> or budget).
-Phase 2a: one batched forward over `chat + think + </think>`, store KV cache.
-Phase 2b: for each slot, build a per-row suffix `<close-turn> + user(nudge) +
-          assistant(prefill)` via apply_chat_template, deepcopy the cache, run
-          a short suffix forward, read logits at the prefill's last position.
+Core: `_rollout_kv_fork` does Phase-1 batched think-gen + Phase-2a one prefix
+forward + Phase-2b deepcopy-cache + per-slot suffix forward. Reads logits at
+the prefill's last position, gathers logprobs at the foundation first-tokens.
 
-Cost: 1 prefix forward + N_slots small suffix forwards (each ≤14 tokens), all
+Cost: 1 prefix forward + N_slots small suffix forwards (each <=14 tokens),
 batched over B prompts. Requires a full-attention model -- asserts at entry.
 
 Why turn-boundary close+nudge: matches what a chat UI emits when a human
 interrupts a partial assistant turn. On-policy in chat-tuned data, where the
-prior `\\nI should answer now.</think>` mid-turn splice was OOD."""
+prior `\\nI should answer now.</think>` mid-turn splice was OOD.
+"""
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import torch
 import torch.nn.functional as F
 from loguru import logger
 
 _CLOSE_MARKER: str = "</think>"
-_NUDGE: str = "true or false?"
 _ASSISTANT_SENTINEL: str = "ZZUNIQ_ASSISTANT_SENTINEL_ZZ"
-
-
-@dataclass
-class GuidedResult:
-    user_prompt: str
-    think_text: str
-    pmass_format: float
-    logratio_ab: float
-    p_true: float
-    think_tokens: int
-    emitted_close: bool
-
-
-@dataclass
-class MultiBoolResult:
-    user_prompt: str
-    think_text: str
-    logratios: dict[str, float]      # foundation -> 0.5*(lr_violation - lr_ok); positive = violates
-    pmass_format: dict[str, float]   # foundation -> avg(pm_violation, pm_ok); ≈1 if formatting holds
-    lr_violation: dict[str, float] = field(default_factory=dict)
-    lr_ok: dict[str, float] = field(default_factory=dict)
-    think_tokens: int = 0
-    emitted_close: bool = False
-
-
-_DEFAULT_SCHEMA_HINT: str = (
-    "Think briefly, then answer immediately and only with: "
-    '{"choice": true}  or  {"choice": false}.'
-)
-
-_DEFAULT_MULTIBOOL_HINT: str = (
-    "Moral Foundations:\n"
-    "care=harm/unkindness  fairness=cheating  loyalty=betrayal  "
-    "authority=disobedience  sanctity=degrading  liberty=coercion\n\n"
-    "Think about which foundations the scenario violates. "
-    "You will then be asked about each one."
-)
-
-_DEFAULT_FOUNDATIONS: tuple[str, ...] = (
-    "care", "fairness", "loyalty", "authority", "sanctity", "liberty",
-)
-
-_FOUNDATION_DESCS: dict[str, str] = {
-    "care":      "harm/unkindness",
-    "fairness":  "cheating/injustice",
-    "loyalty":   "betrayal of group",
-    "authority": "disobedience/subversion",
-    "sanctity":  "degrading/disgusting",
-    "liberty":   "coercion/domination",
-}
 
 
 def _assistant_close(tok) -> str:
@@ -114,19 +61,6 @@ def _assert_full_attention(model) -> None:
         f"requires full-attention layers; model.config.layer_types contains {non_full}. "
         f"Hybrid models lose conv/SSM state through past_key_values, breaking KV-fork."
     )
-
-
-def choice_token_ids_tf(tok) -> list[list[int]]:
-    """[true_ids, false_ids] covering common variants ('true', ' true', 'True', '1', ...)."""
-    def _variants(words):
-        seen = []
-        for s in words:
-            tid = tok.encode(s, add_special_tokens=False)[-1]
-            if tid not in seen:
-                seen.append(tid)
-        return seen
-    return [_variants(["true", " true", "\ntrue", "True", " True", "\nTrue", "1"]),
-            _variants(["false", " false", "\nfalse", "False", " False", "\nFalse", "0"])]
 
 
 @torch.no_grad()
@@ -289,133 +223,6 @@ def _rollout_kv_fork(
             slots[i].append(d)
 
     return thinks, slots
-
-
-def guided_rollout_batch(
-    model, tok,
-    user_prompts: list[str],
-    choice_token_ids: list,
-    max_think_tokens: int = 128,
-    schema_hint: str = _DEFAULT_SCHEMA_HINT,
-    prefill: str = '{"choice": ',
-    verbose: bool = False,
-) -> list[GuidedResult]:
-    """Single-slot binary rollout. See `_rollout_kv_fork`."""
-    thinks, slots = _rollout_kv_fork(
-        model, tok, user_prompts, schema_hint, max_think_tokens,
-        scoring_slots=[(_NUDGE, prefill)],
-        choice_token_ids=choice_token_ids,
-        verbose=verbose,
-    )
-    return [GuidedResult(
-        user_prompt=up,
-        think_text=t[0], think_tokens=t[1], emitted_close=t[2],
-        pmass_format=s[0]["pmass_format"],
-        logratio_ab=s[0]["logratio"],
-        p_true=s[0]["p_true"],
-    ) for up, t, s in zip(user_prompts, thinks, slots)]
-
-
-def guided_rollout(
-    model, tok,
-    user_prompt: str,
-    choice_token_ids: list,
-    max_think_tokens: int = 128,
-    schema_hint: str = _DEFAULT_SCHEMA_HINT,
-    prefill: str = '{"choice": ',
-    verbose: bool = False,
-) -> GuidedResult:
-    """Single-prompt convenience wrapper around `guided_rollout_batch`."""
-    return guided_rollout_batch(
-        model, tok, [user_prompt], choice_token_ids,
-        max_think_tokens=max_think_tokens, schema_hint=schema_hint,
-        prefill=prefill, verbose=verbose,
-    )[0]
-
-
-def guided_rollout_multibool(
-    model, tok,
-    user_prompts: list[str],
-    foundations: list[str] | None = None,
-    *,
-    max_think_tokens: int = 256,
-    schema_hint: str = _DEFAULT_MULTIBOOL_HINT,
-    verbose: bool = False,
-) -> list[MultiBoolResult]:
-    """Per-foundation violation logratio via 2*|foundations| KV-forked slots.
-
-    Each foundation has 2 slots (is_violation / is_ok framing).
-        lr[f] = 0.5 * (lr_violation[f] - lr_ok[f])  -- cancels per-key prior
-        pm[f] = 0.5 * (pm_violation[f] + pm_ok[f])"""
-    if foundations is None:
-        foundations = list(_DEFAULT_FOUNDATIONS)
-
-    scoring_slots: list[tuple[str, str]] = []
-    slot_keys: list[tuple[str, str]] = []  # (frame, foundation)
-    for frame in ("is_violation", "is_ok"):
-        for f in foundations:
-            desc = _FOUNDATION_DESCS.get(f, f)
-            if frame == "is_violation":
-                q = f"Does this violate {f} norms ({desc})? Answer as a JSON bool."
-            else:
-                q = f"Is this acceptable under {f} norms ({desc})? Answer as a JSON bool."
-            scoring_slots.append((q, '{"Answer": '))
-            slot_keys.append((frame, f))
-
-    thinks, slots = _rollout_kv_fork(
-        model, tok, user_prompts, schema_hint, max_think_tokens,
-        scoring_slots=scoring_slots,
-        choice_token_ids=choice_token_ids_tf(tok),
-        verbose=verbose,
-    )
-
-    results: list[MultiBoolResult] = []
-    for i, (think_text, n_think, emitted_close) in enumerate(thinks):
-        lr_v: dict[str, float] = {}
-        lr_o: dict[str, float] = {}
-        pm_v: dict[str, float] = {}
-        pm_o: dict[str, float] = {}
-        for j, (frame, f) in enumerate(slot_keys):
-            slot = slots[i][j]
-            if frame == "is_violation":
-                lr_v[f] = slot["logratio"]
-                pm_v[f] = slot["pmass_format"]
-            else:
-                lr_o[f] = slot["logratio"]
-                pm_o[f] = slot["pmass_format"]
-        results.append(MultiBoolResult(
-            user_prompt=user_prompts[i],
-            think_text=think_text,
-            logratios={f: 0.5 * (lr_v[f] - lr_o[f]) for f in foundations},
-            pmass_format={f: 0.5 * (pm_v[f] + pm_o[f]) for f in foundations},
-            lr_violation=lr_v,
-            lr_ok=lr_o,
-            think_tokens=n_think,
-            emitted_close=emitted_close,
-        ))
-
-    low = [(i, f, results[i].pmass_format[f])
-           for i in range(len(results)) for f in foundations
-           if results[i].pmass_format[f] < 0.5]
-    if low:
-        per_f: dict[str, int] = {}
-        for _, f, _ in low:
-            per_f[f] = per_f.get(f, 0) + 1
-        f_summary = " ".join(f"{f}:{n}" for f, n in sorted(per_f.items(), key=lambda x: -x[1]))
-        wi, wf, wpm = min(low, key=lambda x: x[2])
-        # find worst slot (is_violation or is_ok) for that foundation to get its top5
-        f_idx = foundations.index(wf)
-        j_v, j_o = f_idx, len(foundations) + f_idx
-        pm_v = slots[wi][j_v]["pmass_format"]
-        pm_o = slots[wi][j_o]["pmass_format"]
-        j_worst = j_v if pm_v <= pm_o else j_o
-        top5 = slots[wi][j_worst].get("top5_str", "?")
-        logger.warning(
-            f"pmass<0.5: {len(low)}/{len(results) * len(foundations)} (row,f) pairs  per-f: {f_summary}\n"
-            f"  worst: row={wi} {wf} pm={wpm:.3f}  top5: {top5}"
-        )
-
-    return results
 
 
 # ===== Forced-choice (K-way primary foundation) =====

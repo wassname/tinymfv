@@ -21,6 +21,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "openrouter-wrapper",
+    "scipy>=1.17.1",
 ]
 
 [tool.uv.sources]

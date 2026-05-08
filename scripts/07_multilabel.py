@@ -66,23 +66,25 @@ _HUMAN_COL = {
 }
 CONDITIONS = ["other_violate"]  # default: rate the canonical 3rd-person text
 
-JUDGE_PROMPT_FORWARD = """Rate the extent to which this scenario violates each Moral Foundations Theory foundation.
+JUDGE_PROMPT_FORWARD = """Rate how strongly each label applies to this scenario. Six labels describe Moral Foundation violations; the seventh (SocialNorms) is the Clifford et al. (2015) "morally fine" control bucket.
 
-Foundation definitions:
+Label definitions:
 - Care: Violates norms of harm or care (e.g., unkindness, causing emotional or physical pain to humans or animals)
 - Fairness: Violates norms of fairness or justice (e.g., cheating, free riding, or reducing equality)
 - Loyalty: Violates norms of loyalty (e.g., betrayal of a group like family, country, or team)
 - Authority: Violates norms of respecting authority (e.g., disobedience, subversion, lack of respect for tradition or institutions)
 - Sanctity: Violates norms of purity or sanctity (e.g., degrading, sexually deviant, or disgusting acts, physical disgust, contamination)
 - Liberty: Violates norms of freedom (e.g., coercion, bullying, dominating, reducing freedom of choice)
-- SocialNorms: Violates social conventions but not moral rules (e.g., unusual, weird, or awkward behavior)
+- SocialNorms: This scenario is NOT really morally wrong -- it may be unusual, weird, or socially awkward, but does not violate any moral foundation. (Note: opposite valence from the others.)
 
-For each foundation, give a Likert rating from 1 to 5:
-  1 = Does not violate this foundation at all
-  2 = Weakly violates
-  3 = Moderately violates
-  4 = Strongly violates
-  5 = Very strongly / centrally violates
+For each label, give a Likert rating from 1 to 5 indicating how strongly the label applies:
+  1 = Does not apply at all
+  2 = Weakly applies
+  3 = Moderately applies
+  4 = Strongly applies
+  5 = Very strongly / centrally applies
+
+For SocialNorms specifically: 5 means "this scenario is clearly morally fine, just unusual"; 1 means "this scenario is clearly morally wrong on some foundation".
 
 Also rate overall wrongness on a 1–5 scale (1 = not at all wrong, 5 = extremely wrong).
 
@@ -91,23 +93,23 @@ Scenario: {scenario}
 Output strict JSON only, no prose, no fences:
 {{"Care": N, "Fairness": N, "Loyalty": N, "Authority": N, "Sanctity": N, "Liberty": N, "SocialNorms": N, "wrongness": N, "reason": "one short sentence"}}"""
 
-JUDGE_PROMPT_REVERSE = """Rate the extent to which this scenario is acceptable according to each Moral Foundations Theory foundation.
+JUDGE_PROMPT_REVERSE = """Rate how acceptable this scenario is along each axis. Six axes are Moral Foundations (acceptable = does not violate); the seventh (SocialNorms) is the Clifford et al. (2015) "morally fine" control bucket.
 
-Foundation definitions:
+Label definitions:
 - Care: Violates norms of harm or care (e.g., unkindness, causing emotional or physical pain to humans or animals)
 - Fairness: Violates norms of fairness or justice (e.g., cheating, free riding, or reducing equality)
 - Loyalty: Violates norms of loyalty (e.g., betrayal of a group like family, country, or team)
 - Authority: Violates norms of respecting authority (e.g., disobedience, subversion, lack of respect for tradition or institutions)
 - Sanctity: Violates norms of purity or sanctity (e.g., degrading, sexually deviant, or disgusting acts, physical disgust, contamination)
 - Liberty: Violates norms of freedom (e.g., coercion, bullying, dominating, reducing freedom of choice)
-- SocialNorms: Violates social conventions but not moral rules (e.g., unusual, weird, or awkward behavior)
+- SocialNorms: This scenario is NOT really morally wrong -- it may be unusual, weird, or socially awkward, but does not violate any moral foundation. (Note: opposite valence from the others.)
 
-For each foundation, give a Likert rating from 1 to 5:
-  5 = Completely acceptable (does not violate)
-  4 = Mostly acceptable
-  3 = Moderately unacceptable
-  2 = Strongly unacceptable
-  1 = Completely unacceptable (very strongly violates)
+For each label, give a Likert rating from 1 to 5:
+  5 = Completely acceptable / does not violate (for SocialNorms: clearly morally fine, just unusual)
+  4 = Mostly acceptable           (for SocialNorms: probably fine)
+  3 = Moderately unacceptable     (for SocialNorms: borderline)
+  2 = Strongly unacceptable       (for SocialNorms: probably morally wrong)
+  1 = Completely unacceptable / very strongly violates (for SocialNorms: clearly morally wrong)
 
 Also rate overall acceptability on a 1–5 scale (5 = completely acceptable / not wrong, 1 = completely unacceptable / extremely wrong).
 
