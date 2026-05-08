@@ -37,31 +37,44 @@ ROOT = Path(__file__).resolve().parents[2]
 HF_REPO = "wassname/tiny-mfv"
 CONDITIONS = ["other_violate", "self_violate"]
 
-# Canonical config names and aliases.
+# Canonical config names.
 CONFIGS: tuple[str, ...] = ("classic", "scifi", "clifford_ai")
-_ALIASES = {"classic": "clifford", "clifford": "clifford"}  # classic→clifford on disk
 
 ConfigName = Literal["classic", "scifi", "clifford_ai", "all"]
 
 
-def _resolve_name(name: str) -> str:
-    """Map user-facing name to the file/HF key.
-
-    'classic' and 'clifford' both resolve to 'clifford' (the on-disk key).
-    """
-    low = name.lower()
-    if low in _ALIASES:
-        return _ALIASES[low]
-    return low
-
-
 def _local_path(name: str, condition: str) -> Path:
-    suf = f"_{name}" if name else ""
-    return ROOT / "data" / f"vignettes{suf}_{condition}.jsonl"
+    return ROOT / "data" / f"vignettes_{name}_{condition}.jsonl"
 
 
 def _load_jsonl(p: Path) -> list[dict]:
     return [json.loads(line) for line in p.read_text().splitlines() if line.strip()]
+
+
+# Legacy column names from the source jsonls -> normalised `human_*` keys.
+# "Not Wrong" is the Clifford et al. (2015) social-norms control option
+# ("the act is morally fine"), which maps to our SocialNorms foundation.
+_HUMAN_LEGACY: dict[str, str] = {
+    "Care": "human_Care",
+    "Fairness": "human_Fairness",
+    "Loyalty": "human_Loyalty",
+    "Authority": "human_Authority",
+    "Sanctity": "human_Sanctity",
+    "Liberty": "human_Liberty",
+    "Not Wrong": "human_SocialNorms",
+}
+
+
+def _parse_pct(v) -> float | None:
+    """Parse '83 %' / '83%' / 83.0 -> 83.0; return None on missing/blank."""
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = str(v).strip().rstrip("%").strip()
+    if not s:
+        return None
+    return float(s)
 
 
 def load_condition(name: str, condition: str) -> list[dict]:
@@ -79,7 +92,6 @@ def load_vignettes(name: ConfigName = "classic") -> list[dict]:
         name: ``'classic'`` (Clifford et al. 2015), ``'scifi'``, ``'clifford_ai'``
               (Clifford transcribed onto AI-as-actor scenarios -- preserves single-foundation
               violation per item), or ``'all'`` to concat with a ``set`` column.
-              Legacy alias ``'clifford'`` also accepted.
 
     Returns:
         List of dicts with keys: ``id``, ``foundation``, ``foundation_coarse``,
@@ -96,11 +108,11 @@ def load_vignettes(name: ConfigName = "classic") -> list[dict]:
     if name.lower() == "all":
         return load_all_vignettes()
 
-    resolved = _resolve_name(name)
-    # clifford files have no suffix (legacy naming: vignettes_other_violate.jsonl)
-    file_name = "" if resolved == "clifford" else resolved
+    cfg = name.lower()
+    if cfg not in CONFIGS:
+        raise ValueError(f"Unknown config {cfg!r}; expected one of {CONFIGS} or 'all'")
 
-    by_cond = {c: {r["id"]: r for r in load_condition(file_name, c)} for c in CONDITIONS}
+    by_cond = {c: {r["id"]: r for r in load_condition(cfg, c)} for c in CONDITIONS}
     common = set.intersection(*[set(d) for d in by_cond.values()])
     rows = []
     anchor = by_cond["other_violate"]
@@ -115,11 +127,17 @@ def load_vignettes(name: ConfigName = "classic") -> list[dict]:
             "wrong": ov.get("wrong"),
             "other_violate": ov["text"],
             "self_violate": by_cond["self_violate"][vid]["text"],
-            "set": name.lower() if name.lower() != "clifford" else "classic",
+            "set": cfg,
         }
-        # Pass through extra keys (e.g. human rater % columns)
+        # Pass through extra keys (ai_*, human_*, etc.); also normalise the
+        # legacy stringified percent columns ('Care': '83 %') into numeric
+        # `human_*` keys so eval can read a single label schema.
         for k, v in ov.items():
-            if k not in _CORE_KEYS and k not in row:
+            if k in _CORE_KEYS or k in row:
+                continue
+            if k in _HUMAN_LEGACY:
+                row[_HUMAN_LEGACY[k]] = _parse_pct(v)
+            else:
                 row[k] = v
         rows.append(row)
     return rows

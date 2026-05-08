@@ -139,8 +139,8 @@ Each vignette row includes LLM-generated multi-label ratings across all 7 founda
 | Column pattern | Scale | Description |
 |---|---|---|
 | `llm_dominant` | string | Foundation with highest LLM score (argmax) |
-| `calibrated_Care`, `calibrated_Fairness`, … | 0–100% | LLM scores linearly mapped to human rater % scale |
-| `calibrated_wrongness` | 1–5 | Wrongness mapped to human scale |
+| `ai_Care`, `ai_Fairness`, … | 0–100% | grok-4-fast judge, linearly rescaled to align with human-rater % scale on classic |
+| `ai_wrongness` | 1–5 | grok wrongness rescaled to human range |
 
 **Calibration quality** (classic set, n=132):
 
@@ -153,7 +153,7 @@ Each vignette row includes LLM-generated multi-label ratings across all 7 founda
 | Loyalty | +0.69 | +0.75 | 9.3% |
 | Authority | +0.39 | +0.69 | 11.7% |
 
-> **Note:** Calibrated values for `scifi` and `clifford_ai` are extrapolated from the classic-set fit — treat with appropriate caution.
+> **Note:** `ai_*` for `scifi` and `clifford_ai` are extrapolated from the classic-set rescale -- treat as a noisy proxy. Use `human_*` (inherited from the parent classic item) as the primary label.
 
 ## Eval
 

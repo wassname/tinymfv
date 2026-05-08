@@ -9,7 +9,8 @@ Wraps `tinymfv.evaluate()`. Reports the AI-vs-label distribution match:
 
 Labels:
     classic: human_*    (Clifford 2015 % distributions)
-    scifi / clifford_ai: calibrated_*   (grok-4-fast judge, mapped to human scale)
+    (paraphrased sets carry the same `human_*` as their classic parent;
+     `ai_*` columns are available for cross-source diagnostics)
 
 Usage:
     python scripts/09_forced_choice.py --model Qwen/Qwen3-0.6B
@@ -88,7 +89,7 @@ def main() -> None:
 
     # === Per-foundation table ===
     print(f"\n=== per-foundation aggregates on {args.name} ===")
-    print("SHOULD: pearson_label > 0.5 on most foundations for a calibrated model")
+    print("SHOULD: pearson_label > 0.5 on most foundations for a well-calibrated model")
     print(tabulate(out["table"], headers="keys", tablefmt="pipe", floatfmt=".3f", showindex=False))
 
     # === Headline scalars ===

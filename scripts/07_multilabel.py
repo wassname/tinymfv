@@ -22,7 +22,7 @@ across all 7 foundations. We use these to:
 
 Calibration is fitted on the classic set ONLY then applied to all sets.
 Non-classic sets (scifi, clifford_ai) have no human ground truth, so their
-calibrated values are extrapolated — treat with appropriate caution.
+ai values are extrapolated -- treat with appropriate caution.
 
 Outputs:
     data/multilabel[_<name>].jsonl  — one row per vignette with all ratings
@@ -450,7 +450,7 @@ async def amain(args) -> None:
             continue
         if cfg_name != "classic" and cal_results:
             logger.warning(f"[{cfg_name}] Calibration was fitted on classic set only — "
-                           f"calibrated values for '{cfg_name}' are extrapolated")
+                           f"ai values for '{cfg_name}' are extrapolated")
             
         for rec in records:
             for f in FOUNDATIONS:
@@ -458,19 +458,19 @@ async def amain(args) -> None:
                 cal = cal_results.get(f)
                 if llm_v is not None and cal and not np.isnan(cal.get("slope", float("nan"))):
                     cal_v = cal["slope"] * llm_v + cal["intercept"]
-                    rec[f"calibrated_{f}"] = round(max(0.0, min(100.0, float(cal_v))), 1)
+                    rec[f"ai_{f}"] = round(max(0.0, min(100.0, float(cal_v))), 1)
             
             w_v = rec.get("llm_wrongness")
             w_cal = cal_results.get("wrongness")
             if w_v is not None and w_cal and not np.isnan(w_cal.get("slope", float("nan"))):
                 cal_w = w_cal["slope"] * w_v + w_cal["intercept"]
-                rec["calibrated_wrongness"] = round(max(1.0, min(5.0, float(cal_w))), 2)
+                rec["ai_wrongness"] = round(max(1.0, min(5.0, float(cal_w))), 2)
 
         out = out_path(cfg_name if cfg_name != "classic" else "")
         with out.open("w") as fh:
             for rec in records:
                 fh.write(json.dumps(rec) + "\n")
-        logger.info(f"[{cfg_name}] wrote {len(records)} records (with calibrated labels) to {out}")
+        logger.info(f"[{cfg_name}] wrote {len(records)} records (with ai labels) to {out}")
 
     print("\n" + "=" * 60)
     print("SUMMARY")

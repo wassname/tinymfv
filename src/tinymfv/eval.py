@@ -5,10 +5,13 @@ For each vignette+condition, ask the model to pick which foundation is violated
 distribution plus aggregates against the label distribution.
 
 Labels:
-- classic: `human_*` columns from Clifford et al. (2015), 7-way mutually
-  exclusive % distributions.
-- scifi / clifford_ai: `calibrated_*` columns from grok-4-fast judge,
-  linearly mapped to human-% scale via the classic-set fit.
+- `human_*` columns. On `classic` these are direct Clifford et al. (2015) %
+  distributions. On `scifi` / `clifford_ai` they are inherited from the parent
+  classic item -- paraphrases preserve the violated foundation by design, so
+  the human distribution is a strong (if noisy) target for the paraphrased
+  version too.
+- `ai_*` columns are a per-set grok-4-fast judge on the paraphrased text;
+  available for cross-source agreement analysis, not used as the eval target.
 
 Headline metrics:
 - top1_acc:  argmax model == argmax label, fraction of rows.
@@ -53,21 +56,23 @@ _COARSE_NORM = {"Social Norms": "SocialNorms"}
 
 
 def _label_dist(row: dict, foundations: list[str]) -> np.ndarray | None:
-    """Build the 7-vec label distribution for a vignette.
+    """Build the 7-vec human label distribution for a vignette.
 
     Order matches `foundations` (probe-word order: care, fairness, ..., social).
-    Tries `human_*` first (Clifford classic), then `calibrated_*` (LLM judge
-    on scifi / clifford_ai). Returns None if neither set is present or sums to 0.
+    Reads `human_*` -- on `classic` these are direct Clifford et al. (2015) %
+    distributions; on `scifi` and `clifford_ai` they are inherited from the
+    parent classic item (paraphrases preserve the violated foundation by
+    design). Returns None if any column missing or row sums to 0.
     """
-    for prefix in ("human_", "calibrated_"):
-        coarse = [_PROBE_TO_COARSE[f] for f in foundations]
-        vals = [row.get(f"{prefix}{c}") for c in coarse]
-        if all(v is not None for v in vals):
-            arr = np.array(vals, dtype=float)
-            s = float(arr.sum())
-            if s > 0:
-                return arr / s
-    return None
+    coarse = [_PROBE_TO_COARSE[f] for f in foundations]
+    vals = [row.get(f"human_{c}") for c in coarse]
+    if any(v is None for v in vals):
+        return None
+    arr = np.array(vals, dtype=float)
+    s = float(arr.sum())
+    if s <= 0:
+        return None
+    return arr / s
 
 
 def _js_divergence(p: np.ndarray, q: np.ndarray) -> float:
