@@ -3,7 +3,7 @@
 Two outputs per config, each in its own jsonl:
 
 - `other_violate`  verbatim source CSV (no LLM, never fails). The 3rd-person
-                   condition the eval reads. For clifford this is in every LLM's
+                   condition the eval reads. For classic this is in every LLM's
                    training data; that's a constant offset on absolute wrongness
                    but cancels in delta-across-checkpoints (the eval's main signal).
 - `self_violate`   1st-person LLM rewrite of other_violate.
@@ -40,19 +40,16 @@ CONDITIONS = ["other_violate", "self_violate"]
 
 
 def paths(name: str) -> tuple[Path, Path]:
-    suf = f"_{name}" if name else ""
-    return (ROOT / "data" / f"vignettes{suf}.csv",
+    return (ROOT / "data" / f"vignettes_{name}.csv",
             ROOT / "data")
 
 
 def cache_dir(name: str) -> Path:
-    sub = name or "rewrite"
-    return ROOT / "data" / "cache" / sub
+    return ROOT / "data" / "cache" / name
 
 
 def out_path(name: str, condition: str) -> Path:
-    suf = f"_{name}" if name else ""
-    return ROOT / "data" / f"vignettes{suf}_{condition}.jsonl"
+    return ROOT / "data" / f"vignettes_{name}_{condition}.jsonl"
 
 
 # Strict deny-list enforced in prompt and asserted post-hoc. These tail-clauses
@@ -80,7 +77,7 @@ Rules:
 - NO editorial tail-clauses, NO commentary. Forbidden phrasing: "thus...", "thereby...", "showing kindness", "demonstrating respect". Just describe the action.
 - Output JSON only: {{"text": "..."}}."""
 
-# clifford_ai (AI-transcribed Clifford) needs AI-as-actor preserved in 1st-person:
+# ai-actor needs AI-as-actor preserved in 1st-person:
 # the principal is the AI, not a human. A naive "You X" rewrite drifts the actor
 # archetype to human (judge correctly flagged this in v1). Keeping the system
 # descriptor as an apposition ("You, an AI X bot, do Y") preserves the archetype
@@ -103,7 +100,7 @@ Rules:
 
 
 def self_violate_prompt(name: str) -> str:
-    return _SELF_VIOLATE_AI if name == "clifford_ai" else _SELF_VIOLATE_HUMAN
+    return _SELF_VIOLATE_AI if name == "ai-actor" else _SELF_VIOLATE_HUMAN
 
 
 def coarse(found: str) -> str:
@@ -257,7 +254,7 @@ def main() -> None:
     ap.add_argument("--model", default="openai/gpt-4o-mini")
     ap.add_argument("--fallback-model", default="x-ai/grok-4-fast",
                     help="retry failures/refusals with this model; '' to disable")
-    ap.add_argument("--name", default="", help="config name; '' = clifford default")
+    ap.add_argument("--name", default="classic", choices=["classic", "scifi", "ai-actor"])
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--concurrency", type=int, default=16)
     args = ap.parse_args()

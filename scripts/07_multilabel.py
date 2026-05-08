@@ -14,18 +14,18 @@ We use two frames (violation / acceptability) for bias mitigation:
   are averaged and mapped back to Likert scale. This cancels directional and
   range biases between the two frames.
 
-On the classic (Clifford) set, we have ground-truth human rater % distributions
+On the classic set, we have ground-truth human rater % distributions
 across all 7 foundations. We use these to:
   1. Compute per-foundation Spearman/Pearson correlation (quality check).
   2. Fit a simple linear mapping from LLM Likert → human % (calibration).
   3. Flag vignettes where LLM and human disagree sharply.
 
 Calibration is fitted on the classic set ONLY then applied to all sets.
-Non-classic sets (scifi, clifford_ai) have no human ground truth, so their
+Non-classic sets (scifi, ai-actor) use inherited human labels, so their
 ai values are extrapolated -- treat with appropriate caution.
 
 Outputs:
-    data/multilabel[_<name>].jsonl  — one row per vignette with all ratings
+    data/multilabel_<name>.jsonl  — one row per vignette with all ratings
     data/calibration.json           — fitted calibration parameters (classic only)
     printed: per-foundation correlations, calibration stats, flagged rows
 
@@ -143,13 +143,11 @@ def parse_human_pct(val: str | None) -> float | None:
 
 
 def cache_dir(name: str) -> Path:
-    sub = f"multilabel_{name}" if name else "multilabel"
-    return ROOT / "data" / "cache" / sub
+    return ROOT / "data" / "cache" / f"multilabel_{name}"
 
 
 def out_path(name: str) -> Path:
-    suf = f"_{name}" if name else ""
-    return ROOT / "data" / f"multilabel{suf}.jsonl"
+    return ROOT / "data" / f"multilabel_{name}.jsonl"
 
 
 async def judge_one(model: str, prompt: str, sem: asyncio.Semaphore) -> dict:
@@ -466,10 +464,11 @@ async def amain(args) -> None:
                 cal_w = w_cal["slope"] * w_v + w_cal["intercept"]
                 rec["ai_wrongness"] = round(max(1.0, min(5.0, float(cal_w))), 2)
 
-        out = out_path(cfg_name if cfg_name != "classic" else "")
+        out = out_path(cfg_name)
         with out.open("w") as fh:
             for rec in records:
-                fh.write(json.dumps(rec) + "\n")
+                out_rec = {k: v for k, v in rec.items() if not k.startswith("llm_")}
+                fh.write(json.dumps(out_rec) + "\n")
         logger.info(f"[{cfg_name}] wrote {len(records)} records (with ai labels) to {out}")
 
     print("\n" + "=" * 60)
@@ -489,7 +488,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", default="x-ai/grok-4-fast")
     ap.add_argument("--name", default="classic",
-                    help="config: 'classic', 'scifi', 'clifford_ai', or 'all'")
+                    help="config: 'classic', 'scifi', 'ai-actor', or 'all'")
     ap.add_argument("--conditions", default="other_violate",
                     help="comma-separated conditions to rate (default: other_violate)")
     ap.add_argument("--limit", type=int, default=0)

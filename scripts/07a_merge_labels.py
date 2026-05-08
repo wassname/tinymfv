@@ -13,14 +13,13 @@ from pathlib import Path
 from loguru import logger
 
 ROOT = Path(__file__).resolve().parents[1]
-NAMES = ["classic", "scifi", "clifford_ai"]
+NAMES = ["classic", "scifi", "ai-actor"]
 CONDITIONS = ["other_violate", "self_violate"]
 
 def main() -> None:
     for name in NAMES:
         # Load the multilabel records
-        suf = f"_{name}" if name != "classic" else ""
-        ml_path = ROOT / "data" / f"multilabel{suf}.jsonl"
+        ml_path = ROOT / "data" / f"multilabel_{name}.jsonl"
         
         if not ml_path.exists():
             logger.warning(f"missing {ml_path}, skipping config {name}")
@@ -39,13 +38,9 @@ def main() -> None:
                     extra[k] = v
             extra_by_id[row["id"]] = extra
             
-        # Patch the vignette files
-        # clifford/classic files have no suffix on disk
-        file_name = "" if name == "classic" else name
-        suf_vig = f"_{file_name}" if file_name else ""
-        
+        # Patch the vignette files.
         for cond in CONDITIONS:
-            vig_path = ROOT / "data" / f"vignettes{suf_vig}_{cond}.jsonl"
+            vig_path = ROOT / "data" / f"vignettes_{name}_{cond}.jsonl"
             if not vig_path.exists():
                 logger.warning(f"missing {vig_path}, skipping")
                 continue
