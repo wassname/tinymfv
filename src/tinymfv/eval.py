@@ -6,7 +6,7 @@ distribution plus aggregates against the label distribution.
 
 Labels:
 - `human_*` columns. On `classic` these are direct Clifford et al. (2015) %
-  distributions. On `scifi` / `clifford_ai` they are inherited from the parent
+    distributions. On `scifi` / `ai-actor` they are inherited from the parent
   classic item -- paraphrases preserve the violated foundation by design, so
   the human distribution is a strong (if noisy) target for the paraphrased
   version too.
@@ -60,7 +60,7 @@ def _label_dist(row: dict, foundations: list[str]) -> np.ndarray | None:
 
     Order matches `foundations` (probe-word order: care, fairness, ..., social).
     Reads `human_*` -- on `classic` these are direct Clifford et al. (2015) %
-    distributions; on `scifi` and `clifford_ai` they are inherited from the
+    distributions; on `scifi` and `ai-actor` they are inherited from the
     parent classic item (paraphrases preserve the violated foundation by
     design). Returns None if any column missing or row sums to 0.
     """
@@ -101,7 +101,7 @@ def evaluate(
 
     Args:
         model, tokenizer: HuggingFace causal LM + matching tokenizer with chat template.
-        name: dataset config (`classic` / `scifi` / `clifford_ai`).
+        name: dataset config (`classic` / `scifi` / `ai-actor`).
         vignettes: optional pre-loaded list (overrides `name`).
         conditions: which condition strings to score. Default = both.
         max_think_tokens: think budget per (row, frame). Two frames per row.

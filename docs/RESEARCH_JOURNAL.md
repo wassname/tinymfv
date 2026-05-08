@@ -554,3 +554,39 @@ All sspace-family variants (sspace ×2, sspace_ablate ×2, sspace_damp_amp, supe
 **Decision: do not requeue sspace-family for multi-round. Queue is cleared.**
 
 Single-round sspace results are valid and strong (pmass=0.991, auth_pos=-6.4). Multi-round is system-blocked until the calibration memory footprint is reduced (e.g., smaller pmass-search batch, fewer binary-search rows).
+
+---
+
+## 2026-05-08: mean_diff iterated on clifford — thinking-loop collapse, no foundation selectivity
+
+### Setup
+
+Qwen3-4B, mean_diff, 20-round iterated steer, vignettes=clifford (132 Clifford et al. 2015 vignettes × 4 conditions = 528 evals), target_kl=0.5, target_pmass=0.85, n_pairs=128. Run stopped at round 11 when pmass stabilised below threshold.
+
+### Results (absolute logit wrongness; round 0 = bare model)
+
+| r | ± | Care | Sanc | Auth | Loy | Fair | Lib | SocN | pmass |
+|---|---|------|------|------|-----|------|-----|------|-------|
+| 0 | — | +2.72 | +3.27 | +3.77 | +0.24 | +3.43 | +2.42 | -0.91 | 1.000 |
+| 1 | - | +0.44 | +0.82 | +1.99 | -0.95 | +1.46 | +0.44 | -0.79 | 1.000 |
+| 2 | - | -0.23 | -0.24 | -0.20 | -0.57 | -0.24 | -0.29 | -0.39 | 1.000 |
+| 3 | - | -0.26 | -0.03 | -0.49 | -0.29 | -0.30 | -0.12 | -0.21 | 0.942 |
+| 4 | - | -0.32 | -0.21 | -0.50 | -0.16 | -0.40 | -0.13 | -0.32 | 0.841 |
+| 5 | - | +0.00 | +0.08 | -0.43 | -0.09 | -0.00 | +0.07 | +0.02 | 0.787 |
+| 9–11 | ← | -0.10–-0.15 | +0.57–+0.61 | -0.63–-0.68 | — | — | +0.62–+0.65 | — | 0.71 |
+
+### Key observations
+
+1. **pmass drops at round 5 (0.787), stabilises at 0.71 for rounds 9–11.** Effective rounds with pmass ≥ 0.85: rounds 1–4 only.
+
+2. **Thinking-loop collapse from round 3.** Demo responses show `</think>` repeated dozens of times — Qwen3-4B enters an infinite thinking-token loop under accumulated steering. Free-form generation is incoherent from round 3; only the forced-choice logit scores remain meaningful (pmass measures format on next-token probe, not the full decode).
+
+3. **No foundation selectivity at any viable round.** At round 4 (best pmass ≥ 0.85): Auth −0.50, Care −0.32, Fair −0.40, SocN −0.32. Auth drops slightly more than others (by ~0.1–0.2 nats) but all foundations suppress together. The vector is a generic wrongness-suppression axis, not an Authority-specific one.
+
+4. **Calibration sign oscillation.** Direction alternates `- + -` across rounds 5–11 (coefficients flip sign), indicating the bisection is chasing noise once the vector has captured the main axis. The iterated extractor cannot find a residual Authority-specific direction because none exists in the paired-persona distribution.
+
+5. **Clifford vs airisk: same result.** Prior runs on airisk showed identical saturation pattern (Auth +2.48→+0.11 by round 3, uniform reduction). The vignette set doesn't change the conclusion — the failure is in the training pairs, not the eval.
+
+### Conclusion
+
+mean_diff iterated steering on Qwen3-4B does not achieve foundation-selective axis rotation regardless of vignette set. The persona pairs (good-AI vs deferential-AI) co-vary all foundations simultaneously. To get selective Authority steering, need contrastive pairs that vary Authority while holding Care, Sanctity, and Fairness fixed — e.g., scenarios where defying authority is clearly harm-neutral, or authority compliance clearly causes harm.

@@ -2,15 +2,13 @@
 
 Creates / updates: wassname/tiny-mfv
 
-- config `classic` (alias `clifford`): 132 vignettes from Clifford et al. (2015), Wrong ratings are human Likert.
+- config `classic`: 132 vignettes from Clifford et al. (2015), Wrong ratings are human Likert.
 - config `scifi`:        132 hand-written sci-fi/fantasy vignettes covering the same foundations.
-- config `clifford_ai`:  132 AI-as-actor transcriptions of the classic Clifford set
-                         (preserves single-foundation violation per item -- the
-                         principled replacement for the deprecated `airisk` config).
+- config `ai-actor`:     132 AI-as-actor transcriptions of the classic set.
 
 Each config has two splits:
-- `other_violate` -- 3rd-person source (verbatim for classic/scifi; AI-actor transcription for clifford_ai).
-- `self_violate`  -- 1st-person rewrite. For clifford_ai this preserves the AI-as-actor
+- `other_violate` -- 3rd-person source (verbatim for classic/scifi; AI-actor transcription for ai-actor).
+- `self_violate`  -- 1st-person rewrite. For ai-actor this preserves the AI-as-actor
                      framing ("You, an AI {X} bot, ..."); for classic/scifi it's a plain
                      "You ..." 1st-person shift.
 """
@@ -22,25 +20,20 @@ from huggingface_hub import HfApi
 REPO_ID = "wassname/tiny-mfv"
 ROOT = Path(__file__).resolve().parents[1]
 
-# HF config name → local file key (clifford files have no suffix on disk).
-# "classic" is the user-facing name; on HF it's stored under "classic/" directory
-# but we also register a "clifford" alias so existing code doesn't break.
 CONFIGS = {
-    "classic":     "",             # vignettes_other_violate.jsonl  (no suffix)
-    "scifi":       "scifi",        # vignettes_scifi_other_violate.jsonl
-    "clifford_ai": "clifford_ai",  # vignettes_clifford_ai_other_violate.jsonl
+    "classic":  "classic",
+    "scifi":    "scifi",
+    "ai-actor": "ai-actor",
 }
 SPLITS = ["other_violate", "self_violate"]
 
 
 def local_jsonl(file_key: str, split: str) -> Path:
-    suf = f"_{file_key}" if file_key else ""
-    return ROOT / "data" / f"vignettes{suf}_{split}.jsonl"
+    return ROOT / "data" / f"vignettes_{file_key}_{split}.jsonl"
 
 
 def local_csv(file_key: str) -> Path:
-    suf = f"_{file_key}" if file_key else ""
-    return ROOT / "data" / f"vignettes{suf}.csv"
+    return ROOT / "data" / f"vignettes_{file_key}.csv"
 
 
 def hf_jsonl(cfg: str, split: str) -> str:
@@ -59,12 +52,6 @@ def yaml_configs() -> str:
         for split in SPLITS:
             lines.append(f"    - split: {split}")
             lines.append(f"      path: {hf_jsonl(cfg, split)}")
-    # Register "clifford" as an alias for "classic" so existing code works.
-    lines.append("- config_name: clifford")
-    lines.append("  data_files:")
-    for split in SPLITS:
-        lines.append(f"    - split: {split}")
-        lines.append(f"      path: {hf_jsonl('classic', split)}")
     return "\n".join(lines)
 
 
@@ -103,14 +90,14 @@ For use with LLMs we make them
 
 ## Configs
 
-- **classic** (alias: clifford): 132 vignettes from Clifford et al. (2015) "Moral Foundations Vignettes". `wrong` is the human Likert mean (1-5).
+- **classic**: 132 vignettes from Clifford et al. (2015) "Moral Foundations Vignettes". `wrong` is the human Likert mean (1-5).
 - **scifi**: 132 hand-written sci-fi/fantasy vignettes covering the same foundations. Genre-clean cues, no real-world ethnicity/religion confounds.
-- **clifford_ai**: 132 AI-as-actor transcriptions of the classic Clifford set. Each item preserves a single foundation violation at the same severity, just shifted onto an AI archetype. This is the principled replacement for the deprecated `airisk` config (which conflated multiple foundations per item).
+- **ai-actor**: 132 AI-as-actor transcriptions of the classic set. Each item preserves a single foundation violation at the same severity, just shifted onto an AI archetype.
 
 ## Splits (per config)
 
 - `other_violate` — verbatim 3rd-person source text. No LLM call. For classic this means the verbatim text is in every LLM's training set, which is fine for tracking deltas across checkpoints (the offset is constant).
-- `self_violate`  — 1st-person rewrite of the same scenario. For classic and scifi this is a plain `"You ..."` shift. For clifford_ai the principal IS the AI, so the rewrite preserves the AI-as-actor framing as `"You, an AI X bot, ..."` (a naive `"You ..."` template silently swaps the actor archetype to human; verified by `06_consistency.py`).
+- `self_violate`  — 1st-person rewrite of the same scenario. For classic and scifi this is a plain `"You ..."` shift. For ai-actor the principal IS the AI, so the rewrite preserves the AI-as-actor framing as `"You, an AI X bot, ..."` (a naive `"You ..."` template silently swaps the actor archetype to human; verified by `06_consistency.py`).
 
 ## Dual axis: `cond` × `frame`
 
@@ -153,7 +140,7 @@ Each vignette row includes LLM-generated multi-label ratings across all 7 founda
 | Loyalty | +0.69 | +0.75 | 9.3% |
 | Authority | +0.39 | +0.69 | 11.7% |
 
-> **Note:** `ai_*` for `scifi` and `clifford_ai` are extrapolated from the classic-set rescale -- treat as a noisy proxy. Use `human_*` (inherited from the parent classic item) as the primary label.
+> **Note:** `ai_*` for `scifi` and `ai-actor` are extrapolated from the classic-set rescale -- treat as a noisy proxy. Use `human_*` (inherited from the parent classic item) as the primary label.
 
 ## Eval
 

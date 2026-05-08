@@ -38,9 +38,9 @@ HF_REPO = "wassname/tiny-mfv"
 CONDITIONS = ["other_violate", "self_violate"]
 
 # Canonical config names.
-CONFIGS: tuple[str, ...] = ("classic", "scifi", "clifford_ai")
+CONFIGS: tuple[str, ...] = ("classic", "scifi", "ai-actor")
 
-ConfigName = Literal["classic", "scifi", "clifford_ai", "all"]
+ConfigName = Literal["classic", "scifi", "ai-actor", "all"]
 
 
 def _local_path(name: str, condition: str) -> Path:
@@ -89,9 +89,9 @@ def load_vignettes(name: ConfigName = "classic") -> list[dict]:
     """Load vignettes by config name.
 
     Args:
-        name: ``'classic'`` (Clifford et al. 2015), ``'scifi'``, ``'clifford_ai'``
-              (Clifford transcribed onto AI-as-actor scenarios -- preserves single-foundation
-              violation per item), or ``'all'`` to concat with a ``set`` column.
+        name: ``'classic'`` (Clifford et al. 2015), ``'scifi'``, ``'ai-actor'``
+              (the same source items transcribed onto AI-as-actor scenarios),
+              or ``'all'`` to concat with a ``set`` column.
 
     Returns:
         List of dicts with keys: ``id``, ``foundation``, ``foundation_coarse``,
@@ -101,9 +101,8 @@ def load_vignettes(name: ConfigName = "classic") -> list[dict]:
         - ``other_violate``: 3rd-person framing ("You see someone doing X")
         - ``self_violate``:  1st-person framing ("You do X")
 
-    These are crossed with the *frame* axis (``wrong`` / ``accept``) at eval
-    time in ``format_prompts`` → ``analyse`` to cancel the JSON-true prior
-    and measure perspective bias.  See module docstring for details.
+    Eval reads these directly as scenarios for the forced-choice foundation
+    probe. The `human_*` label distribution is inherited from the source item.
     """
     if name.lower() == "all":
         return load_all_vignettes()

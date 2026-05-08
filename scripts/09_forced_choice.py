@@ -14,7 +14,7 @@ Labels:
 
 Usage:
     python scripts/09_forced_choice.py --model Qwen/Qwen3-0.6B
-    python scripts/09_forced_choice.py --model Qwen/Qwen3-4B --name clifford_ai
+    python scripts/09_forced_choice.py --model Qwen/Qwen3-4B --name ai-actor
 """
 from __future__ import annotations
 import argparse
@@ -36,7 +36,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="Qwen/Qwen3-0.6B")
-    ap.add_argument("--name", default="classic", help="dataset config (classic/scifi/clifford_ai)")
+    ap.add_argument("--name", default="classic", help="dataset config (classic/scifi/ai-actor)")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--batch-size", type=int, default=16)
     ap.add_argument("--max-think-tokens", type=int, default=128)

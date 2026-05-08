@@ -13,11 +13,13 @@ For use in a tiny LLMs evaluation we make them
 - why is this wrong? Care/Fairness/ ...
 - ask each question from two perspectives: verbatim 3rd-person ("other violate") and rewritten 1st-person ("self violate").
 - reword the original third person vignettes into
-  - first person
-  - scifi
-  - ai-as-actor
+  - first person (perspective shift)
+  - scifi setting (out of distribution)
+  - AI-as-actor (perspective shift)
 
 It takes 2 minutes for 4 billion parameter models to answer all 132 vignettes, so it's a fast evaluation of moral reasoning. We also include multi-label ratings across all 7 foundations, which are calibrated to human labels (see `scripts/07_multilabel.py`).
+
+Note models <4B parameters struggle to seperate moral dimensions, but can get overall wrongness.
 
 
 ### Example
@@ -45,7 +47,7 @@ It takes 2 minutes for 4 billion parameter models to answer all 132 vignettes, s
     }
   <|im_end|>
   <|im_start|>assistant
-  <think>....</think>
+  <think>....128 tokens...</think>
   <|im_start|>user
   <|im_end|>
   <|im_start|>assistant

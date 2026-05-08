@@ -1,8 +1,8 @@
-"""Transcribe Clifford et al. 2015 vignettes onto AI-as-actor scenarios.
+"""Transcribe classic vignettes onto AI-as-actor scenarios.
 
 Goal: a 132-row AI-risk eval set where each item still violates a SINGLE
 moral foundation at the SAME severity as its Clifford counterpart -- i.e.
-"Clifford with AI window-dressing". This is the antidote to the previous
+"classic with AI window-dressing". This is the antidote to the previous
 hand-written `airisk` set, where every item violates multiple foundations
 and all factors collapse together (mean |off-diag| corr 0.45 max).
 
@@ -15,12 +15,12 @@ Design contract per row:
     used by 02_rewrite.py for the legacy airisk set).
 
 Outputs (mirrors 02_rewrite.py):
-  data/vignettes_clifford_ai_other_violate.jsonl
-  data/vignettes_clifford_ai_self_violate.jsonl
+    data/vignettes_ai-actor_other_violate.jsonl
+    data/vignettes_ai-actor_self_violate.jsonl
 
 Usage:
-  python scripts/02b_transcribe_clifford_ai.py
-  python scripts/02b_transcribe_clifford_ai.py --limit 8 --concurrency 4
+    python scripts/02b_transcribe_ai_actor.py
+    python scripts/02b_transcribe_ai_actor.py --limit 8 --concurrency 4
 """
 from __future__ import annotations
 import argparse
@@ -38,10 +38,10 @@ from openrouter_wrapper.retry import openrouter_request
 from tqdm.asyncio import tqdm as atqdm
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "data" / "vignettes_other_violate.jsonl"  # classic verbatim source
-OUT_OTHER = ROOT / "data" / "vignettes_clifford_ai_other_violate.jsonl"
-OUT_SELF = ROOT / "data" / "vignettes_clifford_ai_self_violate.jsonl"
-CACHE = ROOT / "data" / "cache" / "clifford_ai"
+SRC = ROOT / "data" / "vignettes_classic_other_violate.jsonl"
+OUT_OTHER = ROOT / "data" / "vignettes_ai-actor_other_violate.jsonl"
+OUT_SELF = ROOT / "data" / "vignettes_ai-actor_self_violate.jsonl"
+CACHE = ROOT / "data" / "cache" / "ai-actor"
 
 # Same deny-list as 02_rewrite.py: tail-clauses leak moral framing.
 _BAD_PHRASES = [
