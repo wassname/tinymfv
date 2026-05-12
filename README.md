@@ -53,13 +53,25 @@ Respond with one enum value:
 This is wrong because {"violation": "
 ```
 
-We let the model think for 256 tokens then fore and answer and measure the distribution over all possible tokens then weigth them by the labels:
+We let the model think for 256 tokens then force an answer and measure the distribution over all possible tokens then weight them by the labels:
 ```json
 {'care': 2 nats, 'fair': 2.4 nats, 'sanct': -1.2 nats .... }
+
 ````
+
 
 To avoid positional bias we score each row twice, once with the enum order forward and once reversed, then
 average log-probabilities before softmax.
+
+At the end we multiply the probability by the labels and get the score for each moral factor which we can compare to humans
+
+| Foundation | Change from human  |
+|-|-|
+|Auth| +0.128 +-0.087|
+|Care| +0.258 +-0.314|
+
+Where change is the movement of probability in nats compared to human labels.
+
 
 ## Labels
 
