@@ -25,8 +25,7 @@ Each config has two scenario columns:
 - `self_violate`: first-person framing, "You do X".
 
 
-[huggingface dataset](https://huggingface.co/datasets/wassname/tiny-mfv)
-[gtihub](https://github.com/wassname/tinymfv)
+[[huggingface dataset](https://huggingface.co/datasets/wassname/tiny-mfv), [GitHub](https://github.com/wassname/tinymfv)]
 
 ## Evaluation
 
