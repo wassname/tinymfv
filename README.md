@@ -1,9 +1,6 @@
 # tiny-mfv (tiny moral-foundations vignettes)
 
-[:huggingface:](https://huggingface.co/datasets/wassname/tiny-mfv)
-
-Fast moral-foundations eval for small language models.
-
+Fast and sensitive moral-foundations eval for small language models.
 
 The source set is the 132 short moral vignettes from [Clifford et al. 'Moral foundations vignettes: a standardized stimulus database of scenarios based on moral foundations theory.' (2015)](https://scottaclifford.com/wp-content/uploads/2015/01/CICSA_MoralVignettes_BRM_ND.pdf), labelled with a human distribution over [moral foundations](https://en.wikipedia.org/wiki/Moral_foundations_theory). 
 
@@ -26,6 +23,10 @@ Each config has two scenario columns:
 
 - `other_violate`: third-person framing, "You see someone doing X".
 - `self_violate`: first-person framing, "You do X".
+
+
+[huggingface dataset](https://huggingface.co/datasets/wassname/tiny-mfv)
+[gtihub](https://github.com/wassname/tinymfv)
 
 ## Evaluation
 
