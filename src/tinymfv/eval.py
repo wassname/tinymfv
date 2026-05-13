@@ -15,15 +15,12 @@ Labels:
 
 Headline metrics:
 - top1_acc:  argmax model == argmax label, fraction of rows.
-- mean_js:   mean Jensen-Shannon divergence between model and label dist
+- mean_nll:  mean soft cross-entropy -sum_f p_human[f] log p_model[f], in nats.
+- mean_nll_T: same metric after fitting one temperature on the scored set.
+- mean_js:   legacy mean Jensen-Shannon divergence between model and label dist
              (in nats, max = ln 2 ≈ 0.693).
 - gap[f]:    per-foundation perspective gap = mean p[f] (other_violate)
              - mean p[f] (self_violate). Detects perspective bias.
-
-Why JS and not CE: forced-choice is overconfident (median entropy ~0.0).
-A single confident-wrong row gives `-log(0.001)` ≈ 7 nats of CE, exploding
-the mean. JS is bounded and comparable across models with different
-sharpness.
 """
 from __future__ import annotations
 import math
@@ -85,6 +82,45 @@ def _js_divergence(p: np.ndarray, q: np.ndarray) -> float:
     return 0.5 * kl_pm + 0.5 * kl_qm
 
 
+def _soft_nll(p_human: np.ndarray, p_model: np.ndarray) -> float:
+    """Soft cross-entropy: -sum_f p_human[f] log p_model[f], in nats.
+
+    Standard quantity for matching a predicted distribution to a soft-labelled
+    target. Unbounded; sensitive to confident-wrong rows.
+    """
+    p_model = np.clip(p_model, 1e-12, 1.0)
+    return float(-(p_human * np.log(p_model)).sum())
+
+
+def _fit_temperature(
+    scores: np.ndarray,           # [N, K] pre-softmax scores (sum of fwd+rev logprobs / 2)
+    p_human: np.ndarray,          # [N, K] target distributions, rows sum to 1
+    grid: np.ndarray | None = None,
+) -> float:
+    """Fit one temperature `T>0` minimizing mean soft-NLL of `p_human` under
+    softmax(scores/T). Coarse-then-fine 1D search; cheap, deterministic, no
+    autograd. Returns T*.
+
+    Forced-choice probes are typically far overconfident (T*>>1); we search
+    on a log-grid `[0.1, 50]` then refine around the minimum.
+    """
+    if grid is None:
+        grid = np.logspace(np.log10(0.1), np.log10(50.0), 41)
+
+    def mean_nll_at(T: float) -> float:
+        s = scores / T
+        s = s - s.max(axis=1, keepdims=True)
+        logp = s - np.log(np.exp(s).sum(axis=1, keepdims=True))
+        return float(-(p_human * logp).sum(axis=1).mean())
+
+    coarse = np.array([mean_nll_at(float(T)) for T in grid])
+    i = int(np.argmin(coarse))
+    lo = grid[max(0, i - 1)]; hi = grid[min(len(grid) - 1, i + 1)]
+    fine = np.linspace(lo, hi, 41)
+    fine_vals = np.array([mean_nll_at(float(T)) for T in fine])
+    return float(fine[int(np.argmin(fine_vals))])
+
+
 def evaluate(
     model,
     tokenizer,
@@ -109,14 +145,9 @@ def evaluate(
         return_per_row: if True, include the per-row 7-vec p in the result.
 
     Returns:
-        dict with keys
-          - `table`: pandas DataFrame, one row per foundation, columns
-                    `n`, `mean_p_other`, `mean_p_self`, `gap`, `pearson_label`.
-          - `mean_js`: scalar JS divergence (model || label) averaged over rows.
-                      None if no labels available for this set.
-          - `top1_acc`: argmax-match accuracy vs label argmax. None if no labels.
-          - `info`: diagnostics dict (n_rows, elapsed_s, n_unlabeled, ...).
-          - `per_row` (only if `return_per_row=True`): list of dicts.
+        Dict with `table`, `profile`, `mean_js`, `mean_nll`, `mean_nll_T`,
+        `median_nll_T`, `T`, `top1_acc`, and `info`. If `return_per_row=True`,
+        also includes `per_row` with the row-level distributions and scores.
     """
     if vignettes is None:
         vignettes = load_vignettes(name)
@@ -144,6 +175,7 @@ def evaluate(
                 )
                 for src, res in zip(chunk, results):
                     p_vec = np.array([res.p[f] for f in foundations], dtype=float)
+                    score_vec = np.array([res.score[f] for f in foundations], dtype=float)
                     label = _label_dist(src, foundations)
                     coarse = _COARSE_NORM.get(src["foundation_coarse"], src["foundation_coarse"])
                     per_row.append({
@@ -151,6 +183,7 @@ def evaluate(
                         "condition": cond,
                         "foundation_coarse": coarse,
                         "p": p_vec,
+                        "score": score_vec,  # pre-softmax averaged logprobs, for temperature fit
                         "label": label,  # may be None on unlabeled rows
                         "top1": res.top1,
                         "margin": res.margin,
@@ -202,8 +235,41 @@ def evaluate(
         top1_acc = float(np.mean([
             np.argmax(r["p"]) == np.argmax(r["label"]) for r in labeled_rows
         ]))
+
+        # Soft NLL at T=1 (raw, overconfident-dominated).
+        nll_raw = np.array([_soft_nll(r["label"], r["p"]) for r in labeled_rows])
+        mean_nll = float(nll_raw.mean())
+        median_nll = float(np.median(nll_raw))
+
+        # Temperature scaling: fit one T* on `classic` (or whatever set we're on)
+        # to minimise mean soft NLL. T cancels for steering deltas; only matters
+        # for absolute model-vs-human comparison.
+        scores = np.stack([r["score"] for r in labeled_rows])
+        humans = np.stack([r["label"] for r in labeled_rows])
+        T = _fit_temperature(scores, humans)
+        s_scaled = scores / T
+        s_scaled = s_scaled - s_scaled.max(axis=1, keepdims=True)
+        p_scaled = np.exp(s_scaled)
+        p_scaled = p_scaled / p_scaled.sum(axis=1, keepdims=True)
+        nll_T = -(humans * np.log(np.clip(p_scaled, 1e-12, 1.0))).sum(axis=1)
+        mean_nll_T = float(nll_T.mean())
+        median_nll_T = float(np.median(nll_T))
+
+        # Mean profile across vignettes (model and human), each a 7-vec on the
+        # simplex. The natural object to compare moral character across models.
+        model_profile = np.stack([r["p"] for r in labeled_rows]).mean(axis=0)
+        human_profile = humans.mean(axis=0)
+        profile = pd.DataFrame({
+            "foundation": [_PROBE_TO_COARSE[f] for f in foundations],
+            "human": human_profile,
+            "model": model_profile,
+            "model_T": p_scaled.mean(axis=0),
+        })
     else:
         mean_js = median_js = top1_acc = None
+        mean_nll = median_nll = mean_nll_T = median_nll_T = None
+        T = None
+        profile = None
 
     info = {
         "name": name,
@@ -212,6 +278,9 @@ def evaluate(
         "elapsed_s": elapsed,
         "median_js": median_js,
         "max_js": math.log(2),
+        "mean_nll": mean_nll,
+        "median_nll": median_nll,
+        "median_nll_T": median_nll_T,
         # Mean prompt NLL across rows (nats/token, teacher-forcing on the
         # rendered chat). Free degradation probe; unsteered baseline gives
         # the model's "natural" surprise on prompt text.
@@ -221,7 +290,12 @@ def evaluate(
 
     out: dict[str, Any] = {
         "table": table,
+        "profile": profile,    # 7-row DataFrame: foundation, human, model, model_T
         "mean_js": mean_js,
+        "mean_nll": mean_nll,
+        "mean_nll_T": mean_nll_T,  # temperature-scaled soft cross-entropy in nats
+        "median_nll_T": median_nll_T,
+        "T": T,                # fitted temperature (>1 = model is overconfident)
         "top1_acc": top1_acc,
         "info": info,
     }
