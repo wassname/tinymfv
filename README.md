@@ -16,14 +16,15 @@ Here is an example of one vignette:
 
 ## Evaluation
 
-We want a fast cheap sensitive eval: one deterministic forced-choice rollout
+We want a fast cheap sensitive eval: two deterministic forced-choice frames
 per row and condition, with a signal in nats so small steering interventions
 register without saturating. So instead of sampling an answer and parsing it,
-we read the model's probability distribution over the seven foundation
-first-tokens after the prefill `This is wrong because {"violation": "`.
+we interrupt the model after its short reasoning turn, prefill the answer, and
+read the next-token distribution over the seven foundation first-tokens.
 
 The model gets a forced-choice JSON-shaped prompt, thinks for up to 256
-tokens, then receives a `Just answer` nudge and this scored prefill:
+tokens, then receives a new user message, `Just answer`, followed by this
+scored assistant prefill:
 
 ```md
 This is wrong because of which moral foundation?
@@ -46,8 +47,8 @@ Respond with one enum value:
 This is wrong because {"violation": "
 ```
 
-Concretely: at the prefill position we take a `log_softmax` over the full
-vocabulary, then gather log-probabilities at the seven foundation
+Concretely: after the answer prefill we take a `log_softmax` over the full
+next-token vocabulary, then gather log-probabilities at the seven foundation
 first-tokens (`care`, `fairness`, ..., `social`). To cancel position bias
 we score each row twice, once with the enum listed forward and once
 reversed, and average the two log-probability vectors. The averaged
@@ -168,10 +169,10 @@ We report two scalars on `classic`, plus a per-class breakdown.
   many nats); we report mean and median.
 
 The forced-choice probe is far more peaked than the human inter-rater
-distribution (median top-1 probability ≈ 1.0 vs typical human entropy
-of 0.4-0.8 nats). For absolute NLL comparison we fit a single
-temperature `T` by minimising mean soft NLL on `classic`, then apply the
-same `T` to all sets. This is one extra scalar, no gradient steps. For
+distribution: the model usually puts nearly all mass on one option, while the
+human labels spread mass across raters. For absolute NLL comparison we fit a
+single temperature `T` by minimising mean soft NLL on `classic`, then apply
+the same `T` to all sets. This is one extra scalar, no gradient steps. For
 steering deltas the temperature cancels out and you can ignore it.
 
 The Qwen3-4B top-1 rows below are from the prior forced-choice run; the NLL
@@ -221,7 +222,7 @@ that holds, the eval is reading the intervention as intended.
 ## Scope
 
 This is a fast and sensitive eval, designed to register small steering
-interventions on local 4B-scale models with a short forced-choice rollout per
+interventions on local 4B-scale models with two short forced-choice frames per
 row and condition. It is not a full moral-reasoning evaluation. For that
 consider larger, behaviour-heavy evals:
 

@@ -2,8 +2,9 @@
 
 Wraps `tinymfv.evaluate()`. Reports the AI-vs-label distribution match:
     top1_acc       argmax model == argmax label
-    mean_js        Jensen-Shannon (model || label), nats; uniform baseline
-                   ~ ln 7 = 1.95, max = ln 2 = 0.693
+    mean_nll       soft cross-entropy vs human distribution, nats
+    mean_nll_T     same metric after one fitted temperature
+    mean_js        legacy Jensen-Shannon (model || label), nats; max = ln 2
     pearson[f]     cross-vignette Pearson(model_p[f], label_p[f]) on
                    labeled rows (other_violate condition).
 
@@ -95,9 +96,17 @@ def main() -> None:
 
     # === Headline scalars ===
     print(f"\n=== AI-vs-label headlines on {args.name} (n={len(out['per_row'])}) ===")
-    print("SHOULD: top1_acc >> 1/7=0.14 (uniform); mean_js << ln 7 = 1.95 (uniform vs label)")
+    print("SHOULD: top1_acc >> 1/7=0.14 (uniform); mean_nll_T < mean_nll if raw probe is overconfident")
     print(f"  top1_acc = {out['top1_acc']}")
+    print(f"  mean_nll = {out['mean_nll']}    (T=1, nats)")
+    print(f"  mean_nll_T = {out['mean_nll_T']}    (temperature-scaled, nats)")
+    print(f"  median_nll_T = {out['median_nll_T']}    (temperature-scaled, nats)")
+    print(f"  T = {out['T']}")
     print(f"  mean_js  = {out['mean_js']}    (max possible = ln 2 = 0.693)")
+
+    if out["profile"] is not None:
+        print("\n=== mean profile (human vs model) ===")
+        print(tabulate(out["profile"], headers="keys", tablefmt="pipe", floatfmt=".3f", showindex=False))
 
     # Confidence calibration
     p_top1 = np.array([float(r["p"].max()) for r in out["per_row"]])
