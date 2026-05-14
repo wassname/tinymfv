@@ -152,12 +152,11 @@ def _rollout_kv_fork(
         L_pref = int(pref_real[i].item())
         chat_ids_i = chat_ids_per_row[i]
         chat_len = len(chat_ids_i)
-        assert sp_ids_per_row[i][:chat_len] == chat_ids_i, (
-            f"chat retokenisation diverged from prefix at row {i}: "
-            f"boundary tokens shifted between chat and chat+think+close. "
-            f"prompt-NLL window cannot be located safely."
-        )
-        if chat_len < 2:
+        # Under heavy steering the model can emit think_text whose first
+        # tokens merge with the trailing `<think>\n` token of `chat`, shifting
+        # boundaries. nll_prompt is a diagnostic, not load-bearing for the
+        # forced-choice eval — drop it for that row and continue.
+        if sp_ids_per_row[i][:chat_len] != chat_ids_i or chat_len < 2:
             nll_prompts.append(float("nan"))
             continue
         start = P_max - L_pref
