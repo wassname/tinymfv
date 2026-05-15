@@ -163,7 +163,7 @@ def evaluate(
     t0 = time.time()
     per_row: list[dict] = []
     total_calls = len(vignettes) * len(conditions)
-    with tqdm(total=total_calls, desc=f"forced-choice {name}") as pbar:
+    with tqdm(total=total_calls, desc=f"forced-choice {name}", mininterval=60, maxinterval=120) as pbar:
         for cond in conditions:
             for i in range(0, len(vignettes), batch_size):
                 chunk = vignettes[i: i + batch_size]
