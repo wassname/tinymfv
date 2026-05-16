@@ -212,14 +212,15 @@ def _rollout_kv_fork(
     for j, (nudge, prefill) in enumerate(scoring_slots):
         suf_ids = suf_ids_for(nudge, prefill)
         if verbose:
+            # DEBUG, not INFO: keeps the trace in the user's verbose sidecar
+            # but out of any downstream INFO sink the caller might be wrapping.
             full_text = sp_per_row[0] + tok.decode(suf_ids[0], skip_special_tokens=False)
-            # Free-form generate to see what the model actually says after the prefill.
             full_ids = torch.tensor(
                 [sp_ids_per_row[0] + suf_ids[0]], device=device, dtype=torch.long,
             )
             gen = model.generate(full_ids, max_new_tokens=64, do_sample=False, pad_token_id=pad_id)
             free = tok.decode(gen[0, full_ids.shape[1]:], skip_special_tokens=False)
-            logger.info(
+            logger.debug(
                 f"--- slot {j} (nudge={nudge!r}, prefill={prefill!r}) ---\n"
                 f"{full_text}<<<MODEL CONTINUES>>>{free}\n--- end slot {j} ---"
             )
