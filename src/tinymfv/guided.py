@@ -331,6 +331,13 @@ class ForcedChoiceResult:
     # signal: rises when the model is perturbed (steering, ablation, etc.)
     # to a state where ordinary prompt text becomes "surprising".
     nll_prompt: float
+    # Sum of probability mass over the K foundation answer-tokens at the
+    # JSON answer slot, averaged across fwd + rev framings. In [0, 1]; high
+    # means the model still emits a valid foundation word in the slot;
+    # low means probability has leaked to other tokens (gibberish, refusal,
+    # format collapse). The direct coherence canary for forced-choice
+    # — independent of WHICH foundation is picked.
+    pmass_format: float
 
 
 def _resolve_first_token_ids(tok, words: list[str]) -> tuple[list[int], dict[str, int]]:
@@ -444,6 +451,13 @@ def guided_rollout_forced_choice(
         # Average prompt NLL across the two framings (schema_hint differs in
         # enum order but the user vignette is identical).
         nll_p = 0.5 * (nll_fwd[i] + nll_rev[i])
+        # Average pmass_format across framings: coherence canary independent
+        # of WHICH foundation is picked. Sum prob mass over the K answer
+        # tokens at the JSON slot; drops when model emits non-foundation
+        # tokens (gibberish, refusal, format collapse).
+        pm_f = slots_fwd[i][0]["pmass_format"]
+        pm_r = slots_rev[i][0]["pmass_format"]
+        pm = 0.5 * (pm_f + pm_r)
         results.append(ForcedChoiceResult(
             user_prompt=user_prompts[i],
             think_text=think_fwd,
@@ -457,6 +471,7 @@ def guided_rollout_forced_choice(
             think_tokens=n_fwd,
             emitted_close=close_fwd,
             nll_prompt=float(nll_p),
+            pmass_format=float(pm),
         ))
 
     return results

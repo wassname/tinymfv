@@ -188,6 +188,7 @@ def evaluate(
                         "top1": res.top1,
                         "margin": res.margin,
                         "nll_prompt": res.nll_prompt,
+                        "pmass_format": res.pmass_format,
                     })
                 pbar.update(len(chunk))
 
@@ -271,6 +272,10 @@ def evaluate(
         T = None
         profile = None
 
+    mean_pmass_format = (
+        float(np.mean([r["pmass_format"] for r in per_row]))
+        if per_row else None
+    )
     info = {
         "name": name,
         "n_rows": n_rows,
@@ -286,6 +291,13 @@ def evaluate(
         # the model's "natural" surprise on prompt text.
         "mean_nll_prompt": float(np.mean([r["nll_prompt"] for r in per_row]))
             if per_row else None,
+        # Mean pmass_format: average prob mass on the K foundation answer
+        # tokens at the JSON answer slot, across rows × framings. In [0, 1].
+        # Direct coherence canary for forced-choice — drops when the model
+        # emits non-foundation tokens (gibberish, refusal, format collapse),
+        # independent of which foundation is picked. Higher = more
+        # "in-format"; a sharp drop after steering signals coherence loss.
+        "mean_pmass_format": mean_pmass_format,
     }
 
     out: dict[str, Any] = {
@@ -297,6 +309,7 @@ def evaluate(
         "median_nll_T": median_nll_T,
         "T": T,                # fitted temperature (>1 = model is overconfident)
         "top1_acc": top1_acc,
+        "mean_pmass_format": mean_pmass_format,
         "info": info,
     }
     if return_per_row:
