@@ -189,6 +189,8 @@ def evaluate(
                         "margin": res.margin,
                         "nll_prompt": res.nll_prompt,
                         "pmass_format": res.pmass_format,
+                        "think_tokens": res.think_tokens,
+                        "emitted_close": res.emitted_close,
                     })
                 pbar.update(len(chunk))
 
@@ -199,6 +201,18 @@ def evaluate(
         f"{name}: {n_rows} rows in {elapsed:.1f}s ({n_rows/elapsed:.1f} rows/s); "
         f"{n_labeled}/{n_rows} have label dist"
     )
+    # Per-row think-token distribution — main eval-cost driver. Rows are
+    # 2 frames × n_vignettes; we average across frames before reporting.
+    # If most rows are well below max_think_tokens, the cap can be lowered.
+    nt = sorted(r["think_tokens"] for r in per_row if r["think_tokens"] is not None)
+    n_closed = sum(1 for r in per_row if r["emitted_close"])
+    if nt:
+        n = len(nt)
+        def _q(p): return nt[min(n - 1, int(p * n))]
+        logger.info(
+            f"  think_tokens: median={_q(0.5)} p75={_q(0.75)} p90={_q(0.9)} "
+            f"p99={_q(0.99)} max={nt[-1]}  emitted_close={n_closed}/{n}"
+        )
 
     # === per-foundation aggregates ===
     rows = []

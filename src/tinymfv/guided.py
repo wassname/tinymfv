@@ -140,7 +140,7 @@ def _rollout_kv_fork(
         pref_input[i, P_max - L:] = torch.tensor(sp_ids, device=device)
         pref_attn[i, P_max - L:] = 1
         pref_real[i] = L
-    pref_out = model(input_ids=pref_input, attention_mask=pref_attn, use_cache=False)
+    pref_out = model(input_ids=pref_input, attention_mask=pref_attn)
 
     # === Per-row prompt NLL (free; reuses pref_out.logits) ===
     # Teacher-forcing on the chat tokens (= rendered user turn + generation
@@ -202,7 +202,7 @@ def _rollout_kv_fork(
             last_pos[i] = L - 1
         full_input = torch.cat([pref_input, suf_input], dim=1)
         full_attn = torch.cat([pref_attn, suf_mask], dim=1)
-        out = model(input_ids=full_input, attention_mask=full_attn, use_cache=False)
+        out = model(input_ids=full_input, attention_mask=full_attn)
         logp = F.log_softmax(out.logits.float(), dim=-1)
         # Suffix's last real token is at absolute position P_max + last_pos[i].
         absolute_last = P_max + last_pos
