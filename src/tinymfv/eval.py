@@ -152,7 +152,8 @@ def evaluate(
         `median_nll_T`, `T`, `top1_acc`, `mean_pmass_format`, and `info`.
         With `return_per_row=True`, also includes `per_row` with per-row
         `p`, `score` (debiased logp per foundation), `pmass_format`,
-        `think_text` / `think_text_rev`, and `top1` / `margin`.
+        `gen_text` / `gen_text_rev` (full decoded gen, no stripping),
+        and `top1` / `margin`.
     """
     if vignettes is None:
         vignettes = load_vignettes(name)
@@ -198,8 +199,8 @@ def evaluate(
                         "pmass_format": res.pmass_format,
                         "think_tokens": res.think_tokens,
                         "emitted_close": res.emitted_close,
-                        "think_text": res.think_text,
-                        "gen_text_full": res.gen_text_full,
+                        "gen_text": res.gen_text,
+                        "gen_text_rev": res.gen_text_rev,
                     })
                 pbar.update(len(chunk))
 

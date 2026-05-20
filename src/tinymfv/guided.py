@@ -85,9 +85,11 @@ def _rollout_kv_fork(
     scoring_slots: list[tuple[str, str]],   # (nudge_user_text, prefill) per slot
     gather_token_ids: list[int],            # K-way answer-token ids
     verbose: bool = False,
-) -> tuple[list[tuple[str, int, bool, str]], list[list[dict]]]:
+) -> tuple[list[tuple[str, int, bool]], list[list[dict]]]:
     """Returns (thinks, slots).
-    thinks[i] = (think_text, n_think_tokens, emitted_close, gen_text_full)
+    thinks[i] = (gen_text, n_think_tokens, emitted_close)
+      where gen_text is the FULL decoded generation (caller can
+      split on _CLOSE_MARKER if a pre-close subset is wanted).
     slots[i][j] = {pmass_format, top5_str, lp_gather}
 
     Three-phase rollout:
@@ -132,17 +134,20 @@ def _rollout_kv_fork(
     pkv = out1.past_key_values     # KV for [left-pad, prompt, think, (eos-pad)]
 
     B = phase1_ids.shape[0]
-    thinks: list[tuple[str, int, bool, str]] = []
+    thinks: list[tuple[str, int, bool]] = []
     real_lens: list[int] = []   # per-sample: seq_len up to and including first </think>
     for i in range(B):
         gen_ids_full = phase1_ids[i, prompt_len:]
         keep = gen_ids_full != pad_id
         gen_ids = gen_ids_full[keep] if keep.any() else gen_ids_full[:0]
+        # Return the FULL decoded gen — including anything past </think> —
+        # so callers can inspect coherence in the post-close regime if any.
+        # No stripping (the caller can split on _CLOSE_MARKER if they want
+        # just the pre-close part — easy one-liner, no info loss).
         gen_text = tok.decode(gen_ids, skip_special_tokens=True)
         n_think = int(gen_ids.shape[0])
         emitted_close = _CLOSE_MARKER in gen_text
-        think_text = gen_text.split(_CLOSE_MARKER, 1)[0] if emitted_close else gen_text
-        thinks.append((think_text, n_think, emitted_close, gen_text))
+        thinks.append((gen_text, n_think, emitted_close))
 
         # Phase 1.5: rewind position = first think_end_id in gen (inclusive),
         # so the answer slot's KV context ends at the natural stopping point —
@@ -169,7 +174,7 @@ def _rollout_kv_fork(
             tokenize=False, continue_final_message=True,
         )
         suffixes = []
-        for _, _, emitted_close, _ in thinks:
+        for _, _, emitted_close in thinks:
             head = "" if emitted_close else _CLOSE_MARKER
             suf_text = head + close + interrupt
             suffixes.append(tok(suf_text, add_special_tokens=False)["input_ids"])
@@ -294,11 +299,12 @@ _DEFAULT_FORCED_HINT: str = _make_forced_hint(list(_DEFAULT_FORCED_FOUNDATIONS))
 @dataclass
 class ForcedChoiceResult:
     user_prompt: str
-    # Two thinks: one per enum-ordering frame. think_fwd uses the forward enum
-    # order, think_rev uses the reversed enum order. These cancel position bias
-    # when the resulting logprobs are averaged.
-    think_text: str       # forward-frame think (for backward compatibility)
-    think_text_rev: str   # reversed-frame think
+    # Full decoded generation per enum-ordering frame. fwd uses forward enum
+    # order, rev uses reversed enum order. Per-frame logprob averaging
+    # cancels position bias. Both texts are FULL — no stripping at </think>.
+    # If you want just the pre-close part, split on `tinymfv.guided._CLOSE_MARKER`.
+    gen_text: str         # forward-frame full gen
+    gen_text_rev: str     # reversed-frame full gen
     # Per-frame raw logprobs (unnormalised) at the prefill position.
     lp_fwd: dict[str, float]   # enum listed [care, ..., social]
     lp_rev: dict[str, float]   # enum listed [social, ..., care]
@@ -318,12 +324,6 @@ class ForcedChoiceResult:
     # format collapse). The direct coherence canary for forced-choice
     # — independent of WHICH foundation is picked.
     pmass_format: float
-    # Forward-frame full decoded gen including anything past </think>. With the
-    # natural-EOS rewind in `_rollout_kv_fork`, this is normally identical to
-    # `think_text` (model stopped at </think>); preserved as a separate field
-    # for sidecar inspection when generation hits max_think_tokens without
-    # emitting close.
-    gen_text_full: str = ""
 
 
 def _resolve_first_token_ids(tok, words: list[str]) -> tuple[list[int], dict[str, int]]:
@@ -419,8 +419,8 @@ def guided_rollout_forced_choice(
     results: list[ForcedChoiceResult] = []
     import math
     for i in range(len(user_prompts)):
-        think_fwd, n_fwd, close_fwd, gen_text_full_fwd = thinks_fwd[i]
-        think_rev, _, _, _ = thinks_rev[i]
+        gen_fwd, n_fwd, close_fwd = thinks_fwd[i]
+        gen_rev, _, _ = thinks_rev[i]
         lp_f = slots_fwd[i][0]["lp_gather"]
         lp_r = slots_rev[i][0]["lp_gather"]
         score = [(lp_f[k] + lp_r[k]) / 2.0 for k in range(K)]
@@ -441,8 +441,8 @@ def guided_rollout_forced_choice(
         pm = 0.5 * (pm_f + pm_r)
         results.append(ForcedChoiceResult(
             user_prompt=user_prompts[i],
-            think_text=think_fwd,
-            think_text_rev=think_rev,
+            gen_text=gen_fwd,
+            gen_text_rev=gen_rev,
             lp_fwd={foundations[k]: lp_f[k] for k in range(K)},
             lp_rev={foundations[k]: lp_r[k] for k in range(K)},
             score={foundations[k]: score[k] for k in range(K)},
@@ -451,7 +451,6 @@ def guided_rollout_forced_choice(
             margin=float(margin),
             think_tokens=n_fwd,
             emitted_close=close_fwd,
-            gen_text_full=gen_text_full_fwd,
             pmass_format=float(pm),
         ))
 
