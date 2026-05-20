@@ -1,5 +1,11 @@
 """tinymfv: tiny moral-foundations vignettes eval.
 
+Forced-choice 7-way scoring on Clifford 2015 vignettes (classic) +
+paraphrase configs (scifi, ai-actor). Default condition is
+`other_violate` (the canonical Clifford framing); `self_violate` is
+available as an opt-in ablation. Each row internally does a fwd + rev
+enum-order pass for position-bias debias (inside guided_rollout).
+
 High-level usage:
 
     from tinymfv import evaluate

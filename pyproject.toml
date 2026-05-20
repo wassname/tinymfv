@@ -1,7 +1,7 @@
 [project]
 name = "tiny-mfv"
 version = "0.1.0"
-description = "Tiny moral-foundations vignettes eval (negation + self/other) for steering checkpoints."
+description = "Tiny moral-foundations vignettes eval (Clifford 2015 classic + paraphrase configs) for steering checkpoints."
 requires-python = ">=3.11"
 dependencies = [
     "transformers>=4.45",

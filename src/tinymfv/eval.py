@@ -127,7 +127,7 @@ def evaluate(
     vignettes: list[dict] | None = None,
     *,
     n_vignettes: int | None = None,
-    conditions: tuple[str, ...] = CONDITIONS,
+    conditions: tuple[str, ...] = ("other_violate",),
     max_think_tokens: int = 256,
     batch_size: int = 8,
     device: str | None = None,
@@ -141,7 +141,10 @@ def evaluate(
         name: dataset config (`classic` / `scifi` / `ai-actor`).
         vignettes: optional pre-loaded list (overrides `name`).
         n_vignettes: optional slice — keep only the first N (after loading).
-        conditions: which condition strings to score. Default = both.
+        conditions: which condition strings to score. Default =
+            ("other_violate",) to match Clifford 2015 classic, which is
+            other-violation only. Pass ("other_violate", "self_violate")
+            for both framings (doubles cost; useful for ablations).
         max_think_tokens: think budget per (row, frame). Two frames per row.
         batch_size: rows per forced-choice call (KV cache = batch * 2 * max_think_tokens).
         return_per_row: if True, include the per-row 7-vec p + think text in the result.
