@@ -132,6 +132,7 @@ def evaluate(
     n_samples: int = 1,
     temperature: float = 0.0,
     top_p: float = 1.0,
+    skip_special_tokens: bool = False,
     batch_size: int = 8,
     device: str | None = None,
     return_per_row: bool = False,
@@ -156,6 +157,10 @@ def evaluate(
         temperature: Phase-1 sampling temperature. 0 = greedy. Must be > 0 when
             n_samples > 1.
         top_p: nucleus-sampling threshold for Phase 1 (ignored when greedy).
+        skip_special_tokens: passed to `tok.decode` when building `gen_text`
+            for each result. Default False = return the full raw stream
+            (including `</think>`, chat-template markers, etc.). Set True if
+            you want the stripped text.
         batch_size: rows per forced-choice call (KV cache = batch * 2 * max_think_tokens).
         return_per_row: if True, include the per-row 7-vec p + think text in the result.
         verbose: if True, log the row-0 think trace at DEBUG level (one per slot).
@@ -196,6 +201,7 @@ def evaluate(
                     n_samples=n_samples,
                     temperature=temperature,
                     top_p=top_p,
+                    skip_special_tokens=skip_special_tokens,
                     verbose=verbose,
                 )
                 for src, res in zip(chunk, results):

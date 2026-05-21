@@ -88,6 +88,7 @@ def _rollout_kv_fork(
     n_samples: int = 1,
     temperature: float = 0.0,
     top_p: float = 1.0,
+    skip_special_tokens: bool = False,
     verbose: bool = False,
 ) -> tuple[list[tuple[str, int, bool]], list[list[dict]]]:
     """Returns (thinks, slots), both flat lists of length `B*N` where
@@ -171,9 +172,12 @@ def _rollout_kv_fork(
         # so callers can inspect coherence in the post-close regime if any.
         # No stripping (the caller can split on _CLOSE_MARKER if they want
         # just the pre-close part — easy one-liner, no info loss).
-        gen_text = tok.decode(gen_ids, skip_special_tokens=True)
+        gen_text = tok.decode(gen_ids, skip_special_tokens=skip_special_tokens)
         n_think = int(gen_ids.shape[0])
-        emitted_close = _CLOSE_MARKER in gen_text
+        # Detect </think> via token id, not substring on gen_text:
+        # robust to skip_special_tokens flag and to models that mark
+        # </think> as a special token (which would otherwise be stripped).
+        emitted_close = bool((gen_ids == think_end_id).any().item())
         thinks.append((gen_text, n_think, emitted_close))
 
         # Phase 1.5: rewind position = first think_end_id in gen (inclusive),
@@ -397,6 +401,7 @@ def guided_rollout_forced_choice(
     n_samples: int = 1,
     temperature: float = 0.0,
     top_p: float = 1.0,
+    skip_special_tokens: bool = False,
     schema_hint: str | None = None,
     verbose: bool = False,
 ) -> list[ForcedChoiceResult]:
@@ -450,6 +455,7 @@ def guided_rollout_forced_choice(
         scoring_slots=scoring_slot,
         gather_token_ids=first_ids,
         n_samples=n_samples, temperature=temperature, top_p=top_p,
+        skip_special_tokens=skip_special_tokens,
         verbose=verbose,
     )
     # Frame B: reversed enum order. Same gather order (by foundation name) so
@@ -459,6 +465,7 @@ def guided_rollout_forced_choice(
         scoring_slots=scoring_slot,
         gather_token_ids=first_ids,
         n_samples=n_samples, temperature=temperature, top_p=top_p,
+        skip_special_tokens=skip_special_tokens,
         verbose=verbose,
     )
 
