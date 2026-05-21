@@ -167,10 +167,10 @@ def evaluate(
 
     Returns:
         Dict with `table`, `profile`, `mean_js`, `mean_nll`, `mean_nll_T`,
-        `median_nll_T`, `T`, `top1_acc`, `mean_pmass_format`, and `info`.
+        `median_nll_T`, `T`, `top1_acc`, `mean_pmass_allowed`, `mean_nll_json`, and `info`.
         With `return_per_row=True`, also includes `per_row` with per-row
-        `p`, `score` (debiased logp per foundation), `pmass_format`,
-        `gen_text` / `gen_text_rev` (full decoded gen, no stripping),
+        `p`, `score` (debiased logp per foundation), `pmass_allowed`,
+        `nll_json`, `gen_text` / `gen_text_rev` (full decoded gen, no stripping),
         and `top1` / `margin`.
     """
     if vignettes is None:
@@ -218,7 +218,8 @@ def evaluate(
                         "label": label,  # may be None on unlabeled rows
                         "top1": res.top1,
                         "margin": res.margin,
-                        "pmass_format": res.pmass_format,
+                        "pmass_allowed": res.pmass_allowed,
+                        "nll_json": res.nll_json,
                         "think_tokens": res.think_tokens,           # list[int], length N
                         "think_tokens_rev": res.think_tokens_rev,   # list[int], length N
                         "emitted_close": res.emitted_close,         # list[bool], length N
@@ -327,8 +328,12 @@ def evaluate(
         T = None
         profile = None
 
-    mean_pmass_format = (
-        float(np.mean([r["pmass_format"] for r in per_row]))
+    mean_pmass_allowed = (
+        float(np.mean([r["pmass_allowed"] for r in per_row]))
+        if per_row else None
+    )
+    mean_nll_json = (
+        float(np.mean([r["nll_json"] for r in per_row]))
         if per_row else None
     )
     info = {
@@ -341,13 +346,16 @@ def evaluate(
         "mean_nll": mean_nll,
         "median_nll": median_nll,
         "median_nll_T": median_nll_T,
-        # Mean pmass_format: average prob mass on the K foundation answer
+        # Mean pmass_allowed: average prob mass on the K foundation answer
         # tokens at the JSON answer slot, across rows × framings. In [0, 1].
         # Direct coherence canary for forced-choice — drops when the model
         # emits non-foundation tokens (gibberish, refusal, format collapse),
         # independent of which foundation is picked. Higher = more
         # "in-format"; a sharp drop after steering signals coherence loss.
-        "mean_pmass_format": mean_pmass_format,
+        "mean_pmass_allowed": mean_pmass_allowed,
+        # Mean NLL in nats/token over the assistant prefill content. Perplexity
+        # is exp(mean_nll_json).
+        "mean_nll_json": mean_nll_json,
     }
 
     out: dict[str, Any] = {
@@ -359,7 +367,8 @@ def evaluate(
         "median_nll_T": median_nll_T,
         "T": T,                # fitted temperature (>1 = model is overconfident)
         "top1_acc": top1_acc,
-        "mean_pmass_format": mean_pmass_format,
+        "mean_pmass_allowed": mean_pmass_allowed,
+        "mean_nll_json": mean_nll_json,
         "info": info,
     }
     if return_per_row:

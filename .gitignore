@@ -1,3 +1,8 @@
+
+/docs/
+spec/
+.claude/
+
 .venv/
 __pycache__/
 *.pyc

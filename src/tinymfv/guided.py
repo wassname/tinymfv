@@ -10,8 +10,8 @@ suffix's last position, gathers logprobs at the foundation first-tokens.
 
 Why per-sample rewind: HF generate() with a batch stops each sample at its
 own EOS but keeps the cache full-length (pad-filled after stop). If we just
-appended a batched suffix at J_max, the suffix's position embeddings would
-land far past the model's actual stopping point, polluting the pmass
+    appended a batched suffix at J_max, the suffix's position embeddings would
+    land far past the model's actual stopping point, polluting `pmass_allowed`
 measurement with post-EOS context. Per-sample slicing puts the suffix
 immediately after each sample's real content.
 
@@ -100,7 +100,7 @@ def _rollout_kv_fork(
     layout in `thinks` and `slots`. Caller reshapes via `[i*N + n]` indexing.
 
     thinks[j] = (gen_text, n_think_tokens, emitted_close), j in [0, B*N).
-    slots[j][k] = {pmass_format, top5_str, lp_gather}, j in [0, B*N).
+    slots[j][k] = {pmass_allowed, nll_json, top5_str, lp_gather}, j in [0, B*N).
 
     Three-phase rollout:
       Phase 1 (batched) — generate up to max_think_tokens with cache=True,
@@ -113,7 +113,8 @@ def _rollout_kv_fork(
       Phase 2 (per-sample) — forward the scoring suffix with rewound pkv,
                              read logits at the suffix's last position.
 
-    `pmass_format` is Σ exp(logp) over `gather_token_ids` at the slot.
+    `pmass_allowed` is Σ exp(logp) over `gather_token_ids` at the slot.
+    `nll_json` is mean NLL in nats/token over the assistant prefill tokens.
     `lp_gather` is the per-id logp vector at the slot.
     """
     if tok.padding_side != "left":
@@ -182,7 +183,7 @@ def _rollout_kv_fork(
 
         # Phase 1.5: rewind position = first think_end_id in gen (inclusive),
         # so the answer slot's KV context ends at the natural stopping point —
-        # not at the post-EOS spew (which would corrupt pmass).
+        # not at the post-EOS spew (which would corrupt `pmass_allowed`).
         eos_mask = (gen_ids_full == think_end_id)
         if eos_mask.any():
             first_eos = int(eos_mask.nonzero(as_tuple=True)[0][0].item())
@@ -196,25 +197,34 @@ def _rollout_kv_fork(
     # === Phase 2: per-sample suffix forward over rewound pkv ===
     gid_t = torch.tensor(gather_token_ids, device=device, dtype=torch.long)
 
-    def suf_ids_for(nudge: str, prefill: str) -> list[list[int]]:
-        """Per-row suffix: optional </think> close + assistant-turn close +
-        interrupt-and-renudge (user(nudge) + assistant(prefill))."""
+    def suffix_parts_for(nudge: str, prefill: str) -> list[tuple[list[int], list[int]]]:
+        """Per-row suffix parts: optional </think> close + assistant-turn close +
+        interrupt-and-renudge prefix, then assistant prefill content.
+
+        Split before tokenization so `nll_json` scores exactly the assistant
+        prefill content, while the final logits still come after the prefill.
+        """
         interrupt = tok.apply_chat_template(
             [{"role": "user", "content": nudge},
-             {"role": "assistant", "content": prefill}],
+             {"role": "assistant", "content": _ASSISTANT_SENTINEL}],
             tokenize=False, continue_final_message=True,
         )
-        suffixes = []
+        assert _ASSISTANT_SENTINEL in interrupt, f"sentinel not in interrupt: {interrupt!r}"
+        interrupt_prefix = interrupt.split(_ASSISTANT_SENTINEL, 1)[0]
+        prefill_ids = tok(prefill, add_special_tokens=False)["input_ids"]
+        assert prefill_ids, f"empty prefill ids for {prefill!r}"
+        suffix_parts = []
         for _, _, emitted_close in thinks:
             head = "" if emitted_close else _CLOSE_MARKER
-            suf_text = head + close + interrupt
-            suffixes.append(tok(suf_text, add_special_tokens=False)["input_ids"])
-        return suffixes
+            prefix_text = head + close + interrupt_prefix
+            prefix_ids = tok(prefix_text, add_special_tokens=False)["input_ids"]
+            suffix_parts.append((prefix_ids, prefill_ids))
+        return suffix_parts
 
-    def fork_per_sample(suffixes: list[list[int]]) -> torch.Tensor:
+    def fork_per_sample(suffix_parts: list[tuple[list[int], list[int]]]) -> tuple[torch.Tensor, torch.Tensor]:
         """Per-sample forward: rewind pkv to first-EOS for each sample,
-        forward only that sample's suffix, return [B, V] logp at the suffix's
-        last position.
+        forward that sample's interrupt prefix and assistant prefill, return
+        [B, V] logp at the answer slot plus per-sample prefill NLL.
 
         Per-sample (bs=1) because each sample's rewind position differs;
         batching would require padding pkv along seq_len with attention-mask
@@ -223,34 +233,57 @@ def _rollout_kv_fork(
         """
         V = model.config.vocab_size
         lp_last = torch.zeros((B, V), device=device, dtype=torch.float32)
+        nll_json = torch.zeros((B,), device=device, dtype=torch.float32)
         for i in range(B):
             end_pos = real_lens[i]
             pkv_i = _slice_pkv_one(pkv, i, end_pos)
             pref_attn_i = pref_attn[i:i+1, :end_pos]
-            suf_i = torch.tensor([suffixes[i]], device=device, dtype=torch.long)
-            L = suf_i.shape[1]
-            suf_mask_i = torch.ones((1, L), dtype=torch.long, device=device)
-            full_attn_i = torch.cat([pref_attn_i, suf_mask_i], dim=1)
-            out = model(
-                input_ids=suf_i,
-                attention_mask=full_attn_i,
+            prefix_ids, prefill_ids = suffix_parts[i]
+            prefix_i = torch.tensor([prefix_ids], device=device, dtype=torch.long)
+            prefill_i = torch.tensor([prefill_ids], device=device, dtype=torch.long)
+
+            P = prefix_i.shape[1]
+            J = prefill_i.shape[1]
+            prefix_mask_i = torch.ones((1, P), dtype=torch.long, device=device)
+            prefix_attn_i = torch.cat([pref_attn_i, prefix_mask_i], dim=1)
+            prefix_out = model(
+                input_ids=prefix_i,
+                attention_mask=prefix_attn_i,
                 past_key_values=pkv_i,
+                use_cache=True,
+            )
+
+            prefill_mask_i = torch.ones((1, J), dtype=torch.long, device=device)
+            prefill_attn_i = torch.cat([prefix_attn_i, prefill_mask_i], dim=1)
+            prefill_out = model(
+                input_ids=prefill_i,
+                attention_mask=prefill_attn_i,
+                past_key_values=prefix_out.past_key_values,
                 use_cache=False,
             )
-            lp_last[i] = F.log_softmax(out.logits[0, -1].float(), dim=-1)
-        return lp_last
+            first_logp = F.log_softmax(prefix_out.logits[0, -1].float(), dim=-1)
+            first_nll = -first_logp[prefill_i[0, 0]]
+            if J == 1:
+                total_nll = first_nll
+            else:
+                next_logp = F.log_softmax(prefill_out.logits[0, :-1].float(), dim=-1)
+                next_ids = prefill_i[0, 1:]
+                total_nll = first_nll - next_logp.gather(1, next_ids[:, None]).sum()
+            nll_json[i] = total_nll / J
+            lp_last[i] = F.log_softmax(prefill_out.logits[0, -1].float(), dim=-1)
+        return lp_last, nll_json
 
     slots: list[list[dict]] = [[] for _ in range(B)]
     for j, (nudge, prefill) in enumerate(scoring_slots):
-        suf_ids = suf_ids_for(nudge, prefill)
+        suffix_parts = suffix_parts_for(nudge, prefill)
         if verbose:
             # DEBUG: shows row 0 only. Independent generate from raw ids
             # (does not use the cache) so it still works after the rewind.
             real0 = phase1_ids[0][phase1_ids[0] != pad_id]
             prefix_text = tok.decode(real0, skip_special_tokens=False)
-            suf_text_0 = tok.decode(suf_ids[0], skip_special_tokens=False)
+            suf_text_0 = tok.decode(suffix_parts[0][0] + suffix_parts[0][1], skip_special_tokens=False)
             full_ids = torch.tensor(
-                [real0.tolist() + suf_ids[0]], device=device, dtype=torch.long,
+                [real0.tolist() + suffix_parts[0][0] + suffix_parts[0][1]], device=device, dtype=torch.long,
             )
             gen = model.generate(full_ids, max_new_tokens=64, do_sample=False, pad_token_id=pad_id)
             free = tok.decode(gen[0, full_ids.shape[1]:], skip_special_tokens=False)
@@ -258,8 +291,8 @@ def _rollout_kv_fork(
                 f"--- slot {j} (nudge={nudge!r}, prefill={prefill!r}) ---\n"
                 f"{prefix_text}{suf_text_0}<<<MODEL CONTINUES>>>{free}\n--- end slot {j} ---"
             )
-        lp_last = fork_per_sample(suf_ids)
-        pmass = lp_last[:, gid_t].exp().sum(-1)
+        lp_last, nll_json = fork_per_sample(suffix_parts)
+        pmass_allowed = lp_last[:, gid_t].exp().sum(-1)
         for i in range(B):
             top5 = lp_last[i].topk(5)
             top5_str = " ".join(
@@ -267,7 +300,8 @@ def _rollout_kv_fork(
                 for idx, prob in zip(top5.indices, top5.values)
             )
             slots[i].append({
-                "pmass_format": float(pmass[i].item()),
+                "pmass_allowed": float(pmass_allowed[i].item()),
+                "nll_json": float(nll_json[i].item()),
                 "top5_str": top5_str,
                 "lp_gather": lp_last[i, gid_t].cpu().tolist(),
             })
@@ -368,7 +402,11 @@ class ForcedChoiceResult:
     # leaked to other tokens (gibberish, refusal, format collapse). Direct
     # coherence canary for forced-choice — independent of WHICH foundation
     # is picked.
-    pmass_format: float
+    pmass_allowed: float
+    # Mean negative log-likelihood in nats/token over the assistant prefill
+    # content, averaged across samples and fwd + rev framings. Perplexity is
+    # `exp(nll_json)`.
+    nll_json: float
 
 
 def _resolve_first_token_ids(tok, words: list[str]) -> tuple[list[int], dict[str, int]]:
@@ -511,11 +549,14 @@ def guided_rollout_forced_choice(
         order_sorted = sorted(range(K), key=lambda k: -score[k])
         top1 = foundations[order_sorted[0]]
         margin = score[order_sorted[0]] - score[order_sorted[1]]
-        # Average pmass_format across N samples per direction, then across
+        # Average pmass_allowed and nll_json across N samples per direction, then across
         # fwd + rev framings.
-        pm_f = sum(slots_fwd[j][0]["pmass_format"] for j in idx) / N
-        pm_r = sum(slots_rev[j][0]["pmass_format"] for j in idx) / N
+        pm_f = sum(slots_fwd[j][0]["pmass_allowed"] for j in idx) / N
+        pm_r = sum(slots_rev[j][0]["pmass_allowed"] for j in idx) / N
         pm = 0.5 * (pm_f + pm_r)
+        nll_f = sum(slots_fwd[j][0]["nll_json"] for j in idx) / N
+        nll_r = sum(slots_rev[j][0]["nll_json"] for j in idx) / N
+        nll_json = 0.5 * (nll_f + nll_r)
         results.append(ForcedChoiceResult(
             user_prompt=user_prompts[i],
             gen_text=gens_fwd,
@@ -532,7 +573,8 @@ def guided_rollout_forced_choice(
             think_tokens_rev=n_rev_list,
             emitted_close=close_fwd_list,
             emitted_close_rev=close_rev_list,
-            pmass_format=float(pm),
+            pmass_allowed=float(pm),
+            nll_json=float(nll_json),
         ))
 
     return results
