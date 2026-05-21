@@ -16,15 +16,15 @@ Here is an example of one vignette:
 
 ## Evaluation
 
-We want a fast cheap sensitive eval: two deterministic forced-choice frames
-per row and condition, with a signal in nats so small steering interventions
-register without saturating. So instead of sampling an answer and parsing it,
-we interrupt the model after its short reasoning turn, prefill the answer, and
+We want a fast cheap sensitive eval: two forced-choice frames per row and
+condition, with a signal in nats so small steering interventions register
+without saturating. So instead of sampling an answer and parsing it, we
+interrupt the model after its short reasoning turn, prefill the answer, and
 read the next-token distribution over the seven foundation first-tokens.
 
-The model gets a forced-choice JSON-shaped prompt, thinks for up to 256
-tokens, then receives a new user message, `Just answer`, followed by this
-scored assistant prefill:
+The model gets a forced-choice JSON-shaped prompt, thinks for up to 64 tokens
+by default (configurable via `max_think_tokens`), then receives a new user
+message, `Just answer`, followed by this scored assistant prefill:
 
 ```md
 This is wrong because of which moral foundation?
@@ -58,6 +58,16 @@ distribution over foundations that sums to 1 for each scored row. The
 `social` option is Clifford's social-norms control
 ("not morally wrong"), so the model can say "this is fine" rather than
 being forced to pick a violation.
+
+By default Phase 1 is greedy (`temperature=0.0`, `n_samples=1`). To average
+over multiple sampled think traces, pass `n_samples=N, temperature=T` to
+`evaluate()` (or to `guided_rollout_forced_choice`). At `N>1` we Bayesian-
+model-average the per-sample answer logprobs (`logsumexp_n lp - log N`) per
+frame before the fwd+rev average. The raw per-sample logprob matrices stay
+on the result object as `lp_fwd_samples` / `lp_rev_samples` so callers can
+re-aggregate (log-pooling, majority vote, etc.). `gen_text` and
+`gen_text_rev` are always `list[str]` of length `N`, even at `N=1`, and
+contain the full decoded generation (no `</think>` stripping).
 
 The same logits also give an internal `pmass_format` diagnostic: the absolute
 probability mass on those seven tokens, before renormalising over the enum.

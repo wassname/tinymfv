@@ -128,7 +128,10 @@ def evaluate(
     *,
     n_vignettes: int | None = None,
     conditions: tuple[str, ...] = ("other_violate",),
-    max_think_tokens: int = 256,
+    max_think_tokens: int = 64,
+    n_samples: int = 1,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
     batch_size: int = 8,
     device: str | None = None,
     return_per_row: bool = False,
@@ -146,6 +149,13 @@ def evaluate(
             other-violation only. Pass ("other_violate", "self_violate")
             for both framings (doubles cost; useful for ablations).
         max_think_tokens: think budget per (row, frame). Two frames per row.
+        n_samples: rollouts per direction. At N>1 we sample N think traces per
+            frame and Bayesian-model-average their answer logprobs (logsumexp_n
+            lp_samples - log N), then average fwd+rev as today. Requires
+            `temperature > 0`. At N=1 the call is greedy (current behaviour).
+        temperature: Phase-1 sampling temperature. 0 = greedy. Must be > 0 when
+            n_samples > 1.
+        top_p: nucleus-sampling threshold for Phase 1 (ignored when greedy).
         batch_size: rows per forced-choice call (KV cache = batch * 2 * max_think_tokens).
         return_per_row: if True, include the per-row 7-vec p + think text in the result.
         verbose: if True, log the row-0 think trace at DEBUG level (one per slot).
@@ -183,6 +193,9 @@ def evaluate(
                     model, tokenizer, user_prompts,
                     foundations=foundations,
                     max_think_tokens=max_think_tokens,
+                    n_samples=n_samples,
+                    temperature=temperature,
+                    top_p=top_p,
                     verbose=verbose,
                 )
                 for src, res in zip(chunk, results):
@@ -195,34 +208,39 @@ def evaluate(
                         "condition": cond,
                         "foundation_coarse": coarse,
                         "p": p_vec,
-                        "score": score_vec,  # pre-softmax averaged logprobs, for temperature fit
+                        "score": score_vec,  # pre-softmax BMA'd + fwd/rev-averaged logprobs, for temperature fit
                         "label": label,  # may be None on unlabeled rows
                         "top1": res.top1,
                         "margin": res.margin,
                         "pmass_format": res.pmass_format,
-                        "think_tokens": res.think_tokens,
-                        "emitted_close": res.emitted_close,
-                        "gen_text": res.gen_text,
-                        "gen_text_rev": res.gen_text_rev,
+                        "think_tokens": res.think_tokens,           # list[int], length N
+                        "think_tokens_rev": res.think_tokens_rev,   # list[int], length N
+                        "emitted_close": res.emitted_close,         # list[bool], length N
+                        "emitted_close_rev": res.emitted_close_rev, # list[bool], length N
+                        "gen_text": res.gen_text,           # list[str], length N
+                        "gen_text_rev": res.gen_text_rev,   # list[str], length N
+                        "lp_fwd_samples": res.lp_fwd_samples,  # [N, K]
+                        "lp_rev_samples": res.lp_rev_samples,  # [N, K]
                     })
                 pbar.update(len(chunk))
 
     elapsed = time.time() - t0
     n_rows = len(per_row)
     n_labeled = sum(1 for r in per_row if r["label"] is not None)
-    # Tokens-per-second: 2 frames per row (fwd + rev), each generates think_tokens.
-    # think_tokens on the result is the fwd count; rev cost is the same order.
-    total_gen_tokens = 2 * sum(r["think_tokens"] for r in per_row if r["think_tokens"] is not None)
+    # Tokens-per-second: per row, sum N samples × (fwd + rev) think lengths.
+    total_gen_tokens = sum(
+        sum(r["think_tokens"]) + sum(r["think_tokens_rev"])
+        for r in per_row
+    )
     tps = total_gen_tokens / elapsed if elapsed > 0 else 0.0
     logger.info(
         f"{name}: {n_rows} rows in {elapsed:.1f}s ({n_rows/elapsed:.1f} rows/s, "
         f"~{tps:.0f} tok/s); {n_labeled}/{n_rows} have label dist"
     )
-    # Per-row think-token distribution — main eval-cost driver. Rows are
-    # 2 frames × n_vignettes; we average across frames before reporting.
-    # If most rows are well below max_think_tokens, the cap can be lowered.
-    nt = sorted(r["think_tokens"] for r in per_row if r["think_tokens"] is not None)
-    n_closed = sum(1 for r in per_row if r["emitted_close"])
+    # Per-sample think-token distribution across all (row × frame × sample).
+    # If most samples are well below max_think_tokens, the cap can be lowered.
+    nt = sorted(t for r in per_row for t in r["think_tokens"] + r["think_tokens_rev"])
+    n_closed = sum(sum(r["emitted_close"]) + sum(r["emitted_close_rev"]) for r in per_row)
     if nt:
         n = len(nt)
         def _q(p): return nt[min(n - 1, int(p * n))]
