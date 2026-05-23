@@ -262,14 +262,22 @@ def _rollout_natural_or_forced(
                 assert answer_pos < len(step_scores), (
                     f"answer_pos={answer_pos} ≥ len(step_scores)={len(step_scores)}"
                 )
-                lp_vec = F.log_softmax(step_scores[answer_pos][i].float(), dim=-1)
-                # Natural NLL: mean NLL over gen_ids[start_pos:answer_pos]
-                # using step_scores[start_pos:answer_pos]. By construction
-                # answer_pos > start_pos so this window is non-empty.
+                # nan_to_num: quantized + adapted forwards occasionally
+                # emit non-finite raw logits at a single generated step;
+                # ±1e4 bound keeps log_softmax stable without changing the
+                # argmax for well-behaved rows.
+                raw = step_scores[answer_pos][i].float()
+                lp_vec = F.log_softmax(
+                    torch.nan_to_num(raw, nan=0.0, posinf=1e4, neginf=-1e4), dim=-1
+                )
                 gen_ids_full = phase1_ids[i, prompt_len:]
                 nat_nll_sum = 0.0
                 for k in range(start_pos, answer_pos):
-                    step_lp = F.log_softmax(step_scores[k][i].float(), dim=-1)
+                    raw_k = step_scores[k][i].float()
+                    step_lp = F.log_softmax(
+                        torch.nan_to_num(raw_k, nan=0.0, posinf=1e4, neginf=-1e4),
+                        dim=-1,
+                    )
                     nat_nll_sum += float(-step_lp[gen_ids_full[k]].item())
                 nll_val = nat_nll_sum / max(1, answer_pos - start_pos)
             elif not emitted_close_i:
