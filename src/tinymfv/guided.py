@@ -3,34 +3,16 @@
 Public API: `guided_rollout_forced_choice` (K-way moral-foundation probe with
 two-pass enum-reversal position-bias debias).
 
-Core: `_rollout_natural_or_forced` does Phase-1 batched think-gen WITHOUT
-early stop at </think> (we want the model to keep going and emit the JSON
-answer slot naturally if it can). Then classifies each sample:
+Per sample at the answer slot:
+  (a) natural — model emitted the JSON answer prefix in-budget: read logits
+      at the answer-token position from `generate.scores`.
+  (b) interrupted — model never emitted </think>: append forced prefill on top
+      of the full-budget cache, batched forward, read logits at the suffix's
+      last position.
+  (c) emitted </think> but no natural answer: cache past close is junk; NaN.
 
-  (a) **natural**: model emitted the JSON answer prefix in-budget → read
-      logits at the answer-token position from `generate.scores`.
-  (b) **interrupted (no close)**: model never emitted </think> → cache at
-      max_think_tokens is "still thinking" (no post-EOS contamination) →
-      append forced prefill, batched forward, read logits at the last
-      suffix position.
-  (c) **emitted-close-but-no-answer**: model emitted </think> but never
-      reached the JSON answer slot. Cache state past EOS is contaminated
-      by whatever the model wandered into. Mark as undefined (NaN), let
-      downstream exclude.
-
-Why no KV cache slicing: Qwen3.5/3.6 hybrid (gated-delta-net + gated
-attention) layers have `LinearAttentionLayer` cache entries with recurrent
-state and no .keys / .values attributes. Per-sample slice via `pkv[i, :, :end_pos]`
-breaks. The hybrid natural+batched-forced path avoids slicing entirely.
-
-Cost: 1 generate (batched) + at most 1 forced forward (batched). The
-natural path is free (logits already in `generate.scores`); the forced
-path uses the full batched cache from generate so wastes some compute
-on samples that resolved naturally — but no per-sample bs=1 loop.
-
-Why turn-boundary close+nudge in forced path: matches what a chat UI emits
-when a human interrupts a partial assistant turn. On-policy in chat-tuned
-data.
+Turn-boundary close+nudge in the forced path matches what a chat UI emits when
+a human interrupts a partial assistant turn — on-policy in chat-tuned data.
 """
 from __future__ import annotations
 
@@ -103,7 +85,7 @@ def _find_natural_prefill_window(
 
 
 @torch.no_grad()
-def _rollout_kv_fork(
+def _rollout_natural_or_forced(
     model, tok,
     user_prompts: list[str],
     schema_hint: str,
@@ -117,39 +99,26 @@ def _rollout_kv_fork(
     skip_special_tokens: bool = False,
     verbose: bool = False,
 ) -> tuple[list[tuple[str, int, bool]], list[list[dict]]]:
-    """Hybrid natural + batched-forced scoring. Architecture-independent.
+    """Hybrid natural + batched-forced scoring.
 
-    Returns (thinks, slots), both flat lists of length `B*N` where
-    `B = len(user_prompts)` and `N = n_samples`.
+    Returns `(thinks, slots)`, both flat lists of length `B*N` where
+    `B = len(user_prompts)` and `N = n_samples`. HF `num_return_sequences=N`
+    expands the batch to rows `[in_0_s_0, ..., in_0_s_(N-1), in_1_s_0, ...]`;
+    callers reshape via `[i*N + n]`.
 
-    Layout: HF `num_return_sequences=N` expands the batch to `[B*N, ...]` with
-    contiguous samples per input, i.e. rows are
-    `[in_0_s_0, in_0_s_1, ..., in_0_s_(N-1), in_1_s_0, ...]`. Preserved in
-    `thinks` / `slots`; caller reshapes via `[i*N + n]` indexing.
+    thinks[j] = (gen_text, n_think_tokens, emitted_close).
+    slots[j][k] = {pmass_allowed, nll_json, top5_str, lp_gather}.
 
-    thinks[j] = (gen_text, n_think_tokens, emitted_close), j in [0, B*N).
-    slots[j][k] = {pmass_allowed, nll_json, top5_str, lp_gather}, j in [0, B*N).
+    Phase 1: batched generate, `min_new_tokens=max_new_tokens=max_think_tokens`
+      → uniform-length cache. Capture `scores` (per-step logits) and `pkv`.
+    Phase 2: per scoring slot, append the uniform forced suffix (`</think>` +
+      assistant-close + interrupt-renudge user turn + prefill) over `pkv`.
+      One batched forward gives forced logits and prefill NLL.
 
-    Two phases:
-      Phase 1 (batched) — generate exactly `max_think_tokens` tokens
-        (`min_new_tokens=max_new_tokens` so no early stop). Capture
-        `out1.scores` (logits per generated step) and `out1.past_key_values`.
-      Phase 2 (batched) — for each scoring slot, append uniform forced suffix
-        `</think>` + assistant-close + interrupt-renudge user turn + assistant
-        prefill on top of `pkv`. One batched forward gives forced logits.
-
-    Per-sample classification at the slot:
-      (a) natural — `prefill` text appears in decoded generation: read
-          `out1.scores[answer_pos][i]` for `pmass_allowed`; compute
-          per-token NLL of the natural prefill tokens via `out1.scores`.
-      (b) interrupted (no `</think>`) — use the forced logits/NLL.
-      (c) emitted `</think>` but no natural answer — the cache is contaminated
-          by post-close spew; mark NaN and let downstream filter.
-
-    Why no per-sample slicing: Qwen3 hybrid (Gated DeltaNet + Gated Attention)
-    cache has `LinearAttentionLayer` entries (recurrent SSM state, no
-    `.keys`/`.values`). Slicing/forking such a cache breaks. Uniform-length
-    cache from `min_new_tokens=max_new_tokens` sidesteps the issue entirely.
+    Per-sample selection: if the prefill text appears in the generation, use
+    natural logits from `scores[answer_pos]` and natural NLL from
+    `scores[start_pos:answer_pos]` (case a). Else if `</think>` never appeared,
+    use forced (case b). Else NaN (case c).
     """
     if tok.padding_side != "left":
         raise ValueError("tok.padding_side must be 'left'")
@@ -511,7 +480,7 @@ def guided_rollout_forced_choice(
     scoring_slot = [(nudge, prefill)]
 
     # Frame A: forward enum order.
-    thinks_fwd, slots_fwd = _rollout_kv_fork(
+    thinks_fwd, slots_fwd = _rollout_natural_or_forced(
         model, tok, user_prompts, schema_fwd, max_think_tokens,
         scoring_slots=scoring_slot,
         gather_token_ids=first_ids,
@@ -521,7 +490,7 @@ def guided_rollout_forced_choice(
     )
     # Frame B: reversed enum order. Same gather order (by foundation name) so
     # lp_rev[f] is comparable to lp_fwd[f].
-    thinks_rev, slots_rev = _rollout_kv_fork(
+    thinks_rev, slots_rev = _rollout_natural_or_forced(
         model, tok, user_prompts, schema_rev, max_think_tokens,
         scoring_slots=scoring_slot,
         gather_token_ids=first_ids,
