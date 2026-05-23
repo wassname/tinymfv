@@ -1,27 +1,36 @@
-"""Guided rollout: think + suffix-only scoring for forced-choice probes.
+"""Guided rollout: hybrid natural-emission + forced-prefill scoring.
 
 Public API: `guided_rollout_forced_choice` (K-way moral-foundation probe with
 two-pass enum-reversal position-bias debias).
 
-Core: `_rollout_kv_fork` does Phase-1 batched think-gen (KV cache captured
-via return_dict_in_generate) + Phase-1.5 per-sample rewind to first </think>
-+ Phase-2 per-sample suffix forward over the rewound pkv. Reads logits at the
-suffix's last position, gathers logprobs at the foundation first-tokens.
+Core: `_rollout_natural_or_forced` does Phase-1 batched think-gen WITHOUT
+early stop at </think> (we want the model to keep going and emit the JSON
+answer slot naturally if it can). Then classifies each sample:
 
-Why per-sample rewind: HF generate() with a batch stops each sample at its
-own EOS but keeps the cache full-length (pad-filled after stop). If we just
-    appended a batched suffix at J_max, the suffix's position embeddings would
-    land far past the model's actual stopping point, polluting `pmass_allowed`
-measurement with post-EOS context. Per-sample slicing puts the suffix
-immediately after each sample's real content.
+  (a) **natural**: model emitted the JSON answer prefix in-budget → read
+      logits at the answer-token position from `generate.scores`.
+  (b) **interrupted (no close)**: model never emitted </think> → cache at
+      max_think_tokens is "still thinking" (no post-EOS contamination) →
+      append forced prefill, batched forward, read logits at the last
+      suffix position.
+  (c) **emitted-close-but-no-answer**: model emitted </think> but never
+      reached the JSON answer slot. Cache state past EOS is contaminated
+      by whatever the model wandered into. Mark as undefined (NaN), let
+      downstream exclude.
 
-Cost: 1 generate (batched) + B suffix forwards (one per sample, ~10-30
-tokens each, prefix cached via past_key_values). Function name predates
-the cache-reuse rewrite.
+Why no KV cache slicing: Qwen3.5/3.6 hybrid (gated-delta-net + gated
+attention) layers have `LinearAttentionLayer` cache entries with recurrent
+state and no .keys / .values attributes. Per-sample slice via `pkv[i, :, :end_pos]`
+breaks. The hybrid natural+batched-forced path avoids slicing entirely.
 
-Why turn-boundary close+nudge: matches what a chat UI emits when a human
-interrupts a partial assistant turn. On-policy in chat-tuned data, where the
-prior `\\nI should answer now.</think>` mid-turn splice was OOD.
+Cost: 1 generate (batched) + at most 1 forced forward (batched). The
+natural path is free (logits already in `generate.scores`); the forced
+path uses the full batched cache from generate so wastes some compute
+on samples that resolved naturally — but no per-sample bs=1 loop.
+
+Why turn-boundary close+nudge in forced path: matches what a chat UI emits
+when a human interrupts a partial assistant turn. On-policy in chat-tuned
+data.
 """
 from __future__ import annotations
 
@@ -50,30 +59,47 @@ def _assistant_close(tok) -> str:
     return closed.split(_ASSISTANT_SENTINEL, 1)[1]
 
 
-def _slice_pkv_one(pkv, i: int, end_pos: int):
-    """Slice the batched KV cache to sample i, keeping only the first `end_pos`
-    seq positions. Returns a per-sample DynamicCache usable as
-    `past_key_values=` in a subsequent forward.
+def _find_natural_prefill_window(
+    gen_ids: torch.Tensor, pattern_text: str, tok, pad_id: int
+) -> tuple[int, int] | None:
+    """Return `(start_pos, answer_pos)` where `gen_ids[start_pos:answer_pos]`
+    are the tokens that decode to `pattern_text` (the prefill), and `answer_pos`
+    is the first token after the prefill (the answer slot). Returns None if
+    `pattern_text` never appears in the generated text, or if the pattern is
+    the very last thing (no answer token follows).
 
-    GQA-safe: slices only batch and seq dims; n_heads_kv (which may be <
-    n_heads_q) is preserved. NOTE: sliding-window-attention layers in models
-    like Gemma-2 cap the cached seq_len at window_size; for budgets >
-    window_size, end_pos may exceed cache length — we clamp to the actual
-    cached length per layer.
-
-    transformers 5.x DynamicCache exposes per-layer `.layers[l].keys` /
-    `.values` ([B, n_heads_kv, seq, d_head]). We slice each and rebuild a
-    fresh DynamicCache via .update().
-    """
-    from transformers.cache_utils import DynamicCache
-    out = DynamicCache()
-    for layer_idx, layer in enumerate(pkv.layers):
-        k = layer.keys
-        v = layer.values
-        kk = k[i:i+1, :, :min(end_pos, k.shape[2]), :]
-        vv = v[i:i+1, :, :min(end_pos, v.shape[2]), :]
-        out.update(kk, vv, layer_idx)
-    return out
+    Token-position mapping uses incremental decoding (O(n²) on token count,
+    fine for n≤2k): step through gen_ids one token at a time, decode prefix,
+    track first index whose decoded length passes the pattern's start char,
+    then the first whose decoded length covers the pattern's end char."""
+    keep = gen_ids != pad_id
+    real_ids = gen_ids[keep] if keep.any() else gen_ids[:0]
+    if real_ids.shape[0] == 0:
+        return None
+    full_text = tok.decode(real_ids, skip_special_tokens=False)
+    idx = full_text.find(pattern_text)
+    if idx < 0:
+        return None
+    target_start = idx
+    target_end = idx + len(pattern_text)
+    start_in_real: int | None = None
+    end_in_real: int | None = None
+    for t in range(real_ids.shape[0]):
+        partial = tok.decode(real_ids[: t + 1], skip_special_tokens=False)
+        if start_in_real is None and len(partial) > target_start:
+            start_in_real = t
+        if len(partial) >= target_end:
+            end_in_real = t + 1
+            break
+    if start_in_real is None or end_in_real is None:
+        return None
+    real_to_full = keep.nonzero(as_tuple=True)[0]
+    if end_in_real >= real_to_full.shape[0]:
+        return None
+    return (
+        int(real_to_full[start_in_real].item()),
+        int(real_to_full[end_in_real].item()),
+    )
 
 
 @torch.no_grad()
@@ -91,31 +117,39 @@ def _rollout_kv_fork(
     skip_special_tokens: bool = False,
     verbose: bool = False,
 ) -> tuple[list[tuple[str, int, bool]], list[list[dict]]]:
-    """Returns (thinks, slots), both flat lists of length `B*N` where
+    """Hybrid natural + batched-forced scoring. Architecture-independent.
+
+    Returns (thinks, slots), both flat lists of length `B*N` where
     `B = len(user_prompts)` and `N = n_samples`.
 
     Layout: HF `num_return_sequences=N` expands the batch to `[B*N, ...]` with
     contiguous samples per input, i.e. rows are
-    `[in_0_s_0, in_0_s_1, ..., in_0_s_(N-1), in_1_s_0, ...]`. We preserve that
-    layout in `thinks` and `slots`. Caller reshapes via `[i*N + n]` indexing.
+    `[in_0_s_0, in_0_s_1, ..., in_0_s_(N-1), in_1_s_0, ...]`. Preserved in
+    `thinks` / `slots`; caller reshapes via `[i*N + n]` indexing.
 
     thinks[j] = (gen_text, n_think_tokens, emitted_close), j in [0, B*N).
     slots[j][k] = {pmass_allowed, nll_json, top5_str, lp_gather}, j in [0, B*N).
 
-    Three-phase rollout:
-      Phase 1 (batched) — generate up to max_think_tokens with cache=True,
-                          capture pkv. Natural EOS stop. When n_samples>1
-                          we sample (do_sample=True) with `temperature/top_p`;
-                          otherwise greedy.
-      Phase 1.5 (per-sample) — find first </think> position per expanded row;
-                               rewind pkv to that position so post-EOS spew
-                               does not pollute the answer-slot measurement.
-      Phase 2 (per-sample) — forward the scoring suffix with rewound pkv,
-                             read logits at the suffix's last position.
+    Two phases:
+      Phase 1 (batched) — generate exactly `max_think_tokens` tokens
+        (`min_new_tokens=max_new_tokens` so no early stop). Capture
+        `out1.scores` (logits per generated step) and `out1.past_key_values`.
+      Phase 2 (batched) — for each scoring slot, append uniform forced suffix
+        `</think>` + assistant-close + interrupt-renudge user turn + assistant
+        prefill on top of `pkv`. One batched forward gives forced logits.
 
-    `pmass_allowed` is Σ exp(logp) over `gather_token_ids` at the slot.
-    `nll_json` is mean NLL in nats/token over the assistant prefill tokens.
-    `lp_gather` is the per-id logp vector at the slot.
+    Per-sample classification at the slot:
+      (a) natural — `prefill` text appears in decoded generation: read
+          `out1.scores[answer_pos][i]` for `pmass_allowed`; compute
+          per-token NLL of the natural prefill tokens via `out1.scores`.
+      (b) interrupted (no `</think>`) — use the forced logits/NLL.
+      (c) emitted `</think>` but no natural answer — the cache is contaminated
+          by post-close spew; mark NaN and let downstream filter.
+
+    Why no per-sample slicing: Qwen3 hybrid (Gated DeltaNet + Gated Attention)
+    cache has `LinearAttentionLayer` entries (recurrent SSM state, no
+    `.keys`/`.values`). Slicing/forking such a cache breaks. Uniform-length
+    cache from `min_new_tokens=max_new_tokens` sidesteps the issue entirely.
     """
     if tok.padding_side != "left":
         raise ValueError("tok.padding_side must be 'left'")
@@ -129,7 +163,7 @@ def _rollout_kv_fork(
     pad_id = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
     close = _assistant_close(tok)
 
-    # === Phase 1: think generation, capture KV cache ===
+    # ── Phase 1: think generation (full budget, no early stop) ──
     chats = [
         tok.apply_chat_template(
             [{"role": "user", "content": f"{up}\n\n{schema_hint}" if schema_hint else up}],
@@ -146,8 +180,14 @@ def _rollout_kv_fork(
     do_sample = temperature > 0.0
     gen_kwargs = dict(
         max_new_tokens=max_think_tokens,
-        eos_token_id=think_end_id, pad_token_id=pad_id,
+        # Force full budget so all samples have identical cache length →
+        # batched suffix forward without per-sample rewinding. Garbage tokens
+        # emitted past natural EOS pollute the cache only for case-(c) samples,
+        # which we NaN downstream anyway.
+        min_new_tokens=max_think_tokens,
+        pad_token_id=pad_id,
         return_dict_in_generate=True,
+        output_scores=True,
         num_return_sequences=n_samples,
     )
     if do_sample:
@@ -155,55 +195,34 @@ def _rollout_kv_fork(
     else:
         gen_kwargs.update(do_sample=False)
     out1 = model.generate(**enc, **gen_kwargs)
-    phase1_ids = out1.sequences    # [B*N, prompt_len + gen_len]
-    pkv = out1.past_key_values     # KV for [left-pad, prompt, think, (eos-pad)], batch=B*N
+    phase1_ids = out1.sequences           # [B*N, prompt_len + max_think_tokens]
+    pkv = out1.past_key_values            # cache for entire phase1_ids span
+    step_scores = out1.scores             # tuple length max_think_tokens, each [B*N, V]
 
-    B = phase1_ids.shape[0]   # B*N (we keep the name B for downstream loops)
+    B = phase1_ids.shape[0]
     assert B == len(user_prompts) * n_samples, (
         f"phase1_ids batch {B} != len(user_prompts)*n_samples = "
         f"{len(user_prompts)}*{n_samples}. HF expansion misaligned."
     )
     thinks: list[tuple[str, int, bool]] = []
-    real_lens: list[int] = []   # per-sample: seq_len up to and including first </think>
     for i in range(B):
         gen_ids_full = phase1_ids[i, prompt_len:]
         keep = gen_ids_full != pad_id
         gen_ids = gen_ids_full[keep] if keep.any() else gen_ids_full[:0]
-        # Return the FULL decoded gen — including anything past </think> —
-        # so callers can inspect coherence in the post-close regime if any.
-        # No stripping (the caller can split on _CLOSE_MARKER if they want
-        # just the pre-close part — easy one-liner, no info loss).
         gen_text = tok.decode(gen_ids, skip_special_tokens=skip_special_tokens)
         n_think = int(gen_ids.shape[0])
-        # Detect </think> via token id, not substring on gen_text:
-        # robust to skip_special_tokens flag and to models that mark
-        # </think> as a special token (which would otherwise be stripped).
         emitted_close = bool((gen_ids == think_end_id).any().item())
         thinks.append((gen_text, n_think, emitted_close))
 
-        # Phase 1.5: rewind position = first think_end_id in gen (inclusive),
-        # so the answer slot's KV context ends at the natural stopping point —
-        # not at the post-EOS spew (which would corrupt `pmass_allowed`).
-        eos_mask = (gen_ids_full == think_end_id)
-        if eos_mask.any():
-            first_eos = int(eos_mask.nonzero(as_tuple=True)[0][0].item())
-            real_lens.append(prompt_len + first_eos + 1)
-        else:
-            real_lens.append(phase1_ids.shape[1])   # no EOS → keep full budget
-
-    # Attention mask for the full cached prefix (per-sample slices reuse this).
-    pref_attn = (phase1_ids != pad_id).long()
-
-    # === Phase 2: per-sample suffix forward over rewound pkv ===
+    pref_attn = (phase1_ids != pad_id).long()   # [B, prompt_len + max_think_tokens]
     gid_t = torch.tensor(gather_token_ids, device=device, dtype=torch.long)
 
-    def suffix_parts_for(nudge: str, prefill: str) -> list[tuple[list[int], list[int]]]:
-        """Per-row suffix parts: optional </think> close + assistant-turn close +
-        interrupt-and-renudge prefix, then assistant prefill content.
-
-        Split before tokenization so `nll_json` scores exactly the assistant
-        prefill content, while the final logits still come after the prefill.
-        """
+    # ── Phase 2: per scoring slot, batched forced forward + natural overlay ──
+    slots: list[list[dict]] = [[] for _ in range(B)]
+    for slot_idx, (nudge, prefill) in enumerate(scoring_slots):
+        # Build uniform suffix. head = </think> always: case-(b) samples need
+        # it to close their open think; for case-(a)/(c) we don't use forced
+        # logits so the duplicate close doesn't matter.
         interrupt = tok.apply_chat_template(
             [{"role": "user", "content": nudge},
              {"role": "assistant", "content": _ASSISTANT_SENTINEL}],
@@ -211,99 +230,103 @@ def _rollout_kv_fork(
         )
         assert _ASSISTANT_SENTINEL in interrupt, f"sentinel not in interrupt: {interrupt!r}"
         interrupt_prefix = interrupt.split(_ASSISTANT_SENTINEL, 1)[0]
+        prefix_text = _CLOSE_MARKER + close + interrupt_prefix
+        prefix_ids = tok(prefix_text, add_special_tokens=False)["input_ids"]
         prefill_ids = tok(prefill, add_special_tokens=False)["input_ids"]
         assert prefill_ids, f"empty prefill ids for {prefill!r}"
-        suffix_parts = []
-        for _, _, emitted_close in thinks:
-            head = "" if emitted_close else _CLOSE_MARKER
-            prefix_text = head + close + interrupt_prefix
-            prefix_ids = tok(prefix_text, add_special_tokens=False)["input_ids"]
-            suffix_parts.append((prefix_ids, prefill_ids))
-        return suffix_parts
+        P, J = len(prefix_ids), len(prefill_ids)
 
-    def fork_per_sample(suffix_parts: list[tuple[list[int], list[int]]]) -> tuple[torch.Tensor, torch.Tensor]:
-        """Per-sample forward: rewind pkv to first-EOS for each sample,
-        forward that sample's interrupt prefix and assistant prefill, return
-        [B, V] logp at the answer slot plus per-sample prefill NLL.
+        # Per-sample natural-emission window detection for THIS slot's prefill.
+        windows: list[tuple[int, int] | None] = [
+            _find_natural_prefill_window(phase1_ids[i, prompt_len:], prefill, tok, pad_id)
+            for i in range(B)
+        ]
 
-        Per-sample (bs=1) because each sample's rewind position differs;
-        batching would require padding pkv along seq_len with attention-mask
-        gymnastics on a heterogeneous-length cache. Heavy lifting (Phase 1)
-        was already batched, so this loop is a thin extra cost.
-        """
-        V = model.config.vocab_size
-        lp_last = torch.zeros((B, V), device=device, dtype=torch.float32)
-        nll_json = torch.zeros((B,), device=device, dtype=torch.float32)
-        for i in range(B):
-            end_pos = real_lens[i]
-            pkv_i = _slice_pkv_one(pkv, i, end_pos)
-            pref_attn_i = pref_attn[i:i+1, :end_pos]
-            prefix_ids, prefill_ids = suffix_parts[i]
-            prefix_i = torch.tensor([prefix_ids], device=device, dtype=torch.long)
-            prefill_i = torch.tensor([prefill_ids], device=device, dtype=torch.long)
+        prefix_t = torch.tensor([prefix_ids] * B, device=device, dtype=torch.long)
+        prefill_t = torch.tensor([prefill_ids] * B, device=device, dtype=torch.long)
+        prefix_mask = torch.ones((B, P), dtype=torch.long, device=device)
+        prefix_attn = torch.cat([pref_attn, prefix_mask], dim=1)
+        prefix_out = model(
+            input_ids=prefix_t,
+            attention_mask=prefix_attn,
+            past_key_values=pkv,
+            use_cache=True,
+        )
+        prefill_mask = torch.ones((B, J), dtype=torch.long, device=device)
+        prefill_attn = torch.cat([prefix_attn, prefill_mask], dim=1)
+        prefill_out = model(
+            input_ids=prefill_t,
+            attention_mask=prefill_attn,
+            past_key_values=prefix_out.past_key_values,
+            use_cache=False,
+        )
+        forced_lp_last = F.log_softmax(prefill_out.logits[:, -1].float(), dim=-1)   # [B, V]
+        first_logp = F.log_softmax(prefix_out.logits[:, -1].float(), dim=-1)        # [B, V]
+        first_nll = -first_logp.gather(1, prefill_t[:, :1]).squeeze(-1)              # [B]
+        if J == 1:
+            forced_nll_json = first_nll
+        else:
+            next_logp = F.log_softmax(prefill_out.logits[:, :-1].float(), dim=-1)   # [B, J-1, V]
+            next_ids = prefill_t[:, 1:].unsqueeze(-1)                                # [B, J-1, 1]
+            tail_nll = -next_logp.gather(2, next_ids).squeeze(-1).sum(dim=1)         # [B]
+            forced_nll_json = (first_nll + tail_nll) / J
 
-            P = prefix_i.shape[1]
-            J = prefill_i.shape[1]
-            prefix_mask_i = torch.ones((1, P), dtype=torch.long, device=device)
-            prefix_attn_i = torch.cat([pref_attn_i, prefix_mask_i], dim=1)
-            prefix_out = model(
-                input_ids=prefix_i,
-                attention_mask=prefix_attn_i,
-                past_key_values=pkv_i,
-                use_cache=True,
-            )
-
-            prefill_mask_i = torch.ones((1, J), dtype=torch.long, device=device)
-            prefill_attn_i = torch.cat([prefix_attn_i, prefill_mask_i], dim=1)
-            prefill_out = model(
-                input_ids=prefill_i,
-                attention_mask=prefill_attn_i,
-                past_key_values=prefix_out.past_key_values,
-                use_cache=False,
-            )
-            first_logp = F.log_softmax(prefix_out.logits[0, -1].float(), dim=-1)
-            first_nll = -first_logp[prefill_i[0, 0]]
-            if J == 1:
-                total_nll = first_nll
-            else:
-                next_logp = F.log_softmax(prefill_out.logits[0, :-1].float(), dim=-1)
-                next_ids = prefill_i[0, 1:]
-                total_nll = first_nll - next_logp.gather(1, next_ids[:, None]).sum()
-            nll_json[i] = total_nll / J
-            lp_last[i] = F.log_softmax(prefill_out.logits[0, -1].float(), dim=-1)
-        return lp_last, nll_json
-
-    slots: list[list[dict]] = [[] for _ in range(B)]
-    for j, (nudge, prefill) in enumerate(scoring_slots):
-        suffix_parts = suffix_parts_for(nudge, prefill)
         if verbose:
-            # DEBUG: shows row 0 only. Independent generate from raw ids
-            # (does not use the cache) so it still works after the rewind.
             real0 = phase1_ids[0][phase1_ids[0] != pad_id]
-            prefix_text = tok.decode(real0, skip_special_tokens=False)
-            suf_text_0 = tok.decode(suffix_parts[0][0] + suffix_parts[0][1], skip_special_tokens=False)
-            full_ids = torch.tensor(
-                [real0.tolist() + suffix_parts[0][0] + suffix_parts[0][1]], device=device, dtype=torch.long,
-            )
-            gen = model.generate(full_ids, max_new_tokens=64, do_sample=False, pad_token_id=pad_id)
-            free = tok.decode(gen[0, full_ids.shape[1]:], skip_special_tokens=False)
+            prefix0_text = tok.decode(real0, skip_special_tokens=False)
+            suf0 = tok.decode(prefix_ids + prefill_ids, skip_special_tokens=False)
             logger.debug(
-                f"--- slot {j} (nudge={nudge!r}, prefill={prefill!r}) ---\n"
-                f"{prefix_text}{suf_text_0}<<<MODEL CONTINUES>>>{free}\n--- end slot {j} ---"
+                f"--- slot {slot_idx} (nudge={nudge!r}, prefill={prefill!r}) ---\n"
+                f"window[0]={windows[0]}  emitted_close[0]={thinks[0][2]}\n"
+                f"{prefix0_text}{suf0}\n--- end slot {slot_idx} ---"
             )
-        lp_last, nll_json = fork_per_sample(suffix_parts)
-        pmass_allowed = lp_last[:, gid_t].exp().sum(-1)
+
         for i in range(B):
-            top5 = lp_last[i].topk(5)
+            win = windows[i]
+            emitted_close_i = thinks[i][2]
+            if win is not None:
+                # Case (a) natural. Read logits at the answer slot from
+                # step_scores. step_scores[t] are the logits that produced
+                # gen_ids[t]; gen_ids[answer_pos] is the answer token, so
+                # the predictive distribution at the slot is step_scores[answer_pos].
+                start_pos, answer_pos = win
+                assert answer_pos < len(step_scores), (
+                    f"answer_pos={answer_pos} ≥ len(step_scores)={len(step_scores)}"
+                )
+                lp_vec = F.log_softmax(step_scores[answer_pos][i].float(), dim=-1)
+                # Natural NLL: mean NLL over gen_ids[start_pos:answer_pos]
+                # using step_scores[start_pos:answer_pos]. By construction
+                # answer_pos > start_pos so this window is non-empty.
+                gen_ids_full = phase1_ids[i, prompt_len:]
+                nat_nll_sum = 0.0
+                for k in range(start_pos, answer_pos):
+                    step_lp = F.log_softmax(step_scores[k][i].float(), dim=-1)
+                    nat_nll_sum += float(-step_lp[gen_ids_full[k]].item())
+                nll_val = nat_nll_sum / max(1, answer_pos - start_pos)
+            elif not emitted_close_i:
+                # Case (b) interrupted: forced
+                lp_vec = forced_lp_last[i]
+                nll_val = float(forced_nll_json[i].item())
+            else:
+                # Case (c) emitted </think> but no natural answer: undefined
+                slots[i].append({
+                    "pmass_allowed": float("nan"),
+                    "nll_json": float("nan"),
+                    "top5_str": "",
+                    "lp_gather": [float("nan")] * len(gather_token_ids),
+                })
+                continue
+
+            top5 = lp_vec.topk(5)
             top5_str = " ".join(
                 f"{tok.decode([int(idx)])!r}:{float(prob.exp()):.3f}"
                 for idx, prob in zip(top5.indices, top5.values)
             )
             slots[i].append({
-                "pmass_allowed": float(pmass_allowed[i].item()),
-                "nll_json": float(nll_json[i].item()),
+                "pmass_allowed": float(lp_vec[gid_t].exp().sum().item()),
+                "nll_json": nll_val,
                 "top5_str": top5_str,
-                "lp_gather": lp_last[i, gid_t].cpu().tolist(),
+                "lp_gather": lp_vec[gid_t].cpu().tolist(),
             })
 
     return thinks, slots
