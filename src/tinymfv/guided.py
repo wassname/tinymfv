@@ -285,9 +285,15 @@ def _rollout_natural_or_forced(
                 lp_vec = forced_lp_last[i]
                 nll_val = float(forced_nll_json[i].item())
             else:
-                # Case (c) emitted </think> but no natural answer: undefined
+                # Case (c) emitted </think> but no natural answer slot found.
+                # Model "finished thinking" without producing JSON — coherence
+                # collapse at the answer slot. pmass=0.0 is the honest measurement
+                # (no probability mass on allowed tokens at a non-existent slot)
+                # and lets c_scan see the failure as a real signal rather than
+                # crashing on NaN. nll_json stays NaN (genuinely undefined: no
+                # JSON tokens were emitted to score).
                 slots[i].append({
-                    "pmass_allowed": float("nan"),
+                    "pmass_allowed": 0.0,
                     "nll_json": float("nan"),
                     "top5_str": "",
                     "lp_gather": [float("nan")] * len(gather_token_ids),
