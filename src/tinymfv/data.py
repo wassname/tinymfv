@@ -22,6 +22,7 @@ perspective bias (model judging others vs itself). The probe itself is
 a single JSON-pseudo-schema with the 7 foundations as enum options —
 not a binary wrong/accept frame.
 """
+
 from __future__ import annotations
 import json
 from pathlib import Path

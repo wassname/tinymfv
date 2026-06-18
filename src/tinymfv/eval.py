@@ -413,7 +413,6 @@ def evaluate(
         "T": T,                # fitted temperature (>1 = model is overconfident)
         "top1_acc": top1_acc,
         "informedness": informedness,  # macro Youden's J, model vs human argmax, in [-1, 1]
-        "mean_pmass_format": mean_pmass_format,
         "mean_pmass_allowed": mean_pmass_allowed,
         "mean_nll_json": mean_nll_json,
         "info": info,
