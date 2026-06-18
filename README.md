@@ -159,20 +159,24 @@ It does. We show these two things below.
 
 ### Agreement with humans (1)
 
-We report two scalars on `classic`, plus a per-class breakdown.
+We report three scalars on `classic`, plus a per-class breakdown.
 
 - *Top-1 agreement*: model argmax `==` human modal label. Calibration-free,
   interpretable. Qwen3-4B: 82.6% (chance is 14.3% for 7-way choice).
-- *Informedness*: macro Youden's J of model argmax vs human argmax, in
-  `[-1, 1]`. Chance-corrected top-1 agreement (`0` = base-rate guessing,
-  `1` = perfect), so a model that just always picks the majority foundation
-  scores `0` where top-1 would look respectable. Reads only the argmax, so it
+- *Informedness*: how much better than chance the model's pick matches the
+  human one. Scored per foundation as
+  [Youden's J](https://en.wikipedia.org/wiki/Youden%27s_J_statistic)
+  (sensitivity + specificity − 1) and averaged over the seven (one per
+  foundation, that class vs the rest), in `[-1, 1]`: `0` = base-rate guessing,
+  `1` = perfect; see [`_informedness`](src/tinymfv/eval.py) for the formula.
+  A model that always picks the
+  majority foundation scores `0`, where raw top-1 would still credit its
+  base-rate hits.
+  [wassname/steering-lite](https://github.com/wassname/steering-lite) uses the
+  same informedness, anchored on a base model rather than the human label. It
   moves when the *answer flips*, not when confidence shifts on an
-  already-decided row. This is the discrete companion to soft NLL: less
-  sensitive, but closer to the qualitative "did the model change its mind"
-  read, and the same flip-informedness used as the headline in
-  [wassname/steering-lite](https://github.com/wassname/steering-lite) (which
-  anchors flips on a base model rather than on the human label).
+  already-decided row, which makes it less sensitive than soft NLL but closer
+  to whether the model actually changed its mind.
 - *Mean soft NLL*: `-Σ_f p_human[f] log p_model[f]` in nats, the standard
   quantity for matching a predicted distribution to a soft-labelled
   target. Unbounded and sensitive (a single confident-wrong row can add
