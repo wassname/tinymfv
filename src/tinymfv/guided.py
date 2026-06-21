@@ -333,13 +333,16 @@ _DEFAULT_FORCED_FOUNDATIONS: tuple[str, ...] = (
     "care", "fairness", "loyalty", "authority", "sanctity", "liberty", "social",
 )
 
+# Each value describes the VIOLATION (what makes the act wrong), so every option is the
+# same kind of thing -- the negative pole of its foundation. (Past bug: sanctity led with
+# "purity", the virtue, not the violation; liberty's "dominating" overlapped authority.)
 _FORCED_FOUNDATION_DESCS: dict[str, str] = {
     "care":      "harm or unkindness, causing pain to another",
     "fairness":  "cheating or reducing equality",
     "loyalty":   "betrayal of a group",
-    "authority": "subversion or lack of respect for tradition",
-    "sanctity":  "purity, degrading or disgusting acts",
-    "liberty":   "bullying or dominating",
+    "authority": "subversion or disrespect toward legitimate authority or tradition",
+    "sanctity":  "degradation, impurity, or disgusting acts",
+    "liberty":   "oppression, restricting another's freedom",
     "social":    "weird or unusual behaviour, but not morally wrong",
 }
 
