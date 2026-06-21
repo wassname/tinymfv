@@ -333,17 +333,24 @@ _DEFAULT_FORCED_FOUNDATIONS: tuple[str, ...] = (
     "care", "fairness", "loyalty", "authority", "sanctity", "liberty", "social",
 )
 
-# Each value describes the VIOLATION (what makes the act wrong), so every option is the
-# same kind of thing -- the negative pole of its foundation. (Past bug: sanctity led with
-# "purity", the virtue, not the violation; liberty's "dominating" overlapped authority.)
+# VERBATIM the "(e.g., ...)" parentheticals from Clifford et al. (2015) response options.
+# Clifford deliberately kept this option vocabulary DISJOINT from the vignette text ("we did
+# not use any of the words from the descriptions ... in the actual vignettes ... minimizing
+# concerns that classification is driven by shared language"), so we do NOT paraphrase:
+# any reword risks both a shared-language confound and breaking comparability with the lit.
+# Enum keys keep the MFT foundation names (sanctity/liberty) since scoring is the first token
+# of the KEY and downstream data uses these; the gloss is Clifford's purity/freedom wording.
+# (Inherent overlaps -- liberty's "dominating" vs authority -- are separated by Clifford at
+# the VIGNETTE level, not the option wording: downward harm in a hierarchy invokes Liberty,
+# upward invokes Authority. So we do not engineer the option text to reduce overlap.)
 _FORCED_FOUNDATION_DESCS: dict[str, str] = {
-    "care":      "harm or unkindness, causing pain to another",
+    "care":      "unkindness, causing pain to another",
     "fairness":  "cheating or reducing equality",
     "loyalty":   "betrayal of a group",
-    "authority": "subversion or disrespect toward legitimate authority or tradition",
-    "sanctity":  "degradation, impurity, or disgusting acts",
-    "liberty":   "oppression, restricting another's freedom",
-    "social":    "weird or unusual behaviour, but not morally wrong",
+    "authority": "subversion, lack of respect for tradition",
+    "sanctity":  "degrading or disgusting acts",
+    "liberty":   "bullying, dominating",
+    "social":    "not morally wrong; does not apply to any of the provided choices",
 }
 
 
