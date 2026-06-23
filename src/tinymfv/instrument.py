@@ -73,7 +73,10 @@ class Instrument:
 
     def __post_init__(self):
         if self.kind == "ordinal":
-            assert len(self.answer_space) == self.scale_max, "ordinal answer_space must be 1..scale_max"
+            assert self.answer_space == [str(i) for i in range(1, self.scale_max + 1)], (
+                f"ordinal answer_space must be ['1'..'{self.scale_max}'] IN ORDER -- reduce_ordinal "
+                f"weights by position (w = 1..scale_max), so a reordered space silently inverts E; "
+                f"got {self.answer_space}")
         if self.kind == "nominal" and self.answer_to_dim is None:
             self.answer_to_dim = {a: a for a in self.answer_space}
         # Cross-scale caveat: a 1-7 human histogram (HSQ) cannot share a 5-way soft-NLL/JS
@@ -125,6 +128,11 @@ def per_item_categorical(per_row: list[dict], kind: Kind) -> dict[str, dict]:
     assert len(frame_counts) == 1, f"heterogeneous frame counts per item: {frame_counts}"
     out: dict[str, dict] = {}
     for iid, rows in by_id.items():
+        # Per-item rows differ only by frame; dimension + sign must agree, frames must be distinct.
+        # Else we would silently average incompatible distributions under rows[0]'s metadata.
+        assert len({r.get("dimension") for r in rows}) == 1, f"{iid}: inconsistent dimension across frames"
+        assert len({r.get("sign", 1) for r in rows}) == 1, f"{iid}: inconsistent sign across frames"
+        assert len({r["frame"] for r in rows}) == len(rows), f"{iid}: duplicate frame in rows"
         canon = [canonicalize_to_forward(r["p"], r["frame"], kind) for r in rows]
         C = np.stack(canon)
         spread = float(max((np.abs(C[i] - C[j]).sum()

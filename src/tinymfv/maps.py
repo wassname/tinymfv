@@ -55,12 +55,19 @@ def row_centre_op(K: int) -> np.ndarray:
 
 def ipsative_pca(M: np.ndarray, k: int = 2):
     """Row-centre each row of M (societies x K), then PCA across rows.
-    Returns (P, Vt, var, mu, Pc); project a new point v via ((v @ Pc) - mu) @ Vt[:k].T."""
-    Pc = row_centre_op(M.shape[1])
+    Returns (P, Vt, var, mu, Pc); project a new point v via ((v @ Pc) - mu) @ Vt[:k].T.
+    SVD signs are stabilized here (PC1 loads + on factor 0, PC2 on factor 1) so this helper and
+    any plot built on it share ONE orientation -- otherwise saved coords could mirror the figure."""
+    K = M.shape[1]
+    Pc = row_centre_op(K)
     Mp = M @ Pc
     mu = Mp.mean(axis=0)
     Mc = Mp - mu
     _, S, Vt = np.linalg.svd(Mc, full_matrices=False)
+    if Vt[0, 0] < 0:
+        Vt[0] = -Vt[0]
+    if Vt.shape[0] > 1 and Vt[1, 1 % K] < 0:
+        Vt[1] = -Vt[1]
     var = (S ** 2) / (S ** 2).sum()
     return Mc @ Vt[:k].T, Vt, var, mu, Pc
 
@@ -100,11 +107,7 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
         import textalloc as ta
     except ImportError:
         ta = None
-    P, Vt, var, mu, Pc = ipsative_pca(M)
-    if Vt[0, 0] < 0:                                    # stabilise SVD sign: factor[0] loads +PC1
-        Vt[0] = -Vt[0]
-    if Vt[1, 1 % len(dims)] < 0:
-        Vt[1] = -Vt[1]
+    P, Vt, var, mu, Pc = ipsative_pca(M)               # signs already stabilized inside the helper
     P = (M @ Pc - mu) @ Vt[:2].T
 
     def proj(v):

@@ -17,8 +17,14 @@ dependencies = [
     "tabulate",
     "datasets",
     "numpy",
-    "matplotlib>=3.8",   # tinymfv.maps: culture-map + range viz
-    "textalloc>=1.2.3",  # non-overlapping label placement on the maps
+]
+
+[project.optional-dependencies]
+# tinymfv.maps (culture-map + range viz) only; `import tinymfv` and the evals stay headless,
+# numeric-only consumers (steering-lite) skip this. Install with `pip install tiny-mfv[maps]`.
+maps = [
+    "matplotlib>=3.8",
+    "textalloc>=1.2.3",   # non-overlapping label placement on the maps
 ]
 
 [dependency-groups]

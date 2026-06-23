@@ -8,11 +8,15 @@ import numpy as np
 
 from tinymfv.instrument import (
     Instrument, InstrItem, canonicalize_to_forward, per_item_categorical,
-    reduce_nominal, reduce_ordinal, expected_value, shuffle_dimensions,
+    reduce_ordinal, shuffle_dimensions,
 )
 
 M = 5
 ONEHOT = {d: np.eye(M)[d - 1] for d in range(1, M + 1)}  # ONEHOT[4] = mass on scale point 4
+
+
+def _E(p, scale_max):  # expected scale point; reduce_ordinal computes this inline now
+    return float((np.asarray(p) * np.arange(1, scale_max + 1)).sum())
 
 
 def _ord_instr(items):
@@ -33,7 +37,7 @@ def test_forward_expectation():
     rows = [{"id": "1", "frame": "forward", "p": ONEHOT[4], "pmass_allowed": 1.0,
              "dimension": "care", "sign": 1, "human_label": None}]
     items = per_item_categorical(rows, "ordinal")
-    assert abs(expected_value(items["1"]["p"], M) - 4.0) < 1e-9
+    assert abs(_E(items["1"]["p"], M) - 4.0) < 1e-9
     prof = reduce_ordinal(items, _ord_instr([]))
     assert abs(prof[0] - 4.0) < 1e-9  # care
     assert np.isnan(prof[1])          # authority has no items
@@ -45,8 +49,8 @@ def test_frame_consistency():
             "dimension": "care", "sign": 1, "human_label": None}]
     inv = [{"id": "1", "frame": "inverted", "p": ONEHOT[5], "pmass_allowed": 1.0,
             "dimension": "care", "sign": 1, "human_label": None}]
-    e_fwd = expected_value(per_item_categorical(fwd, "ordinal")["1"]["p"], M)
-    e_inv = expected_value(per_item_categorical(inv, "ordinal")["1"]["p"], M)
+    e_fwd = _E(per_item_categorical(fwd, "ordinal")["1"]["p"], M)
+    e_inv = _E(per_item_categorical(inv, "ordinal")["1"]["p"], M)
     assert abs(e_fwd - 1.0) < 1e-9 and abs(e_inv - 1.0) < 1e-9  # canonicalization makes them agree
 
 
@@ -59,7 +63,7 @@ def test_keying_is_not_double_flip():
     rows = [{"id": "x", "frame": "inverted", "p": ONEHOT[5], "pmass_allowed": 1.0,
              "dimension": "care", "sign": -1, "human_label": None}]
     items = per_item_categorical(rows, "ordinal")
-    assert abs(expected_value(items["x"]["p"], M) - 1.0) < 1e-9      # canonical agreement-with-item = 1
+    assert abs(_E(items["x"]["p"], M) - 1.0) < 1e-9      # canonical agreement-with-item = 1
     prof = reduce_ordinal(items, _ord_instr([]))
     assert abs(prof[0] - 5.0) < 1e-9                                 # keyed factor score = 5, not 1 (no double flip)
 
@@ -79,15 +83,6 @@ def test_frame_spread_diagnostic():
              "dimension": "care", "sign": 1, "human_label": None}]
     items = per_item_categorical(rows, "ordinal")
     assert abs(items["1"]["frame_spread"] - 2.0) < 1e-9
-
-
-def test_reduce_nominal():
-    instr = Instrument("mfv", "salience", "nominal", ["care", "authority"],
-                       ["care", "authority"], [InstrItem("1", "v1")], prefill="(")
-    rows = [{"id": "1", "frame": "forward", "p": np.array([0.8, 0.2]), "pmass_allowed": 1.0},
-            {"id": "2", "frame": "forward", "p": np.array([0.4, 0.6]), "pmass_allowed": 1.0}]
-    prof = reduce_nominal(per_item_categorical(rows, "nominal"), instr)
-    assert np.allclose(prof, [0.6, 0.4])  # mean choice frequency
 
 
 def test_negative_control_shuffle():

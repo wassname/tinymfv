@@ -72,9 +72,12 @@ def read_items(model, tok, instr: Instrument, items: list[InstrItem], answer_ids
         enc = tok(texts, return_tensors="pt", padding=True, add_special_tokens=False).to(device)
         logits = model(**enc).logits[:, -1, :].float()        # [B, V] next-token
         logp = F.log_softmax(logits, dim=-1)
-        p_a = logp[:, gid].exp()                              # [B, A] prob on each answer token
-        pmass = p_a.sum(dim=-1)                               # [B]
-        p_norm = p_a / pmass[:, None]                         # [B, A] within allowed
+        logp_a = logp[:, gid]                                 # [B, A] logprob on each answer token
+        pmass = logp_a.exp().sum(dim=-1)                      # [B] coherence check: mass on allowed tokens
+        # softmax over the allowed logprobs == p_a / pmass when pmass > 0, but NaN-safe: at coherence
+        # collapse pmass underflows to 0 and the divide would poison the whole profile with NaN; the
+        # softmax still returns a valid within-allowed distribution and pmass separately flags the drop.
+        p_norm = F.softmax(logp_a, dim=-1)                    # [B, A] within allowed
         for j, it in enumerate(chunk):
             out.append({
                 "id": it.id, "frame": it.frame,
