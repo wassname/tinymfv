@@ -72,12 +72,14 @@ def read_items(model, tok, instr: Instrument, items: list[InstrItem], answer_ids
         enc = tok(texts, return_tensors="pt", padding=True, add_special_tokens=False).to(device)
         logits = model(**enc).logits[:, -1, :].float()        # [B, V] next-token
         logp = F.log_softmax(logits, dim=-1)
-        logp_a = logp[:, gid]                                 # [B, A] logprob on each answer token
-        pmass = logp_a.exp().sum(dim=-1)                      # [B] coherence check: mass on allowed tokens
-        # softmax over the allowed logprobs == p_a / pmass when pmass > 0, but NaN-safe: at coherence
-        # collapse pmass underflows to 0 and the divide would poison the whole profile with NaN; the
-        # softmax still returns a valid within-allowed distribution and pmass separately flags the drop.
-        p_norm = F.softmax(logp_a, dim=-1)                    # [B, A] within allowed
+        p_a = logp[:, gid].exp()                              # [B, A] prob on each answer token
+        pmass = p_a.sum(dim=-1)                               # [B] coherence check: mass on allowed tokens
+        # Renormalize within allowed. INTENTIONALLY NOT NaN-guarded: at full coherence collapse
+        # pmass -> 0 so p_norm -> NaN and poisons that item's factor. That is the honest signal, a
+        # distribution renormalized from ~zero mass is NOT comparable to one from real mass (the mean
+        # of 10 != the mean of 130), so it must not be silently turned into a comparable-looking
+        # number. NaN marks "do not compare". Do not "fix" this with a softmax/eps fallback.
+        p_norm = p_a / pmass[:, None]                         # [B, A] within allowed (NaN at collapse, by design)
         for j, it in enumerate(chunk):
             out.append({
                 "id": it.id, "frame": it.frame,
