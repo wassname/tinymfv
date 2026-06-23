@@ -88,10 +88,13 @@ def compass(ax_main, L: np.ndarray, labels: list[str], title: str = "compass",
 
 
 def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], M: np.ndarray,
-                      base: np.ndarray, hon: np.ndarray | None, dis: np.ndarray | None,
-                      *, boots: dict | None = None, pad=(0.18, 0.16)):
-    """Ipsative culture map. M is societies x K (0-1 fraction); base/hon/dis are length-K fraction
-    vectors (or None). `boots` optionally maps 'base'/'honest'/'dis' -> (n x K) bootstrap fraction
+                      base: np.ndarray, pos: np.ndarray | None, neg: np.ndarray | None,
+                      *, boots: dict | None = None, pad=(0.18, 0.16),
+                      labels: tuple[str, str, str] = ("baseline (c=0)", "honest (c=+2)", "dishonest (c=-2)")):
+    """Ipsative culture map. M is societies x K (0-1 fraction); base / pos / neg are the length-K
+    fraction vectors for the base model and its two steer poles (or None). `labels` is the legend
+    text (base, +pole, -pole) -- override it for a non-honesty steer or a different coefficient.
+    `boots` optionally maps the role keys 'base'/'honest'/'dis' -> (n x K) bootstrap fraction
     matrices for the uncertainty cross. Returns the Figure."""
     try:
         import textalloc as ta
@@ -106,7 +109,7 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
 
     def proj(v):
         return ((v @ Pc) - mu) @ Vt[:2].T if v is not None else None
-    pb, ph, pf = proj(base), proj(hon), proj(dis)
+    pb, ph, pf = proj(base), proj(pos), proj(neg)
 
     fig, ax = plt.subplots(figsize=(8.5, 7.5))
     ax.set_facecolor("#faf8f2")
@@ -128,9 +131,10 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
             e1, e2 = 1.96 * bp.std(0)
             ax.errorbar(pt[0], pt[1], xerr=e1, yerr=e2, fmt="none", ecolor=col,
                         elinewidth=0.7, alpha=0.55, capsize=2.5, capthick=0.8, zorder=4)
-    for pt, col, mk, lab, dxy, ha in [(ph, C_HON, "s", "honest (c=+2)", (9, 9), "left"),
-                                      (pf, C_DIS, "^", "dishonest (c=-2)", (-9, -1), "right"),
-                                      (pb, C_BASE, "o", "baseline (c=0)", (9, -13), "left")]:
+    base_lab, pos_lab, neg_lab = labels
+    for pt, col, mk, lab, dxy, ha in [(ph, C_HON, "s", pos_lab, (9, 9), "left"),
+                                      (pf, C_DIS, "^", neg_lab, (-9, -1), "right"),
+                                      (pb, C_BASE, "o", base_lab, (9, -13), "left")]:
         if pt is None:
             continue
         if pt is not pb:

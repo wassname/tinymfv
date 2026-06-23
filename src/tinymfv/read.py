@@ -10,7 +10,7 @@ on the instrument's `answer_space` tokens after its `prefill`. Per InstrItem:
 
   - p        = renormalized distribution over answer_space (sums to 1). This is the per-(item,frame)
                categorical that `instrument.per_item_categorical` canonicalizes + averages.
-  - pmass    = sum of raw (full-vocab) mass on the answer tokens: the coherence canary. Drops when
+  - pmass    = sum of raw (full-vocab) mass on the answer tokens: the coherence check. Drops when
                the model leaks to refusals / prose / gibberish, independent of which option it picks.
 
 Framing (forward / inverted / negated) is carried by each InstrItem.frame; canonicalization to a
@@ -19,7 +19,7 @@ frame-agnostic: it just reports the presented-orientation distribution.
 
 Single-token requirement: every answer token must encode to exactly one id given the tokenizer,
 and they must be distinct. Verified for Qwen ('(1' -> ['(','1']). A pmass collapse (not an error
-here) is the canary that the prefill merged with the option and the readout went blind.
+here) is the tell that the prefill merged with the option and the readout went blind.
 """
 from __future__ import annotations
 

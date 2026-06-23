@@ -1,7 +1,7 @@
 """Instrument spec: one answer-token reader, many questionnaires (Option 3).
 
 Every instrument is the SAME measurement: a softmax over an answer-token set at a prefilled
-slot, with a think budget, debias, BMA over sampled traces, a pmass coherence canary, and
+slot, with a think budget, debias, BMA over sampled traces, a pmass coherence check, and
 temperature calibration to human soft-labels. Per-instrument variation is small:
 
   1. answer_space : tokens gathered. Nominal = foundation words (forced-choice MFV);
@@ -13,9 +13,8 @@ temperature calibration to human soft-labels. Per-instrument variation is small:
   3. scaffold     : prompt + assistant prefill that forces the answer slot.
   4. human_label  : per-item forward-orientation distribution over answer_space.
 
-Design corrected after a frontier scientist panel (docs/reviews/sci_ma_*.md). The panel's
-central, agreed flaw: leaving the frame reflection in the reducer made nominal and ordinal
-debias asymmetric and risked double-flipping. The fix unifies them:
+The frame reflection must NOT live in the reducer: that makes nominal and ordinal debias
+asymmetric and risks double-flipping. Both kinds unify on one rule:
 
   CANONICALIZE-AT-READER. Every frame's gathered distribution is mapped to ONE forward
   orientation before anything else (`canonicalize_to_forward`): nominal reorder frames reindex
@@ -32,7 +31,7 @@ debias asymmetric and risked double-flipping. The fix unifies them:
       framing canonicalization -- not a double-correction.
 
 `p` everywhere is renormalized over the allowed answer tokens (sums to 1); `pmass_allowed` is
-the separate coherence canary, never mixed into the distribution.
+the separate coherence check, never mixed into the distribution.
 """
 from __future__ import annotations
 from collections import defaultdict
@@ -77,8 +76,8 @@ class Instrument:
             assert len(self.answer_space) == self.scale_max, "ordinal answer_space must be 1..scale_max"
         if self.kind == "nominal" and self.answer_to_dim is None:
             self.answer_to_dim = {a: a for a in self.answer_space}
-        # Cross-scale caveat (panel: human_scale_max was unused): a 1-7 human histogram (HSQ)
-        # cannot share a 5-way soft-NLL/JS with a 1-5 model directly. Calibration for such
+        # Cross-scale caveat: a 1-7 human histogram (HSQ) cannot share a 5-way soft-NLL/JS
+        # with a 1-5 model directly. Calibration for such
         # instruments must project both to a common support (or report 0-1 endorsement only).
         # Enforced loudly rather than silently mis-comparing:
         if self.kind == "ordinal" and self.human_scale_max != self.scale_max:
@@ -121,7 +120,7 @@ def per_item_categorical(per_row: list[dict], kind: Kind) -> dict[str, dict]:
     # Each item collapses to ONE averaged distribution, so every item contributes EQUALLY to the
     # factor mean. That matches pooling all (item, frame) rows only if every item has the same frame
     # count. Assert it loudly rather than silently reweighting a factor if a future instrument gives
-    # some items fewer frames. (External review #57: dormant weighting asymmetry.)
+    # some items fewer frames.
     frame_counts = {len(rows) for rows in by_id.values()}
     assert len(frame_counts) == 1, f"heterogeneous frame counts per item: {frame_counts}"
     out: dict[str, dict] = {}
@@ -143,17 +142,7 @@ def per_item_categorical(per_row: list[dict], kind: Kind) -> dict[str, dict]:
     return out
 
 
-# --- profile reducers: the only kind-specific summary ---
-
-def reduce_nominal(items: dict[str, dict], instr: Instrument) -> np.ndarray:
-    """Forced-choice profile = mean choice frequency over the answer space, folded to dimensions."""
-    dim_idx = {d: j for j, d in enumerate(instr.dimensions)}
-    acc = np.zeros((len(items), len(instr.dimensions)))
-    for i, it in enumerate(items.values()):
-        for a, pa in zip(instr.answer_space, it["p"]):
-            acc[i, dim_idx[instr.answer_to_dim[a]]] += pa
-    return acc.mean(axis=0)
-
+# --- profile reducer: the ordinal kind-specific summary (nominal evaluate folds its profile inline) ---
 
 def reduce_ordinal(items: dict[str, dict], instr: Instrument) -> np.ndarray:
     """Likert profile = mean keyed agreement per dimension; agreement = E[scale point].
@@ -172,16 +161,9 @@ def reduce_ordinal(items: dict[str, dict], instr: Instrument) -> np.ndarray:
     return np.array([float(np.mean(by_dim[d])) for d in instr.dimensions])
 
 
-REDUCERS = {"nominal": reduce_nominal, "ordinal": reduce_ordinal}
-
-
-def expected_value(p: np.ndarray, scale_max: int) -> float:
-    return float((np.asarray(p) * np.arange(1, scale_max + 1)).sum())
-
-
-# --- negative control: shuffle item->dimension (ordinal) / answer->dim (nominal); profile
-# correlation with the true profile must collapse to chance. A non-null result is only
-# interpretable if this control passes (all three reviewers required it). ---
+# --- negative control (currently unwired): shuffle item->dimension; the shuffled profile's
+# correlation with the true profile must collapse to chance, else the signal is a layout artifact.
+# A non-null steering result is only interpretable once this passes. ---
 
 def shuffle_dimensions(items: dict[str, dict], rng: np.random.Generator) -> dict[str, dict]:
     dims = [it["dimension"] for it in items.values()]

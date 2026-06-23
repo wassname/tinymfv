@@ -462,7 +462,7 @@ def evaluate(
         "informedness": informedness,
         # Mean pmass_format: average prob mass on the K foundation answer
         # tokens at the JSON answer slot, across rows × framings. In [0, 1].
-        # Direct coherence canary for forced-choice — drops when the model
+        # Direct coherence check for forced-choice: drops when the model
         # emits non-foundation tokens (gibberish, refusal, format collapse),
         # independent of which foundation is picked. Higher = more
         # "in-format"; a sharp drop after steering signals coherence loss.

@@ -1,4 +1,4 @@
-"""Run an ordinal Instrument end-to-end on a local model -> profile + coherence canary.
+"""Run an ordinal Instrument end-to-end on a local model -> profile + coherence check.
 
 This is the survey counterpart to `tinymfv.evaluate` (the vignette forced-choice eval). It ties:
 
@@ -10,10 +10,12 @@ The profile vector (per `instr.dimensions`) is the load-bearing output; `per_ite
 canonicalization makes it algebraically identical to the experiment's `admin.administer` per-factor
 means (verified by the reducer parity check), so this is a drop-in for the maps.
 
-`mean_pmass_allowed` is the coherence canary: mass on valid answer tokens. A sharp drop (especially
+`mean_pmass_allowed` is the coherence check: mass on valid answer tokens. A sharp drop (especially
 after steering) means the profile is untrustworthy even if every digit is in-format.
 """
 from __future__ import annotations
+
+from typing import TypedDict
 
 import numpy as np
 
@@ -21,11 +23,39 @@ from .instrument import Instrument, per_item_categorical, reduce_ordinal, canoni
 from .read import read_items, resolve_answer_ids
 
 
-def administer(model, tok, instr: Instrument, *, batch_size: int = 36) -> dict:
+class ItemRow(TypedDict):
+    id: str
+    foundation: str
+    keyed_agreement: float          # E, reverse-keyed for sign<0 items
+    E: float                        # expected scale point, 1..scale_max
+    pmass_allowed: float
+    frame_spread: float
+
+
+class ItemFrameRow(TypedDict):
+    id: str
+    framing: str                    # forward | inverted | negated
+    foundation: str
+    agreement: float                # forward-canonicalized E toward the original statement
+    keyed_agreement: float
+    pmass_allowed: float
+
+
+class AdministerResult(TypedDict):
+    profile: np.ndarray             # [len(dimensions)] per-factor keyed agreement -- the map input
+    dimensions: list[str]           # factor order, matches `profile`
+    foundations: list[dict]         # one per factor: foundation, mean, sd, ci95_lo/hi, framing_spread,
+                                    # + dynamic f_<frame> keys (f_forward/f_inverted/f_negated)
+    per_item: list[ItemRow]         # one per item, frame-averaged
+    per_item_frame: list[ItemFrameRow]  # one per (item, frame) -- the granularity the maps bootstrap
+    mean_pmass_allowed: float       # coherence check (mass on valid answer tokens)
+
+
+def administer(model, tok, instr: Instrument, *, batch_size: int = 36) -> AdministerResult:
     assert instr.kind == "ordinal", "administer() is the ordinal survey readout; use evaluate() for nominal MFV"
     # Every ordinal item must carry its frame-specific response-scale legend in meta['task']; without
     # it build_prompt would silently emit a bare statement (no legend) and the profile would be junk
-    # while pmass still looks fine. Fail loud. (External review #57: build_prompt silent fallback.)
+    # while pmass still looks fine. Fail loud.
     assert all("task" in it.meta for it in instr.items), f"{instr.name}: ordinal items need meta['task']"
     w = np.arange(1, instr.scale_max + 1, dtype=float)
     answer_ids = resolve_answer_ids(tok, instr.answer_space)

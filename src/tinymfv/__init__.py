@@ -23,21 +23,32 @@ Lower-level: see `guided_rollout_forced_choice` in `tinymfv.guided`.
 from .data import load_vignettes, load_all_vignettes, CONFIGS, ConfigName
 from .eval import evaluate, CONDITIONS
 from .guided import guided_rollout_forced_choice, _DEFAULT_FORCED_FOUNDATIONS
-from .instrument import Instrument, InstrItem, per_item_categorical, REDUCERS
+from .instrument import Instrument, InstrItem, per_item_categorical
 from .instruments import get as get_instrument, INSTRUMENTS, build_instrument
 from .read import read_items, resolve_answer_ids, build_prompt
 from .administer import administer
-from . import maps
 
+
+def __getattr__(name: str):
+    # `maps` pulls matplotlib; load it lazily so `import tinymfv` stays headless and fast for the
+    # numeric-only consumers (steering-lite). `tinymfv.maps.plot_*` still works -- first access
+    # triggers the import here.
+    if name == "maps":
+        import importlib
+        return importlib.import_module(".maps", __name__)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+# The front door. Other symbols above stay importable (e.g. read_items for item subsets,
+# per_item_categorical, build_instrument) but are plumbing, kept out of `import *`.
 __all__ = [
-    "CONDITIONS", "CONFIGS", "ConfigName",
-    "load_vignettes", "load_all_vignettes",
-    "evaluate",
-    "guided_rollout_forced_choice", "_DEFAULT_FORCED_FOUNDATIONS",
-    # survey readout (ordinal instruments: MFQ-2 / Big5 / 16PF / HSQ)
-    "Instrument", "InstrItem", "per_item_categorical", "REDUCERS",
-    "get_instrument", "INSTRUMENTS", "build_instrument",
-    "read_items", "resolve_answer_ids", "build_prompt", "administer",
-    "maps",
+    # entrypoints
+    "evaluate", "administer", "get_instrument", "read_items",
+    # types consumers build / subset
+    "Instrument", "InstrItem",
+    # data API
+    "load_vignettes", "load_all_vignettes", "CONFIGS", "ConfigName", "CONDITIONS",
+    # lower-level rollout + lazy plotting
+    "guided_rollout_forced_choice", "maps",
 ]
 

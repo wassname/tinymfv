@@ -29,8 +29,6 @@ from pathlib import Path
 from typing import Literal
 
 _DATA_DIR = Path(__file__).with_name("data")
-HF_REPO = "wassname/tiny-mfv"
-ROOT = Path(__file__).resolve().parents[2]
 CONDITIONS = ["other_violate", "self_violate"]
 
 # Canonical config names.

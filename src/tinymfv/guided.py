@@ -391,9 +391,6 @@ def _make_forced_hint(foundations: list[str]) -> str:
     )
 
 
-_DEFAULT_FORCED_HINT: str = _make_forced_hint(list(_DEFAULT_FORCED_FOUNDATIONS))
-
-
 @dataclass
 class ForcedChoiceResult:
     user_prompt: str
@@ -433,7 +430,7 @@ class ForcedChoiceResult:
     # then across fwd + rev framings. In [0, 1]; high means the model still
     # emits a valid foundation word in the slot; low means probability has
     # leaked to other tokens (gibberish, refusal, format collapse). Direct
-    # coherence canary for forced-choice — independent of WHICH foundation
+    # coherence check for forced-choice, independent of WHICH foundation
     # is picked.
     pmass_allowed: float
     # Mean negative log-likelihood in nats/token over the assistant prefill
