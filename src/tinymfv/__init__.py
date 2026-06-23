@@ -27,6 +27,7 @@ from .instrument import Instrument, InstrItem, per_item_categorical, REDUCERS
 from .instruments import get as get_instrument, INSTRUMENTS, build_instrument
 from .read import read_items, resolve_answer_ids, build_prompt
 from .administer import administer
+from . import maps
 
 __all__ = [
     "CONDITIONS", "CONFIGS", "ConfigName",
@@ -37,5 +38,6 @@ __all__ = [
     "Instrument", "InstrItem", "per_item_categorical", "REDUCERS",
     "get_instrument", "INSTRUMENTS", "build_instrument",
     "read_items", "resolve_answer_ids", "build_prompt", "administer",
+    "maps",
 ]
 

@@ -118,6 +118,12 @@ def per_item_categorical(per_row: list[dict], kind: Kind) -> dict[str, dict]:
     by_id: dict[str, list[dict]] = defaultdict(list)
     for r in per_row:
         by_id[r["id"]].append(r)
+    # Each item collapses to ONE averaged distribution, so every item contributes EQUALLY to the
+    # factor mean. That matches pooling all (item, frame) rows only if every item has the same frame
+    # count. Assert it loudly rather than silently reweighting a factor if a future instrument gives
+    # some items fewer frames. (External review #57: dormant weighting asymmetry.)
+    frame_counts = {len(rows) for rows in by_id.values()}
+    assert len(frame_counts) == 1, f"heterogeneous frame counts per item: {frame_counts}"
     out: dict[str, dict] = {}
     for iid, rows in by_id.items():
         canon = [canonicalize_to_forward(r["p"], r["frame"], kind) for r in rows]
@@ -159,6 +165,7 @@ def reduce_ordinal(items: dict[str, dict], instr: Instrument) -> np.ndarray:
     w = np.arange(1, instr.scale_max + 1, dtype=float)
     by_dim: dict[str, list[float]] = defaultdict(list)
     for it in items.values():
+        assert it["dimension"] is not None, "ordinal item has dimension=None; it would pool into a phantom factor"
         E = float((it["p"] * w).sum())
         agr = (instr.scale_max + 1 - E) if it["sign"] < 0 else E
         by_dim[it["dimension"]].append(agr)

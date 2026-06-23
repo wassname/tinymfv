@@ -16,6 +16,9 @@ dependencies = [
     "tqdm",
     "tabulate",
     "datasets",
+    "numpy",
+    "matplotlib>=3.8",   # tinymfv.maps: culture-map + range viz
+    "textalloc>=1.2.3",  # non-overlapping label placement on the maps
 ]
 
 [dependency-groups]

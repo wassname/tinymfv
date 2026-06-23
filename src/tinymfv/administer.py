@@ -23,6 +23,10 @@ from .read import read_items, resolve_answer_ids
 
 def administer(model, tok, instr: Instrument, *, batch_size: int = 36) -> dict:
     assert instr.kind == "ordinal", "administer() is the ordinal survey readout; use evaluate() for nominal MFV"
+    # Every ordinal item must carry its frame-specific response-scale legend in meta['task']; without
+    # it build_prompt would silently emit a bare statement (no legend) and the profile would be junk
+    # while pmass still looks fine. Fail loud. (External review #57: build_prompt silent fallback.)
+    assert all("task" in it.meta for it in instr.items), f"{instr.name}: ordinal items need meta['task']"
     w = np.arange(1, instr.scale_max + 1, dtype=float)
     answer_ids = resolve_answer_ids(tok, instr.answer_space)
     per_row = read_items(model, tok, instr, instr.items, answer_ids,
