@@ -1,0 +1,115 @@
+country,foundation,mean,sd,n,se,ci95_lo,ci95_hi
+Switzerland,care,3.947,0.678,205,0.047,3.854,4.04
+Ireland,care,4.007,0.791,205,0.055,3.898,4.115
+Egypt,care,4.382,0.603,205,0.042,4.3,4.465
+UAE,care,4.008,0.919,205,0.064,3.882,4.134
+Chile,care,3.772,0.824,205,0.058,3.66,3.885
+New Zealand,care,3.841,0.783,205,0.055,3.734,3.949
+Kenya,care,4.205,0.767,205,0.054,4.1,4.31
+Morocco,care,4.207,0.785,205,0.055,4.1,4.315
+Russia,care,3.957,0.749,206,0.052,3.855,4.059
+Saudi Arabia,care,4.237,0.753,207,0.052,4.134,4.339
+Japan,care,3.031,0.768,207,0.053,2.926,3.135
+Columbia,care,3.831,0.705,205,0.049,3.734,3.927
+Mexico,care,3.767,0.785,206,0.055,3.66,3.874
+Peru,care,3.62,0.725,205,0.051,3.521,3.72
+Belgium,care,3.907,0.728,205,0.051,3.808,4.007
+France,care,4.081,0.676,206,0.047,3.989,4.173
+South Africa,care,4.21,0.689,205,0.048,4.115,4.304
+Nigeria,care,4.318,0.639,205,0.045,4.23,4.405
+Argentina,care,3.838,0.774,205,0.054,3.732,3.944
+Chile,equality,2.775,0.88,205,0.061,2.654,2.895
+Kenya,equality,2.882,0.969,205,0.068,2.749,3.015
+Peru,equality,2.631,0.924,205,0.065,2.504,2.757
+Japan,equality,2.269,0.78,207,0.054,2.163,2.375
+Belgium,equality,3.195,0.936,205,0.065,3.067,3.323
+New Zealand,equality,2.607,1.023,205,0.071,2.467,2.747
+Egypt,equality,3.562,0.939,205,0.066,3.433,3.69
+Mexico,equality,2.873,0.907,206,0.063,2.749,2.997
+Columbia,equality,2.911,0.901,205,0.063,2.788,3.035
+South Africa,equality,3.015,0.921,205,0.064,2.889,3.141
+Switzerland,equality,3.269,0.98,205,0.068,3.135,3.403
+Morocco,equality,3.363,0.969,205,0.068,3.23,3.495
+Nigeria,equality,2.898,1.028,205,0.072,2.758,3.039
+Saudi Arabia,equality,3.316,0.933,207,0.065,3.188,3.443
+UAE,equality,3.279,0.932,205,0.065,3.151,3.406
+France,equality,3.233,0.921,206,0.064,3.107,3.359
+Ireland,equality,2.937,0.934,205,0.065,2.809,3.064
+Russia,equality,3.243,0.873,206,0.061,3.124,3.362
+Argentina,equality,2.807,1.011,205,0.071,2.669,2.946
+Mexico,proportionality,3.803,0.697,206,0.049,3.707,3.898
+Kenya,proportionality,3.784,0.789,205,0.055,3.676,3.892
+Argentina,proportionality,3.915,0.657,205,0.046,3.825,4.005
+Columbia,proportionality,3.691,0.684,205,0.048,3.597,3.785
+New Zealand,proportionality,3.611,0.713,205,0.05,3.514,3.709
+UAE,proportionality,3.959,0.89,205,0.062,3.838,4.081
+Ireland,proportionality,3.732,0.767,205,0.054,3.627,3.837
+Belgium,proportionality,3.907,0.557,205,0.039,3.83,3.983
+Japan,proportionality,3.135,0.734,207,0.051,3.035,3.235
+Egypt,proportionality,4.372,0.58,205,0.041,4.292,4.451
+Saudi Arabia,proportionality,4.178,0.693,207,0.048,4.084,4.272
+France,proportionality,4.12,0.542,206,0.038,4.046,4.194
+Switzerland,proportionality,3.844,0.641,205,0.045,3.756,3.932
+Russia,proportionality,4.266,0.481,206,0.033,4.201,4.332
+Chile,proportionality,3.698,0.694,205,0.048,3.603,3.793
+South Africa,proportionality,4.029,0.64,205,0.045,3.942,4.117
+Morocco,proportionality,4.177,0.705,205,0.049,4.081,4.274
+Nigeria,proportionality,4.142,0.675,205,0.047,4.05,4.235
+Peru,proportionality,3.75,0.691,205,0.048,3.656,3.845
+Egypt,loyalty,4.423,0.621,205,0.043,4.338,4.508
+Chile,loyalty,3.449,0.881,205,0.062,3.328,3.569
+UAE,loyalty,4.021,0.911,205,0.064,3.896,4.146
+Columbia,loyalty,3.671,0.822,205,0.057,3.558,3.783
+Russia,loyalty,3.87,0.81,206,0.056,3.759,3.98
+Nigeria,loyalty,4.114,0.744,205,0.052,4.012,4.216
+Morocco,loyalty,4.163,0.823,205,0.057,4.05,4.275
+Japan,loyalty,2.659,0.818,207,0.057,2.547,2.77
+Peru,loyalty,3.729,0.764,205,0.053,3.625,3.834
+Saudi Arabia,loyalty,4.196,0.781,207,0.054,4.09,4.303
+New Zealand,loyalty,3.218,0.998,205,0.07,3.081,3.354
+South Africa,loyalty,3.854,0.862,205,0.06,3.737,3.972
+Switzerland,loyalty,3.576,0.848,205,0.059,3.459,3.692
+Argentina,loyalty,3.582,0.817,205,0.057,3.47,3.694
+France,loyalty,3.858,0.737,206,0.051,3.758,3.959
+Belgium,loyalty,3.622,0.773,205,0.054,3.516,3.728
+Mexico,loyalty,3.778,0.746,206,0.052,3.676,3.88
+Ireland,loyalty,3.288,0.983,205,0.069,3.153,3.422
+Kenya,loyalty,3.946,0.899,205,0.063,3.823,4.069
+UAE,authority,3.913,0.888,205,0.062,3.791,4.035
+Switzerland,authority,3.519,0.805,205,0.056,3.408,3.629
+France,authority,3.88,0.622,206,0.043,3.795,3.965
+Ireland,authority,3.492,0.914,205,0.064,3.367,3.617
+South Africa,authority,3.997,0.734,205,0.051,3.896,4.097
+Peru,authority,3.814,0.693,205,0.048,3.719,3.909
+Nigeria,authority,4.207,0.615,205,0.043,4.122,4.291
+Egypt,authority,4.184,0.68,205,0.048,4.091,4.277
+Chile,authority,3.668,0.811,205,0.057,3.557,3.779
+Belgium,authority,3.704,0.636,205,0.044,3.617,3.791
+Russia,authority,3.681,0.759,206,0.053,3.578,3.785
+Columbia,authority,3.839,0.681,205,0.048,3.746,3.932
+Kenya,authority,4.071,0.803,205,0.056,3.961,4.181
+Morocco,authority,3.946,0.764,205,0.053,3.842,4.051
+Saudi Arabia,authority,4.075,0.732,207,0.051,3.975,4.175
+New Zealand,authority,3.483,0.871,205,0.061,3.364,3.602
+Japan,authority,2.669,0.66,207,0.046,2.579,2.759
+Mexico,authority,3.944,0.67,206,0.047,3.853,4.036
+Argentina,authority,3.672,0.726,205,0.051,3.572,3.771
+Nigeria,purity,3.795,0.769,205,0.054,3.69,3.9
+Peru,purity,2.999,0.82,205,0.057,2.887,3.111
+Mexico,purity,2.814,0.814,206,0.057,2.703,2.925
+Chile,purity,2.543,0.851,205,0.059,2.427,2.66
+Japan,purity,2.629,0.692,207,0.048,2.535,2.723
+Switzerland,purity,2.951,0.789,205,0.055,2.843,3.059
+Saudi Arabia,purity,3.979,0.716,207,0.05,3.882,4.077
+Argentina,purity,2.597,0.817,205,0.057,2.485,2.709
+Egypt,purity,4.194,0.63,205,0.044,4.108,4.281
+UAE,purity,3.741,0.848,205,0.059,3.625,3.857
+Morocco,purity,3.933,0.733,205,0.051,3.833,4.034
+Kenya,purity,3.585,0.834,205,0.058,3.47,3.699
+France,purity,3.091,0.737,206,0.051,2.99,3.191
+South Africa,purity,3.395,0.939,205,0.066,3.267,3.524
+Russia,purity,3.245,0.802,206,0.056,3.136,3.355
+Belgium,purity,3.006,0.742,205,0.052,2.904,3.107
+Ireland,purity,2.508,0.926,205,0.065,2.381,2.635
+New Zealand,purity,2.582,0.979,205,0.068,2.448,2.716
+Columbia,purity,2.98,0.86,205,0.06,2.863,3.098

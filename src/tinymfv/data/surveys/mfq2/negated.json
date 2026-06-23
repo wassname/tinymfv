@@ -1,0 +1,195 @@
+[
+  {
+    "label": "descriptiveness",
+    "task": "For each of the statements below, please indicate how well each statement describes you or your opinions. Response options: Does not describe me at all (1); slightly describes me (2); moderately describes me (3); describes me fairly well (4); and describes me extremely well (5). Respond only with the predicted class [(1), (2), (3), (4), (5)].",
+    "questions": [
+        { 
+            "id": 1, 
+            "content": "Caring for people who have suffered is not an important virtue.", 
+            "dimension": "care" 
+        },
+        { 
+            "id": 2, 
+            "content": "The world would not be a better place if everyone made the same amount of money.", 
+            "dimension": "equality" 
+        },
+        { 
+            "id": 3, 
+            "content": "I do not think people who are more hardworking should end up with more money.", 
+            "dimension": "proportionality" 
+        },
+        { 
+            "id": 4, 
+            "content": "I do not think children should be taught to be loyal to their country.", 
+            "dimension": "loyalty" 
+        },
+        { 
+            "id": 5, 
+            "content": "I do not think it is important for societies to cherish their traditional values.", 
+            "dimension": "authority" 
+        },
+        { 
+            "id": 6, 
+            "content": "I do not think the human body should be treated like a temple, housing something sacred within.", 
+            "dimension": "purity" 
+        },
+        { 
+            "id": 7, 
+            "content": "I do not believe that compassion for those who are suffering is one of the most crucial virtues.", 
+            "dimension": "care" 
+        },
+        { 
+            "id": 8, 
+            "content": "Our society would not have fewer problems if people had the same income.", 
+            "dimension": "equality" 
+        },
+        { 
+            "id": 9, 
+            "content": "I do not think people should be rewarded in proportion to what they contribute.", 
+            "dimension": "proportionality" 
+        },
+        { 
+            "id": 10, 
+            "content": "It does not upset me when people have no loyalty to their country.", 
+            "dimension": "loyalty" 
+        },
+        { 
+            "id": 11, 
+            "content": "I do not feel that most traditions serve a valuable function in keeping society orderly.", 
+            "dimension": "authority" 
+        },
+        { 
+            "id": 12, 
+            "content": "I do not believe chastity is an important virtue.", 
+            "dimension": "purity" 
+        },
+        { 
+            "id": 13, 
+            "content": "We should all not care for people who are in emotional pain.", 
+            "dimension": "care" 
+        },
+        { 
+            "id": 14, 
+            "content": "I do not believe that everyone should be given the same quantity of resources in life.", 
+            "dimension": "equality" 
+        },
+        { 
+            "id": 15, 
+            "content": "The effort a worker puts into a job ought not to be reflected in the size of a raise they receive.", 
+            "dimension": "proportionality" 
+        },
+        { 
+            "id": 16, 
+            "content": "Everyone should not love their own community.", 
+            "dimension": "loyalty" 
+        },
+        { 
+            "id": 17, 
+            "content": "I do not think obedience to parents is an important virtue.", 
+            "dimension": "authority" 
+        },
+        { 
+            "id": 18, 
+            "content": "It does not upset me when people use foul language like it is nothing.", 
+            "dimension": "purity" 
+        },
+        { 
+            "id": 19, 
+            "content": "I am not empathetic toward those people who have suffered in their lives.", 
+            "dimension": "care" 
+        },
+        { 
+            "id": 20, 
+            "content": "I do not believe it would be ideal if everyone in society wound up with roughly the same amount of money.", 
+            "dimension": "equality" 
+        },
+        { 
+            "id": 21, 
+            "content": "It does not make me happy when people are recognized on their merits.", 
+            "dimension": "proportionality" 
+        },
+        { 
+            "id": 22, 
+            "content": "Everyone should not defend their country, even if called upon.", 
+            "dimension": "loyalty" 
+        },
+        { 
+            "id": 23, 
+            "content": "We all do not need to learn from our elders.", 
+            "dimension": "authority" 
+        },
+        { 
+            "id": 24, 
+            "content": "If I found out that an acquaintance had an unusual but harmless sexual fetish I would not feel uneasy about them.", 
+            "dimension": "purity" 
+        },
+        { 
+            "id": 25, 
+            "content": "Everyone should not try to comfort people who are going through something hard.", 
+            "dimension": "care" 
+        },
+        { 
+            "id": 26, 
+            "content": "When people work together toward a common goal, they should not share the rewards equally  if some worked harder on it.", 
+            "dimension": "equality" 
+        },
+        { 
+            "id": 27, 
+            "content": "In a fair society, those who work hard should not live with higher standards of living.", 
+            "dimension": "proportionality" 
+        },
+        { 
+            "id": 28, 
+            "content": "Everyone should not feel proud when a person in their community wins in an international competition.", 
+            "dimension": "loyalty" 
+        },
+        { 
+            "id": 29, 
+            "content": "I do not believe that one of the most important values to teach children is to have respect for authority.", 
+            "dimension": "authority" 
+        },
+        { 
+            "id": 30, 
+            "content": "People should not try to use natural medicines rather than chemically identical human-made ones.", 
+            "dimension": "purity" 
+        },
+        { 
+            "id": 31, 
+            "content": "It does not pain me when I see someone ignoring the needs of another human being.", 
+            "dimension": "care" 
+        },
+        { 
+            "id": 32, 
+            "content": "I do not get upset when some people have a lot more money than others in my country.", 
+            "dimension": "equality" 
+        },
+        { 
+            "id": 33, 
+            "content": "I do not feel good when I see cheaters get caught and punished.", 
+            "dimension": "proportionality" 
+        },
+        { 
+            "id": 34, 
+            "content": "I do not believe the strength of a sports team comes from the loyalty of its members to each other.", 
+            "dimension": "loyalty" 
+        },
+        { 
+            "id": 35, 
+            "content": "I do not think having a strong leader is good for society.", 
+            "dimension": "authority" 
+        },
+        { 
+            "id": 36, 
+            "content": "I do not admire people who keep their virginity until marriage.", 
+            "dimension": "purity" 
+        }
+    ],
+    "scale": {
+      "1": "Does not describe me at all",
+      "2": "Does slightly describe me",
+      "3": "Does moderately describe me",
+      "4": "Does describe me fairly well",
+      "5": "Does describe me extremely well"
+    }
+  }
+]

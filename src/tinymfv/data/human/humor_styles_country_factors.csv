@@ -1,0 +1,113 @@
+country,foundation,mean,sd,n,se,ci95_lo,ci95_hi
+Bosnia & Herzegovina,affiliative,5.293,0.963,500,0.043,5.208,5.377
+Bosnia & Herzegovina,aggressive,3.212,0.881,500,0.0394,3.135,3.29
+Bosnia & Herzegovina,selfenhancing,4.34,1.031,500,0.0461,4.25,4.43
+Bosnia & Herzegovina,selfdefeating,3.531,1.075,500,0.0481,3.437,3.625
+Brazil,affiliative,5.559,1.073,304,0.0615,5.438,5.679
+Brazil,aggressive,3.021,0.92,304,0.0528,2.918,3.125
+Brazil,selfenhancing,4.264,1.238,304,0.071,4.125,4.403
+Brazil,selfdefeating,3.344,1.211,304,0.0695,3.208,3.48
+Bulgaria,affiliative,5.56,0.94,259,0.0584,5.446,5.674
+Bulgaria,aggressive,3.429,0.996,259,0.0619,3.307,3.55
+Bulgaria,selfenhancing,4.415,1.085,259,0.0674,4.283,4.547
+Bulgaria,selfdefeating,3.752,0.986,259,0.0613,3.632,3.873
+Canada,affiliative,5.728,0.843,228,0.0558,5.618,5.837
+Canada,aggressive,3.598,1.002,228,0.0664,3.467,3.728
+Canada,selfenhancing,4.24,1.19,228,0.0788,4.086,4.394
+Canada,selfdefeating,3.515,1.077,228,0.0714,3.375,3.655
+Chile,affiliative,5.345,1.039,233,0.0681,5.212,5.478
+Chile,aggressive,3.214,0.993,233,0.065,3.086,3.341
+Chile,selfenhancing,4.473,1.113,233,0.0729,4.33,4.615
+Chile,selfdefeating,3.462,1.058,233,0.0693,3.327,3.598
+Colombia,affiliative,5.133,1.038,256,0.0648,5.005,5.26
+Colombia,aggressive,3.001,0.939,256,0.0587,2.886,3.116
+Colombia,selfenhancing,4.471,1.153,256,0.072,4.33,4.612
+Colombia,selfdefeating,2.993,1.026,256,0.0641,2.867,3.118
+Croatia,affiliative,5.301,0.93,249,0.0589,5.186,5.417
+Croatia,aggressive,3.451,0.792,249,0.0502,3.353,3.55
+Croatia,selfenhancing,4.12,0.985,249,0.0624,3.998,4.242
+Croatia,selfdefeating,3.237,1.002,249,0.0635,3.113,3.362
+Estonia,affiliative,5.532,0.891,368,0.0465,5.441,5.624
+Estonia,aggressive,3.635,0.945,368,0.0493,3.538,3.732
+Estonia,selfenhancing,4.435,1.016,368,0.053,4.331,4.539
+Estonia,selfdefeating,3.505,0.97,368,0.0506,3.406,3.604
+Germany,affiliative,5.429,1.029,333,0.0564,5.318,5.539
+Germany,aggressive,3.339,0.902,333,0.0495,3.242,3.436
+Germany,selfenhancing,4.256,1.145,333,0.0627,4.133,4.379
+Germany,selfdefeating,3.192,1.195,333,0.0655,3.064,3.321
+Hungary,affiliative,5.338,1.144,286,0.0676,5.205,5.47
+Hungary,aggressive,3.092,1.011,286,0.0598,2.975,3.21
+Hungary,selfenhancing,4.518,1.235,286,0.073,4.374,4.661
+Hungary,selfdefeating,3.224,1.147,286,0.0679,3.091,3.357
+Indonesia,affiliative,5.479,0.892,294,0.0521,5.377,5.581
+Indonesia,aggressive,3.575,0.74,294,0.0432,3.49,3.66
+Indonesia,selfenhancing,4.689,0.96,294,0.056,4.579,4.798
+Indonesia,selfdefeating,3.956,0.961,294,0.0561,3.846,4.066
+Iran,affiliative,5.1,1.16,328,0.0641,4.974,5.226
+Iran,aggressive,2.82,0.874,328,0.0482,2.725,2.915
+Iran,selfenhancing,3.911,1.337,328,0.0739,3.767,4.056
+Iran,selfdefeating,3.04,0.95,328,0.0525,2.937,3.143
+Japan,affiliative,4.744,0.96,197,0.0684,4.61,4.878
+Japan,aggressive,3.544,0.855,197,0.0609,3.424,3.663
+Japan,selfenhancing,3.729,0.723,197,0.0515,3.628,3.83
+Japan,selfdefeating,3.906,0.779,197,0.0555,3.798,4.015
+Latvia,affiliative,4.301,0.784,203,0.055,4.193,4.409
+Latvia,aggressive,3.599,0.73,203,0.0512,3.498,3.699
+Latvia,selfenhancing,4.224,0.886,203,0.0622,4.102,4.346
+Latvia,selfdefeating,3.735,0.946,203,0.0664,3.605,3.865
+Malaysia,affiliative,4.053,0.654,200,0.0462,3.962,4.143
+Malaysia,aggressive,3.942,0.547,200,0.0387,3.867,4.018
+Malaysia,selfenhancing,3.92,0.507,200,0.0359,3.85,3.99
+Malaysia,selfdefeating,3.908,0.51,200,0.0361,3.837,3.978
+Pakistan,affiliative,4.345,0.9,352,0.048,4.251,4.439
+Pakistan,aggressive,3.556,0.819,352,0.0436,3.471,3.642
+Pakistan,selfenhancing,4.351,0.938,352,0.05,4.253,4.449
+Pakistan,selfdefeating,3.756,1.011,352,0.0539,3.651,3.862
+Poland,affiliative,5.357,1.065,245,0.068,5.224,5.491
+Poland,aggressive,3.43,0.974,245,0.0622,3.308,3.552
+Poland,selfenhancing,4.263,1.055,245,0.0674,4.13,4.395
+Poland,selfdefeating,3.678,1.09,245,0.0696,3.541,3.814
+Portugal,affiliative,5.446,0.96,469,0.0443,5.359,5.533
+Portugal,aggressive,3.04,0.841,469,0.0388,2.964,3.116
+Portugal,selfenhancing,4.166,1.206,469,0.0557,4.057,4.275
+Portugal,selfdefeating,2.958,1.183,469,0.0546,2.85,3.065
+South Africa,affiliative,5.367,1.005,365,0.0526,5.264,5.471
+South Africa,aggressive,3.237,0.958,365,0.0501,3.139,3.336
+South Africa,selfenhancing,4.675,1.161,365,0.0608,4.556,4.794
+South Africa,selfdefeating,3.264,1.136,365,0.0595,3.147,3.38
+Romania,affiliative,5.452,0.891,200,0.063,5.329,5.576
+Romania,aggressive,3.553,0.829,200,0.0586,3.438,3.667
+Romania,selfenhancing,4.416,1.011,200,0.0715,4.276,4.556
+Romania,selfdefeating,3.13,0.934,200,0.066,3.001,3.259
+Russia,affiliative,5.235,1.05,314,0.0593,5.119,5.351
+Russia,aggressive,3.716,0.946,314,0.0534,3.612,3.821
+Russia,selfenhancing,4.256,1.061,314,0.0599,4.139,4.374
+Russia,selfdefeating,3.531,1.004,314,0.0566,3.42,3.642
+Serbia,affiliative,5.758,0.824,404,0.041,5.677,5.838
+Serbia,aggressive,3.071,0.927,404,0.0461,2.981,3.162
+Serbia,selfenhancing,4.606,1.107,404,0.0551,4.498,4.714
+Serbia,selfdefeating,3.45,1.146,404,0.057,3.338,3.562
+South Korea,affiliative,5.119,0.849,184,0.0626,4.996,5.241
+South Korea,aggressive,3.164,0.821,184,0.0605,3.045,3.282
+South Korea,selfenhancing,4.011,0.818,184,0.0603,3.893,4.129
+South Korea,selfdefeating,3.536,0.915,184,0.0675,3.404,3.668
+Spain,affiliative,5.475,0.892,326,0.0494,5.378,5.572
+Spain,aggressive,2.783,0.887,326,0.0492,2.686,2.879
+Spain,selfenhancing,4.306,1.08,326,0.0598,4.189,4.423
+Spain,selfdefeating,3.333,1.004,326,0.0556,3.224,3.441
+Turkey,affiliative,5.26,0.946,202,0.0666,5.13,5.39
+Turkey,aggressive,3.346,0.885,202,0.0623,3.224,3.468
+Turkey,selfenhancing,4.034,1.323,202,0.0931,3.851,4.216
+Turkey,selfdefeating,3.092,1.032,202,0.0726,2.95,3.235
+Ukraine,affiliative,5.332,1.025,341,0.0555,5.224,5.441
+Ukraine,aggressive,3.12,0.866,341,0.0469,3.028,3.212
+Ukraine,selfenhancing,4.379,1.085,341,0.0588,4.264,4.494
+Ukraine,selfdefeating,2.98,1.015,341,0.055,2.872,3.088
+United States,affiliative,5.169,1.124,421,0.0548,5.061,5.276
+United States,aggressive,3.48,0.96,421,0.0468,3.388,3.572
+United States,selfenhancing,4.455,1.15,421,0.056,4.345,4.565
+United States,selfdefeating,3.421,1.131,421,0.0551,3.313,3.529
+Vietnam,affiliative,4.905,0.95,284,0.0564,4.795,5.015
+Vietnam,aggressive,3.138,0.84,284,0.0498,3.04,3.235
+Vietnam,selfenhancing,4.438,0.938,284,0.0556,4.328,4.547
+Vietnam,selfdefeating,3.46,1.04,284,0.0617,3.339,3.581

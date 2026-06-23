@@ -69,6 +69,8 @@ class Instrument:
     answer_to_dim: dict[str, str] | None = None  # nominal only: answer token -> dimension
     scale_max: int = 5                     # ordinal: top of the Likert scale (== len(answer_space))
     human_scale_max: int = 5               # human reference scale; HSQ humans on 1-7 (see caveat below)
+    display: str = ""                      # human-readable name for plot titles ("Big Five")
+    human_csv: str | None = None           # per-country subscale means CSV (the map's cross-cultural cloud)
 
     def __post_init__(self):
         if self.kind == "ordinal":

@@ -1,0 +1,825 @@
+[
+  {
+    "label": "agreement",
+    "task": "For each of the statements below, please indicate how much you agree or disagree with the statement. Response options: Disagree (1); Slightly disagree (2); Neutral (3); Slightly agree (4); and Agree (5). Respond only with the predicted class [(1), (2), (3), (4), (5)].",
+    "questions": [
+      {
+        "id": 1,
+        "content": "I know how to comfort others",
+        "dimension": "warmth"
+      },
+      {
+        "id": 2,
+        "content": "I enjoy bringing people together",
+        "dimension": "warmth"
+      },
+      {
+        "id": 3,
+        "content": "I feel others' emotions",
+        "dimension": "warmth"
+      },
+      {
+        "id": 4,
+        "content": "I take an interest in other people's lives",
+        "dimension": "warmth"
+      },
+      {
+        "id": 5,
+        "content": "I cheer people up",
+        "dimension": "warmth"
+      },
+      {
+        "id": 6,
+        "content": "I make people feel at ease",
+        "dimension": "warmth"
+      },
+      {
+        "id": 7,
+        "content": "I take time out for others",
+        "dimension": "warmth"
+      },
+      {
+        "id": 8,
+        "content": "I don't like to get involved in other people's problems",
+        "dimension": "warmth"
+      },
+      {
+        "id": 9,
+        "content": "I am not really interested in others",
+        "dimension": "warmth"
+      },
+      {
+        "id": 10,
+        "content": "I try not to think about the needy",
+        "dimension": "warmth"
+      },
+      {
+        "id": 11,
+        "content": "I make insightful remarks",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 12,
+        "content": "I know the answers to many questions",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 13,
+        "content": "I tend to analyze things",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 14,
+        "content": "I use my brain",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 15,
+        "content": "I learn quickly",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 16,
+        "content": "I counter others' arguments",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 17,
+        "content": "I reflect on things before acting",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 18,
+        "content": "I weigh the pros against the cons",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 19,
+        "content": "I consider myself an average person",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 20,
+        "content": "I get confused easily",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 21,
+        "content": "I know that I am not a special person",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 22,
+        "content": "I have a poor vocabulary",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 23,
+        "content": "I skip difficult words while reading",
+        "dimension": "reasoning"
+      },
+      {
+        "id": 24,
+        "content": "I seldom feel blue",
+        "dimension": "emotional-stability"
+      },
+      {
+        "id": 25,
+        "content": "I feel comfortable with myself",
+        "dimension": "emotional-stability"
+      },
+      {
+        "id": 26,
+        "content": "I readily overcome setbacks",
+        "dimension": "emotional-stability"
+      },
+      {
+        "id": 27,
+        "content": "I am relaxed most of the time",
+        "dimension": "emotional-stability"
+      },
+      {
+        "id": 28,
+        "content": "I am not easily frustrated",
+        "dimension": "emotional-stability"
+      },
+      {
+        "id": 29,
+        "content": "I have frequent mood swings",
+        "dimension": "emotional-stability"
+      },
+      {
+        "id": 30,
+        "content": "I often feel blue",
+        "dimension": "emotional-stability"
+      },
+      {
+        "id": 31,
+        "content": "I dislike myself",
+        "dimension": "emotional-stability"
+      },
+      {
+        "id": 32,
+        "content": "I feel desperate",
+        "dimension": "emotional-stability"
+      },
+      {
+        "id": 33,
+        "content": "I am easily discouraged",
+        "dimension": "emotional-stability"
+      },
+      {
+        "id": 34,
+        "content": "I take charge",
+        "dimension": "dominance"
+      },
+      {
+        "id": 35,
+        "content": "I want to be in charge",
+        "dimension": "dominance"
+      },
+      {
+        "id": 36,
+        "content": "I say what I think",
+        "dimension": "dominance"
+      },
+      {
+        "id": 37,
+        "content": "I am not afraid of providing criticism",
+        "dimension": "dominance"
+      },
+      {
+        "id": 38,
+        "content": "I take control of things",
+        "dimension": "dominance"
+      },
+      {
+        "id": 39,
+        "content": "I can take strong measures",
+        "dimension": "dominance"
+      },
+      {
+        "id": 40,
+        "content": "I wait for others to lead the way",
+        "dimension": "dominance"
+      },
+      {
+        "id": 41,
+        "content": "I never challenge things",
+        "dimension": "dominance"
+      },
+      {
+        "id": 42,
+        "content": "I let others make the decisions",
+        "dimension": "dominance"
+      },
+      {
+        "id": 43,
+        "content": "I let myself be pushed around",
+        "dimension": "dominance"
+      },
+      {
+        "id": 44,
+        "content": "I am the life of the party",
+        "dimension": "liveliness"
+      },
+      {
+        "id": 45,
+        "content": "I love large parties",
+        "dimension": "liveliness"
+      },
+      {
+        "id": 46,
+        "content": "I joke around a lot",
+        "dimension": "liveliness"
+      },
+      {
+        "id": 47,
+        "content": "I enjoy being part of a loud crowd",
+        "dimension": "liveliness"
+      },
+      {
+        "id": 48,
+        "content": "I amuse my friends",
+        "dimension": "liveliness"
+      },
+      {
+        "id": 49,
+        "content": "I act wild and crazy",
+        "dimension": "liveliness"
+      },
+      {
+        "id": 50,
+        "content": "I seldom joke around",
+        "dimension": "liveliness"
+      },
+      {
+        "id": 51,
+        "content": "I don't like crowded events",
+        "dimension": "liveliness"
+      },
+      {
+        "id": 52,
+        "content": "I am the last to laugh at a joke",
+        "dimension": "liveliness"
+      },
+      {
+        "id": 53,
+        "content": "I dislike loud music",
+        "dimension": "liveliness"
+      },
+      {
+        "id": 54,
+        "content": "I believe laws should be strictly enforced",
+        "dimension": "rule-consciousness"
+      },
+      {
+        "id": 55,
+        "content": "I try to follow the rules",
+        "dimension": "rule-consciousness"
+      },
+      {
+        "id": 56,
+        "content": "I believe in one true religion",
+        "dimension": "rule-consciousness"
+      },
+      {
+        "id": 57,
+        "content": "I respect authority",
+        "dimension": "rule-consciousness"
+      },
+      {
+        "id": 58,
+        "content": "I like to stand during the national anthem",
+        "dimension": "rule-consciousness"
+      },
+      {
+        "id": 59,
+        "content": "I resist authority",
+        "dimension": "rule-consciousness"
+      },
+      {
+        "id": 60,
+        "content": "I break rules",
+        "dimension": "rule-consciousness"
+      },
+      {
+        "id": 61,
+        "content": "I use swear words",
+        "dimension": "rule-consciousness"
+      },
+      {
+        "id": 62,
+        "content": "I oppose authority",
+        "dimension": "rule-consciousness"
+      },
+      {
+        "id": 63,
+        "content": "I know how to get around the rules",
+        "dimension": "rule-consciousness"
+      },
+      {
+        "id": 64,
+        "content": "I feel comfortable around people",
+        "dimension": "social-boldness"
+      },
+      {
+        "id": 65,
+        "content": "I talk to a lot of different people at parties",
+        "dimension": "social-boldness"
+      },
+      {
+        "id": 66,
+        "content": "I don't mind being the center of attention",
+        "dimension": "social-boldness"
+      },
+      {
+        "id": 67,
+        "content": "I make friends easily",
+        "dimension": "social-boldness"
+      },
+      {
+        "id": 68,
+        "content": "I start conversations",
+        "dimension": "social-boldness"
+      },
+      {
+        "id": 69,
+        "content": "I find it difficult to approach others",
+        "dimension": "social-boldness"
+      },
+      {
+        "id": 70,
+        "content": "I often feel uncomfortable around others",
+        "dimension": "social-boldness"
+      },
+      {
+        "id": 71,
+        "content": "I have little to say",
+        "dimension": "social-boldness"
+      },
+      {
+        "id": 72,
+        "content": "I am quiet around strangers",
+        "dimension": "social-boldness"
+      },
+      {
+        "id": 73,
+        "content": "I keep in the background",
+        "dimension": "social-boldness"
+      },
+      {
+        "id": 74,
+        "content": "I like to read",
+        "dimension": "sensitivity"
+      },
+      {
+        "id": 75,
+        "content": "I enjoy discussing movies and books with others",
+        "dimension": "sensitivity"
+      },
+      {
+        "id": 76,
+        "content": "I read a lot",
+        "dimension": "sensitivity"
+      },
+      {
+        "id": 77,
+        "content": "I don't like action movies",
+        "dimension": "sensitivity"
+      },
+      {
+        "id": 78,
+        "content": "I cry during movies",
+        "dimension": "sensitivity"
+      },
+      {
+        "id": 79,
+        "content": "I love flowers",
+        "dimension": "sensitivity"
+      },
+      {
+        "id": 80,
+        "content": "I do not enjoy watching dance performances",
+        "dimension": "sensitivity"
+      },
+      {
+        "id": 81,
+        "content": "I do not like poetry",
+        "dimension": "sensitivity"
+      },
+      {
+        "id": 82,
+        "content": "I dislike works of fiction",
+        "dimension": "sensitivity"
+      },
+      {
+        "id": 83,
+        "content": "I rarely notice my emotional reactions",
+        "dimension": "sensitivity"
+      },
+      {
+        "id": 84,
+        "content": "I find it hard to forgive others",
+        "dimension": "vigilance"
+      },
+      {
+        "id": 85,
+        "content": "I suspect hidden motives in others",
+        "dimension": "vigilance"
+      },
+      {
+        "id": 86,
+        "content": "I am wary of others",
+        "dimension": "vigilance"
+      },
+      {
+        "id": 87,
+        "content": "I distrust people",
+        "dimension": "vigilance"
+      },
+      {
+        "id": 88,
+        "content": "I believe that people seldom tell you the whole truth",
+        "dimension": "vigilance"
+      },
+      {
+        "id": 89,
+        "content": "I believe that people are essentially evil",
+        "dimension": "vigilance"
+      },
+      {
+        "id": 90,
+        "content": "I trust what people say",
+        "dimension": "vigilance"
+      },
+      {
+        "id": 91,
+        "content": "I trust others",
+        "dimension": "vigilance"
+      },
+      {
+        "id": 92,
+        "content": "I believe that others have good intentions",
+        "dimension": "vigilance"
+      },
+      {
+        "id": 93,
+        "content": "I believe that people are basically moral",
+        "dimension": "vigilance"
+      },
+      {
+        "id": 94,
+        "content": "I do things that others find strange",
+        "dimension": "abstractedness"
+      },
+      {
+        "id": 95,
+        "content": "I like to get lost in thought",
+        "dimension": "abstractedness"
+      },
+      {
+        "id": 96,
+        "content": "I enjoy wild flights of fantasy",
+        "dimension": "abstractedness"
+      },
+      {
+        "id": 97,
+        "content": "I love to daydream",
+        "dimension": "abstractedness"
+      },
+      {
+        "id": 98,
+        "content": "I swim against the current",
+        "dimension": "abstractedness"
+      },
+      {
+        "id": 99,
+        "content": "I take deviant positions",
+        "dimension": "abstractedness"
+      },
+      {
+        "id": 100,
+        "content": "I do unexpected things",
+        "dimension": "abstractedness"
+      },
+      {
+        "id": 101,
+        "content": "I do things by the book",
+        "dimension": "abstractedness"
+      },
+      {
+        "id": 102,
+        "content": "I seldom daydream",
+        "dimension": "abstractedness"
+      },
+      {
+        "id": 103,
+        "content": "I seldom get lost in thought",
+        "dimension": "abstractedness"
+      },
+      {
+        "id": 104,
+        "content": "I reveal little about myself",
+        "dimension": "privateness"
+      },
+      {
+        "id": 105,
+        "content": "I am hard to get to know",
+        "dimension": "privateness"
+      },
+      {
+        "id": 106,
+        "content": "I don't talk a lot",
+        "dimension": "privateness"
+      },
+      {
+        "id": 107,
+        "content": "I bottle up my feelings",
+        "dimension": "privateness"
+      },
+      {
+        "id": 108,
+        "content": "I keep my thoughts to myself",
+        "dimension": "privateness"
+      },
+      {
+        "id": 109,
+        "content": "I am open about myself to others",
+        "dimension": "privateness"
+      },
+      {
+        "id": 110,
+        "content": "I am open about my feelings",
+        "dimension": "privateness"
+      },
+      {
+        "id": 111,
+        "content": "I disclose my intimate thoughts",
+        "dimension": "privateness"
+      },
+      {
+        "id": 112,
+        "content": "I show my feelings",
+        "dimension": "privateness"
+      },
+      {
+        "id": 113,
+        "content": "I am willing to talk about myself",
+        "dimension": "privateness"
+      },
+      {
+        "id": 114,
+        "content": "I am afraid that I will do the wrong thing",
+        "dimension": "apprehension"
+      },
+      {
+        "id": 115,
+        "content": "I feel threatened easily",
+        "dimension": "apprehension"
+      },
+      {
+        "id": 116,
+        "content": "I am easily hurt",
+        "dimension": "apprehension"
+      },
+      {
+        "id": 117,
+        "content": "I worry about things",
+        "dimension": "apprehension"
+      },
+      {
+        "id": 118,
+        "content": "I spend time thinking about past mistakes",
+        "dimension": "apprehension"
+      },
+      {
+        "id": 119,
+        "content": "I feel guilty when I say 'no'",
+        "dimension": "apprehension"
+      },
+      {
+        "id": 120,
+        "content": "I feel crushed by setbacks",
+        "dimension": "apprehension"
+      },
+      {
+        "id": 121,
+        "content": "I don't worry about things that have already happened",
+        "dimension": "apprehension"
+      },
+      {
+        "id": 122,
+        "content": "I am not easily bothered by things",
+        "dimension": "apprehension"
+      },
+      {
+        "id": 123,
+        "content": "I don't let others discourage me",
+        "dimension": "apprehension"
+      },
+      {
+        "id": 124,
+        "content": "I believe in the importance of art",
+        "dimension": "openness-to-change"
+      },
+      {
+        "id": 125,
+        "content": "I love to think up new ways of doing things",
+        "dimension": "openness-to-change"
+      },
+      {
+        "id": 126,
+        "content": "I enjoy hearing new ideas",
+        "dimension": "openness-to-change"
+      },
+      {
+        "id": 127,
+        "content": "I carry the conversation to a higher level",
+        "dimension": "openness-to-change"
+      },
+      {
+        "id": 128,
+        "content": "I prefer variety to routine",
+        "dimension": "openness-to-change"
+      },
+      {
+        "id": 129,
+        "content": "I avoid philosophical discussions",
+        "dimension": "openness-to-change"
+      },
+      {
+        "id": 130,
+        "content": "I rarely look for a deeper meaning in things",
+        "dimension": "openness-to-change"
+      },
+      {
+        "id": 131,
+        "content": "I am not interested in theoretical discussions",
+        "dimension": "openness-to-change"
+      },
+      {
+        "id": 132,
+        "content": "I am not interested in abstract ideas",
+        "dimension": "openness-to-change"
+      },
+      {
+        "id": 133,
+        "content": "I try to avoid complex people",
+        "dimension": "openness-to-change"
+      },
+      {
+        "id": 134,
+        "content": "I want to be left alone",
+        "dimension": "self-reliance"
+      },
+      {
+        "id": 135,
+        "content": "I prefer to do things by myself",
+        "dimension": "self-reliance"
+      },
+      {
+        "id": 136,
+        "content": "I enjoy spending time by myself",
+        "dimension": "self-reliance"
+      },
+      {
+        "id": 137,
+        "content": "I seek quiet",
+        "dimension": "self-reliance"
+      },
+      {
+        "id": 138,
+        "content": "I don't mind eating alone",
+        "dimension": "self-reliance"
+      },
+      {
+        "id": 139,
+        "content": "I enjoy silence",
+        "dimension": "self-reliance"
+      },
+      {
+        "id": 140,
+        "content": "I enjoy my privacy",
+        "dimension": "self-reliance"
+      },
+      {
+        "id": 141,
+        "content": "I enjoy being part of a group",
+        "dimension": "self-reliance"
+      },
+      {
+        "id": 142,
+        "content": "I enjoy teamwork",
+        "dimension": "self-reliance"
+      },
+      {
+        "id": 143,
+        "content": "I can't do without the company of others",
+        "dimension": "self-reliance"
+      },
+      {
+        "id": 144,
+        "content": "I want everything to be 'just right'",
+        "dimension": "perfectionism"
+      },
+      {
+        "id": 145,
+        "content": "I get chores done right away",
+        "dimension": "perfectionism"
+      },
+      {
+        "id": 146,
+        "content": "I like order",
+        "dimension": "perfectionism"
+      },
+      {
+        "id": 147,
+        "content": "I continue until everything is perfect",
+        "dimension": "perfectionism"
+      },
+      {
+        "id": 148,
+        "content": "I am exacting in my work",
+        "dimension": "perfectionism"
+      },
+      {
+        "id": 149,
+        "content": "I am not bothered by messy people",
+        "dimension": "perfectionism"
+      },
+      {
+        "id": 150,
+        "content": "I am not bothered by disorder",
+        "dimension": "perfectionism"
+      },
+      {
+        "id": 151,
+        "content": "I leave a mess in my room",
+        "dimension": "perfectionism"
+      },
+      {
+        "id": 152,
+        "content": "I leave my belongings around",
+        "dimension": "perfectionism"
+      },
+      {
+        "id": 153,
+        "content": "I put off unpleasant tasks",
+        "dimension": "perfectionism"
+      },
+      {
+        "id": 154,
+        "content": "I get irritated easily",
+        "dimension": "tension"
+      },
+      {
+        "id": 155,
+        "content": "I get angry easily",
+        "dimension": "tension"
+      },
+      {
+        "id": 156,
+        "content": "I am quick to judge others",
+        "dimension": "tension"
+      },
+      {
+        "id": 157,
+        "content": "I am annoyed by others' mistakes",
+        "dimension": "tension"
+      },
+      {
+        "id": 158,
+        "content": "I am easily put out",
+        "dimension": "tension"
+      },
+      {
+        "id": 159,
+        "content": "I can't stand being contradicted",
+        "dimension": "tension"
+      },
+      {
+        "id": 160,
+        "content": "I judge people by their appearance",
+        "dimension": "tension"
+      },
+      {
+        "id": 161,
+        "content": "I am not easily annoyed",
+        "dimension": "tension"
+      },
+      {
+        "id": 162,
+        "content": "I try to forgive and forget",
+        "dimension": "tension"
+      }
+    ],
+    "scale": {
+      "1": "Disagree",
+      "2": "Slightly disagree",
+      "3": "Neutral",
+      "4": "Slightly agree",
+      "5": "Agree"
+    }
+  }
+]

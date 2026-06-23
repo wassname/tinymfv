@@ -23,11 +23,19 @@ Lower-level: see `guided_rollout_forced_choice` in `tinymfv.guided`.
 from .data import load_vignettes, load_all_vignettes, CONFIGS, ConfigName
 from .eval import evaluate, CONDITIONS
 from .guided import guided_rollout_forced_choice, _DEFAULT_FORCED_FOUNDATIONS
+from .instrument import Instrument, InstrItem, per_item_categorical, REDUCERS
+from .instruments import get as get_instrument, INSTRUMENTS, build_instrument
+from .read import read_items, resolve_answer_ids, build_prompt
+from .administer import administer
 
 __all__ = [
     "CONDITIONS", "CONFIGS", "ConfigName",
     "load_vignettes", "load_all_vignettes",
     "evaluate",
     "guided_rollout_forced_choice", "_DEFAULT_FORCED_FOUNDATIONS",
+    # survey readout (ordinal instruments: MFQ-2 / Big5 / 16PF / HSQ)
+    "Instrument", "InstrItem", "per_item_categorical", "REDUCERS",
+    "get_instrument", "INSTRUMENTS", "build_instrument",
+    "read_items", "resolve_answer_ids", "build_prompt", "administer",
 ]
 

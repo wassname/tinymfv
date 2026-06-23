@@ -1,0 +1,265 @@
+[
+    {
+      "label": "agreement",
+      "task": "For each of the statements below, please indicate how much you agree or disagree with the statement. Response options: Agree (1); Slightly agree (2); Neutral (3); Slightly disagree (4); and Disagree (5). Respond only with the predicted class [(1), (2), (3), (4), (5)].",
+      "questions": [
+        {
+          "id": 1,
+          "content": "I am the life of the party.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 2,
+          "content": "I don't talk a lot.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 3,
+          "content": "I feel comfortable around people.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 4,
+          "content": "I keep in the background.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 5,
+          "content": "I start conversations.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 6,
+          "content": "I have little to say.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 7,
+          "content": "I talk to a lot of different people at parties.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 8,
+          "content": "I don't like to draw attention to myself.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 9,
+          "content": "I don't mind being the center of attention.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 10,
+          "content": "I am quiet around strangers.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 11,
+          "content": "I get stressed out easily.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 12,
+          "content": "I am relaxed most of the time.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 13,
+          "content": "I worry about things.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 14,
+          "content": "I seldom feel blue.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 15,
+          "content": "I am easily disturbed.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 16,
+          "content": "I get upset easily.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 17,
+          "content": "I change my mood a lot.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 18,
+          "content": "I have frequent mood swings.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 19,
+          "content": "I get irritated easily.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 20,
+          "content": "I often feel blue.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 21,
+          "content": "I feel little concern for others.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 22,
+          "content": "I am interested in people.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 23,
+          "content": "I insult people.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 24,
+          "content": "I sympathize with others' feelings.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 25,
+          "content": "I am not interested in other people's problems.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 26,
+          "content": "I have a soft heart.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 27,
+          "content": "I am not really interested in others.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 28,
+          "content": "I take time out for others.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 29,
+          "content": "I feel others' emotions.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 30,
+          "content": "I make people feel at ease.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 31,
+          "content": "I am always prepared.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 32,
+          "content": "I leave my belongings around.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 33,
+          "content": "I pay attention to details.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 34,
+          "content": "I make a mess of things.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 35,
+          "content": "I get chores done right away.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 36,
+          "content": "I often forget to put things back in their proper place.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 37,
+          "content": "I like order.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 38,
+          "content": "I shirk my duties.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 39,
+          "content": "I follow a schedule.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 40,
+          "content": "I am exacting in my work.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 41,
+          "content": "I have a rich vocabulary.",
+          "dimension": "openness"
+        },
+        {
+          "id": 42,
+          "content": "I have difficulty understanding abstract ideas.",
+          "dimension": "openness"
+        },
+        {
+          "id": 43,
+          "content": "I have a vivid imagination.",
+          "dimension": "openness"
+        },
+        {
+          "id": 44,
+          "content": "I am not interested in abstract ideas.",
+          "dimension": "openness"
+        },
+        {
+          "id": 45,
+          "content": "I have excellent ideas.",
+          "dimension": "openness"
+        },
+        {
+          "id": 46,
+          "content": "I do not have a good imagination.",
+          "dimension": "openness"
+        },
+        {
+          "id": 47,
+          "content": "I am quick to understand things.",
+          "dimension": "openness"
+        },
+        {
+          "id": 48,
+          "content": "I use difficult words.",
+          "dimension": "openness"
+        },
+        {
+          "id": 49,
+          "content": "I spend time reflecting on things.",
+          "dimension": "openness"
+        },
+        {
+          "id": 50,
+          "content": "I am full of ideas.",
+          "dimension": "openness"
+        }
+      ],
+      "scale": {
+        "1": "Agree",
+        "2": "Slightly agree",
+        "3": "Neutral",
+        "4": "Slightly disagree",
+        "5": "Disagree"    
+      }
+    }
+  ]

@@ -1,0 +1,265 @@
+[
+    {
+      "label": "agreement",
+      "task": "For each of the statements below, please indicate how much you agree or disagree with the statement. Response options: Disagree (1); Slightly disagree (2); Neutral (3); Slightly agree (4); and Agree (5). Respond only with the predicted class [(1), (2), (3), (4), (5)].",
+      "questions": [
+        {
+          "id": 1,
+          "content": "I am not the life of the party.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 2,
+          "content": "I talk a lot.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 3,
+          "content": "I do not feel comfortable around people.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 4,
+          "content": "I do not keep in the background.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 5,
+          "content": "I do not start conversations.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 6,
+          "content": "I have much to say.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 7,
+          "content": "I do not talk to a lot of different people at parties.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 8,
+          "content": "I like to draw attention to myself.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 9,
+          "content": "I mind being the center of attention.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 10,
+          "content": "I am not quiet around strangers.",
+          "dimension": "extraversion"
+        },
+        {
+          "id": 11,
+          "content": "I do not get stressed out easily.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 12,
+          "content": "I am not relaxed most of the time.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 13,
+          "content": "I do not worry about things.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 14,
+          "content": "I often feel blue.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 15,
+          "content": "I am not easily disturbed.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 16,
+          "content": "I do not get upset easily.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 17,
+          "content": "I do not change my mood a lot.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 18,
+          "content": "I do not have frequent mood swings.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 19,
+          "content": "I do not get irritated easily.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 20,
+          "content": "I seldom feel blue.",
+          "dimension": "neuroticism"
+        },
+        {
+          "id": 21,
+          "content": "I do not feel little concern for others.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 22,
+          "content": "I am not interested in people.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 23,
+          "content": "I do not insult people.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 24,
+          "content": "I do not sympathize with others' feelings.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 25,
+          "content": "I am interested in other people's problems.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 26,
+          "content": "I do not have a soft heart.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 27,
+          "content": "I am really interested in others.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 28,
+          "content": "I do not take time out for others.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 29,
+          "content": "I do not feel others' emotions.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 30,
+          "content": "I do not make people feel at ease.",
+          "dimension": "agreeableness"
+        },
+        {
+          "id": 31,
+          "content": "I am never prepared.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 32,
+          "content": "I do not leave my belongings around.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 33,
+          "content": "I do not pay attention to details.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 34,
+          "content": "I do not make a mess of things.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 35,
+          "content": "I do not get chores done right away.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 36,
+          "content": "I seldom forget to put things back in their proper place.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 37,
+          "content": "I do not like order.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 38,
+          "content": "I do not shirk my duties.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 39,
+          "content": "I do not follow a schedule.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 40,
+          "content": "I am not exacting in my work.",
+          "dimension": "conscientiousness"
+        },
+        {
+          "id": 41,
+          "content": "I do not have a rich vocabulary.",
+          "dimension": "openness"
+        },
+        {
+          "id": 42,
+          "content": "I do not have difficulty understanding abstract ideas.",
+          "dimension": "openness"
+        },
+        {
+          "id": 43,
+          "content": "I do not have a vivid imagination.",
+          "dimension": "openness"
+        },
+        {
+          "id": 44,
+          "content": "I am interested in abstract ideas.",
+          "dimension": "openness"
+        },
+        {
+          "id": 45,
+          "content": "I do not have excellent ideas.",
+          "dimension": "openness"
+        },
+        {
+          "id": 46,
+          "content": "I have a good imagination.",
+          "dimension": "openness"
+        },
+        {
+          "id": 47,
+          "content": "I am not quick to understand things.",
+          "dimension": "openness"
+        },
+        {
+          "id": 48,
+          "content": "I do not use difficult words.",
+          "dimension": "openness"
+        },
+        {
+          "id": 49,
+          "content": "I do not spend time reflecting on things.",
+          "dimension": "openness"
+        },
+        {
+          "id": 50,
+          "content": "I am not full of ideas.",
+          "dimension": "openness"
+        }
+      ],
+      "scale": {
+        "1": "Disagree",
+        "2": "Slightly disagree",
+        "3": "Neutral",
+        "4": "Slightly agree",
+        "5": "Agree"
+      }
+    }
+  ]
