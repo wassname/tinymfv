@@ -46,13 +46,21 @@ def administer(model, tok, instr: Instrument, *, batch_size: int = 36) -> dict:
 
     # per-frame factor means + framing spread (acquiescence/wording diagnostic): for each frame,
     # canonicalize that frame's presented distribution to forward, key it, pool per factor.
+    # Also keep the per-(item, frame) rows: experiment analyses (e.g. the MFQ-2 map's framing-bias
+    # diagnostic + paired base-vs-steer delta) need the per-framing granularity that per_item
+    # averages away. agreement = forward-canonicalized E (agreement toward the original statement);
+    # keyed_agreement reflects reverse-keyed items, same as reduce_ordinal.
     frames = sorted({r["frame"] for r in per_row})
     by_dim_frame: dict[tuple[str, str], list[float]] = {}
+    per_item_frame: list[dict] = []
     for r in per_row:
         p_fwd = canonicalize_to_forward(r["p"], r["frame"], instr.kind)
         E = float((p_fwd * w).sum())
         keyed = (instr.scale_max + 1 - E) if r["sign"] < 0 else E
         by_dim_frame.setdefault((r["dimension"], r["frame"]), []).append(keyed)
+        per_item_frame.append({"id": r["id"], "framing": r["frame"], "foundation": r["dimension"],
+                               "agreement": E, "keyed_agreement": keyed,
+                               "pmass_allowed": r["pmass_allowed"]})
 
     rng = np.random.default_rng(0)
     foundations = []
@@ -67,4 +75,5 @@ def administer(model, tok, instr: Instrument, *, batch_size: int = 36) -> dict:
             **{f"f_{fr}": v for fr, v in per_fr.items()},
         })
     return {"profile": profile, "dimensions": instr.dimensions, "foundations": foundations,
-            "per_item": per_item_rows, "mean_pmass_allowed": mean_pmass}
+            "per_item": per_item_rows, "per_item_frame": per_item_frame,
+            "mean_pmass_allowed": mean_pmass}
