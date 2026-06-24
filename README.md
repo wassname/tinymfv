@@ -17,7 +17,7 @@ the grey human cross-cultural band, per foundation. It answers "does any steer p
 outside the human range" at a glance.
 
 These two are the engine's whole output surface, produced by exactly two plotting functions
-(`plot_ipsative_pca` and `plot_range`). The images above are real outputs from the Qwen3.5-4B
+(`plot_ipsative_pca` and `plot_range`). The images above are real outputs from the Qwen3-4B
 showcase run below (regenerated each run; the maps move into this repo from the steering experiment).
 Output paths:
 
@@ -180,7 +180,7 @@ Agreement, Qwen3-4B on `classic`:
 
 | check | result | interpretation |
 |---|---:|---|
-| top-1 vs human modal | 82.6% | chance is 14.3% for 7-way choice |
+| top-1 vs human modal | 77.3% | chance is 14.3% for 7-way choice (was 82.6% on an earlier eval build) |
 | mean soft NLL (T=1) | TODO nats | raw, dominated by overconfident misses |
 | mean soft NLL (T*) | TODO nats | after temperature scaling |
 | median top-1 probability | 1.00 | model usually commits to one foundation |
@@ -189,22 +189,19 @@ Per-class top-1 recall is uneven (Care/Fairness/Sanctity ~1.0; Loyalty 0.56, Lib
 weak spots match the usual MFT pattern: binding foundations cluster, liberty overlaps care/harm.
 
 Sensitivity to steering: a small calibrated vector registers as a shift in `Δ log p[f]`. On the
-Qwen3.5-4B showcase the base MFV readout is coherent (`emitted_close` 4/264, the base profile
-discriminates: Social Norms `logit` -0.43, i.e. often "not wrong", down to Loyalty -5.79, rarely the
-answer, a clear spread rather than the uniform ~-1.79 of a collapsed readout). `+C` is a moderate,
-coherent steer; `-C` (the strong negative pole at fixed C=1) over-steers into a readout collapse,
-shifting every foundation by a near-uniform +10 nats ("everything is a violation"). That collapse is
-real over-steering, not a base-eval bug, and it mirrors the `-C` instability on the ordinal surveys
-(NaN at collapse). The MFV figure below shows both arms.
+Qwen3-4B showcase the base MFV readout is coherent (`emitted_close` 4/264, `pmass` >= 0.985, top-1
+0.77) and the Authority/Care vector moves it cleanly in both directions: `+C` raises perceived
+violations across foundations (Care +0.65 nats) while lowering Social Norms (the "not wrong" option,
+-0.24); `-C` does the opposite (Care -0.31, Social Norms +1.52). Both poles stay coherent. The MFV
+figure below shows the two arms moving apart.
 
 ## One vector across every instrument
 
 The same calibrated Authority/Care vector, administered through every instrument tinymfv supports
 (`scripts/plot_steer_showcase.py` over a [steering-lite](https://github.com/wassname/steering-lite)
 `run_allinstr_showcase` run). The ordinal surveys read the vector as a gentle global shift and stay
-coherent at base and `+C` (`pmass` >= 0.94); the strong `-C` pole collapses a couple of factors (NaN,
-shown as a missing arm). The nominal MFV vignettes (last section) are coherent at base and `+C` and
-over-steer into collapse at `-C`, the same pattern.
+coherent on every pole (`pmass` ~1.0 at base, `+C`, and `-C`). The nominal MFV vignettes (last
+section) are coherent throughout too, with `+C` and `-C` moving the foundation deltas apart.
 
 How to read a range: grey dots are the human societies (two extremes named, the short dash is their
 median); the black dot is the unsteered model, the red arrow its `+C` pole and the blue arrow its
@@ -213,53 +210,55 @@ the human map.
 
 ### MFQ-2: the clearest ordinal signal
 
-![ipsative PCA culture map: Qwen3.5-4B base and its two steered poles among 19 human societies](docs/img/showcase/mfq2/map_pca_ipsative.png)
+![ipsative PCA culture map: Qwen3-4B base and its two steered poles among 19 human societies](docs/img/showcase/mfq2/map_pca_ipsative.png)
 
 The culture map (each society's profile row-centred then PCA'd, so the axes are relative emphasis, not
-overall level). Baseline sits near the centre of the human cloud, between France and South Africa; the
-`+C` and `-C` poles move only a short way off it and stay among the human societies. Because the
-steer's main effect is a near-uniform shift in level (next plot), most of it cancels under
-row-centring, leaving a small residual re-weighting here.
+overall level). Baseline sits near the centre of the human cloud, by Japan and South Africa; `+C`
+shifts up toward the binding-foundation corner (loyalty/authority/purity) while `-C` stays close to
+base. Both poles stay among the human societies, so the re-weighting is real but modest.
 
-![steered MFQ-2 range: +C lowers most foundations; -C is mixed and collapses loyalty/authority, against the human strip](docs/img/showcase/mfq2/range.png)
+![steered MFQ-2 range: +C and -C move the foundations apart, both poles inside the human strip](docs/img/showcase/mfq2/range.png)
 
-The range view: `+C` (red) lowers endorsement on most foundations (care 3.86 to 3.13, authority 3.33
-to 3.03), a broadly downward global shift. `-C` (blue) is mixed, raising equality and purity but
-collapsing loyalty and authority (their `-C` arm is absent: the readout went incoherent at that pole,
-the `pmass`->0 NaN that marks "do not compare"). The base model sits just below the human median on
-most foundations (care 3.86 vs median 3.96, authority 3.33 vs 3.84), and the coherent arms stay inside
-the human band. So the readable steer here is `+C`; the strong `-C` pole is past this vector's coherent
-range (see the C-sweep note for the MFV path, which hits the same wall).
+The range view: the steer is small but bidirectional on most foundations, `+C` (red) and `-C` (blue)
+moving apart (care 4.09 base, 4.18 at `+C`, 3.85 at `-C`; equality 2.83 -> 3.13 / 2.75; purity 3.36 ->
+3.42 / 3.05). Authority is the exception, both poles dip below base (3.95 -> 3.87 / 3.32). Every pole
+stays coherent (`pmass` ~1.0) and inside the human band. The base model sits near the human median
+(care 4.09 vs median 3.96, authority 3.95 vs 3.84). On the survey this vector is moderate, not alien.
 
-### Side instruments: the off-axis nulls
+### Side instruments: a broad persona axis
 
-![steered Big Five range: tiny arms, the Authority/Care vector barely touches personality](docs/img/showcase/big5/range.png)
+The same vector also shifts the off-target instruments, so on this model it reads as a broad persona
+axis, not an MFT-only steer.
 
-Big Five. The Authority/Care vector barely moves the personality profile (every arm is short): a clean
-off-axis null showing the eval is not manufacturing motion.
+![steered Big Five range: the Authority/Care vector moves agreeableness most, both poles](docs/img/showcase/big5/range.png)
 
-![steered 16PF range: 15 factors, almost every arm short](docs/img/showcase/16pf/range.png)
+Big Five. Agreeableness moves most (base 3.13, `+C` 3.55, `-C` 2.85), with conscientiousness and
+extraversion following; neuroticism and openness barely budge. The Care/Authority direction loading
+onto agreeableness is the expected cross-talk, not noise.
 
-16PF across 15 factors, the same near-null. A handful of factors (reasoning, self-reliance) twitch
-under `-C`, most do not move.
+![steered 16PF range: several factors move, emotional-stability and rule-consciousness most](docs/img/showcase/16pf/range.png)
 
-![steered Humor Styles range: base model an outlier low on affiliative humor, steer does not pull it back](docs/img/showcase/humor_styles/range.png)
+16PF across 16 factors: not a null either. Emotional-stability (`+C` +0.49), rule-consciousness,
+openness-to-change, dominance and sensitivity each move 0.3 to 0.6 nats across the two poles; the rest
+stay short.
 
-Humor Styles, the most distinctive base: the model sits at the bottom of the human strip on
-affiliative (warm) humor, near the lowest society, and the Authority/Care steer does not pull it back
-up. The base profile is the outlier here, not the steer.
+![steered Humor Styles range: +C raises affiliative humor, -C lowers it](docs/img/showcase/humor_styles/range.png)
+
+Humor Styles: the base sits in the lower half of the human strip on affiliative (warm) humor (3.19),
+and the steer is bidirectional, `+C` lifts it toward the human median (3.46) while `-C` pushes it to
+the low edge (3.05). So the vector reaches humor too.
 
 ### MFV vignettes: the nominal readout
 
-![steered MFV foundation deltas: +C a moderate coherent steer, -C collapses every foundation to "violation"](docs/img/showcase/mfv/foundation_dlogit.png)
+![steered MFV foundation deltas: +C raises violations across foundations, -C lowers them and raises "not wrong"](docs/img/showcase/mfv/foundation_dlogit.png)
 
 The nominal forced-choice path, `Δ logit(violation)` vs the unsteered model per foundation. `+C` (red)
-is a moderate, differentiated steer: most foundations move +1.5 to +3.3 nats while Social Norms drops
-(the model calls fewer scenarios "not wrong"). `-C` (blue) is the over-steer: every foundation jumps a
-near-uniform +9 to +12 nats, the readout collapsing into "everything is a violation" (`emitted_close`
-220/264 at this pole). So the coherent, readable steer is the `+C` arm; the `-C` arm marks where fixed
-C=1 is too strong for this direction, the same boundary the ordinal `-C` pole hits. A C-sweep for the
-largest jointly-coherent coefficient is the natural next step.
+raises perceived violations on most foundations (Care +0.65, Loyalty +0.40, Liberty +0.38 nats) while
+lowering Social Norms (-0.24, the model calls fewer scenarios "not wrong"). `-C` (blue) is the mirror:
+foundations drop (Care -0.31, Authority -0.45) and Social Norms jumps +1.52. Both poles stay coherent
+(`emitted_close` <= 9/264), so this is a clean bidirectional moral-salience steer rather than a
+collapse. The effect is modest at fixed C=1; a C-sweep for the largest coherent coefficient would
+sharpen it.
 
 Each instrument also has an ipsative culture map and a per-subscale zoom under
 `docs/img/showcase/<instrument>/`.
