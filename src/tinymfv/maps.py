@@ -20,12 +20,48 @@ fig_profile_sweeps.py). The experiment's MFQ-2-specific overlays (MFT theory axe
 stay there -- they are about the steering vectors, not the instrument.
 """
 from __future__ import annotations
+import csv
 from pathlib import Path
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 from .instrument import Instrument
+
+DATA = Path(__file__).resolve().parent / "data"
+
+# Official MFQ-2 final 6-factor keying, verbatim from Atari et al. Code_Study2.R `model_6factors`.
+# Drives respondent_profiles below (the individual cloud behind the ipsative map). MFQ-2 only.
+MFQ2_FOUNDATION_ITEMS = {
+    "care":            ["care1", "care3", "care11", "care12", "care13", "care14"],
+    "equality":        ["equalFairness6", "equalFairness10", "equality2", "equality4", "equality6", "equality10"],
+    "proportionality": ["propFairness1", "propFairness3", "proportionality5", "proportionality9", "proportionality12", "proportionality17"],
+    "loyalty":         ["loyalty5", "loyalty6", "loyalty12", "loyalty13", "loyalty14", "loyalty16"],
+    "authority":       ["authority6", "authority8", "authority11", "authority14", "authority18", "authority20"],
+    "purity":          ["purity2", "purity3", "purity6", "purity9", "purity13", "purity17"],
+}
+
+
+def respondent_profiles(foundations: list[str], scale_max: int = 5) -> np.ndarray:
+    """Per-respondent MFQ-2 6-foundation profiles (each foundation = mean of its 6 raw 1-5 items),
+    returned as 0-1 FRACTION (same scale as `M` in plot_ipsative_pca) in `foundations` order.
+    Rows with any NA in the keyed items are dropped (fail-fast, no imputation). MFQ-2 only --
+    keying is MFQ2_FOUNDATION_ITEMS. Source: data/atari_study2_raw.csv (Atari et al. 2023 Study 2)."""
+    raw_path = DATA / "atari_study2_raw.csv"
+    rows = list(csv.DictReader(raw_path.open(newline="")))
+    cols = rows[0].keys()
+    missing = [c for items in MFQ2_FOUNDATION_ITEMS.values() for c in items if c not in cols]
+    if missing:
+        raise KeyError(f"keying columns absent from {raw_path.name}: {missing}")
+    def cell(v: str) -> float:
+        return np.nan if v in ("NA", "", "-99") else float(v)
+    out = []
+    for r in rows:
+        prof = [np.mean([cell(r[c]) for c in MFQ2_FOUNDATION_ITEMS[f]]) for f in foundations]
+        if not np.isnan(prof).any():
+            out.append(prof)
+    X = np.array(out)                                   # (n_resp x K), raw 1-5
+    return (X - 1) / (scale_max - 1)                    # -> 0-1 fraction
 
 # range-plot palette + geometry (shared with the experiment's prior fig_profile_sweeps look)
 CLOUD_GREY = "0.78"      # individual respondents (subtle backdrop)
@@ -94,20 +130,36 @@ def compass(ax_main, L: np.ndarray, labels: list[str], title: str = "compass",
     cax.set_title(title, fontsize=10, fontweight="bold", color=color, pad=3)
 
 
+def _axis_gloss(load1: np.ndarray, dims: list[str], n: int = 2) -> str:
+    """One-line interpretation of a PC from its loadings: top-n +loading factors vs top-n -loading,
+    e.g. 'loyalty/authority (+) vs equality/care (-)'. So the axis is readable without the compass."""
+    order = np.argsort(load1)
+    neg = "/".join(dims[i] for i in order[:n])
+    pos = "/".join(dims[i] for i in order[::-1][:n])
+    return f"{pos} (+) vs {neg} (-)"
+
+
 def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], M: np.ndarray,
                       base: np.ndarray, pos: np.ndarray | None, neg: np.ndarray | None,
-                      *, boots: dict | None = None, pad=(0.18, 0.16),
+                      *, respondents: np.ndarray | None = None, boots: dict | None = None,
+                      pad=(0.18, 0.16),
                       labels: tuple[str, str, str] = ("baseline (c=0)", "honest (c=+2)", "dishonest (c=-2)")):
     """Ipsative culture map. M is societies x K (0-1 fraction); base / pos / neg are the length-K
     fraction vectors for the base model and its two steer poles (or None). `labels` is the legend
     text (base, +pole, -pole) -- override it for a non-honesty steer or a different coefficient.
+    `respondents` (n_resp x K, SAME 0-1 fraction scale as M) scatters individual respondents as a
+    grey haze and, crucially, becomes the PCA BASIS: fitting on people (thousands of points, real
+    covariance) beats fitting on a handful of noisy society means, and the cloud IS the honest
+    cross-cultural envelope the model is placed against. The crop then frames that cloud's core
+    (2-98 pct) unioned with the anchors. None -> old behaviour (fit on M, pad-based crop, no haze).
     `boots` optionally maps the role keys 'base'/'honest'/'dis' -> (n x K) bootstrap fraction
     matrices for the uncertainty cross. Returns the Figure."""
     try:
         import textalloc as ta
     except ImportError:
         ta = None
-    P, Vt, var, mu, Pc = ipsative_pca(M)               # signs already stabilized inside the helper
+    fit_on = respondents if respondents is not None else M
+    _, Vt, var, mu, Pc = ipsative_pca(fit_on)          # signs already stabilized inside the helper
     P = (M @ Pc - mu) @ Vt[:2].T
 
     def proj(v):
@@ -117,6 +169,10 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     fig, ax = plt.subplots(figsize=(8.5, 7.5))
     ax.set_facecolor("#faf8f2")
     ax.grid(True, color="#eceadf", lw=0.3, zorder=0)
+    if respondents is not None:                        # grey haze = individual respondents (rasterized; SVG-safe)
+        Pi = (respondents @ Pc - mu) @ Vt[:2].T
+        ax.scatter(Pi[:, 0], Pi[:, 1], s=4, c="#8f8a7e", alpha=0.14, edgecolors="none",
+                   zorder=1, rasterized=True)
     ax.scatter(P[:, 0], P[:, 1], s=26, c=C_HUM, alpha=0.7, edgecolors="white", linewidths=0.5, zorder=3)
     if ta is not None:
         try:
@@ -146,10 +202,21 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
         ax.annotate(lab, pt, xytext=dxy, textcoords="offset points", fontsize=9, color=col,
                     fontweight="bold", ha=ha, va="center", zorder=8)
     compass(ax, Vt[:2].T, dims, title=f"{instr.display} compass")
-    x0, x1 = ax.get_xlim(); y0, y1 = ax.get_ylim()      # modest top-right headroom for the compass inset
-    ax.set_xlim(x0, x1 + pad[0] * (x1 - x0)); ax.set_ylim(y0, y1 + pad[1] * (y1 - y0))
-    ax.set_xlabel(f"PC1 ({var[0]*100:.0f}% var, relative emphasis)")
-    ax.set_ylabel(f"PC2 ({var[1]*100:.0f}% var, relative emphasis)")
+    if respondents is not None:
+        # crop to the respondent-cloud core (2-98 pct) unioned with every anchor, so societies +
+        # poles fill the frame instead of being buried in one corner of the full cloud.
+        anc = np.vstack([P] + [p for p in (pb, ph, pf) if p is not None])
+        cx, cy = np.percentile(Pi[:, 0], [2, 98]), np.percentile(Pi[:, 1], [2, 98])
+        wx0, wx1 = min(cx[0], anc[:, 0].min()), max(cx[1], anc[:, 0].max())
+        wy0, wy1 = min(cy[0], anc[:, 1].min()), max(cy[1], anc[:, 1].max())
+        sx, sy = wx1 - wx0, wy1 - wy0
+        ax.set_xlim(wx0 - 0.05 * sx, wx1 + 0.05 * sx + pad[0] * sx)   # right/top headroom for compass inset
+        ax.set_ylim(wy0 - 0.05 * sy, wy1 + 0.05 * sy + pad[1] * sy)
+    else:
+        x0, x1 = ax.get_xlim(); y0, y1 = ax.get_ylim()  # modest top-right headroom for the compass inset
+        ax.set_xlim(x0, x1 + pad[0] * (x1 - x0)); ax.set_ylim(y0, y1 + pad[1] * (y1 - y0))
+    ax.set_xlabel(f"PC1 ({var[0]*100:.0f}% var) · {_axis_gloss(Vt[0], dims)}")
+    ax.set_ylabel(f"PC2 ({var[1]*100:.0f}% var) · {_axis_gloss(Vt[1], dims)}")
     ax.set_title(f"{instr.name}: ipsative culture map ({len(countries)} societies)", fontsize=10)
     return fig
 

@@ -87,9 +87,12 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float) 
 
     countries, Mfrac = human_matrix(instr)
     labels = (f"base (c=0)", f"+C={C:+.2f}", f"-C={-C:+.2f}")
+    # mfq2 has per-respondent Atari data -> scatter the individual cloud behind the societies and
+    # fit the ipsative PCA on PEOPLE (better-conditioned, the real envelope). Other instruments: None.
+    respondents = T.maps.respondent_profiles(dims, instr.scale_max) if name == "mfq2" else None
     figm = T.maps.plot_ipsative_pca(instr, dims, countries, Mfrac,
                                     _frac(base, instr.scale_max), _frac(pos, instr.scale_max),
-                                    _frac(neg, instr.scale_max), labels=labels)
+                                    _frac(neg, instr.scale_max), respondents=respondents, labels=labels)
     paths = [T.maps.save_both(figm, out / name, "map_pca_ipsative")]
     plt.close(figm)
 
