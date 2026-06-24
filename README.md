@@ -221,13 +221,15 @@ overall level). Baseline sits near the centre of the human cloud, between France
 steer's main effect is a near-uniform shift in level (next plot), most of it cancels under
 row-centring, leaving a small residual re-weighting here.
 
-![steered MFQ-2 range: +C lowers every foundation, -C raises every foundation, against the human strip](docs/img/showcase/mfq2/range.png)
+![steered MFQ-2 range: +C lowers most foundations; -C is mixed and collapses loyalty/authority, against the human strip](docs/img/showcase/mfq2/range.png)
 
-The range view shows why: `+C` (red) lowers endorsement on all six foundations and `-C` (blue) raises
-it, a near-uniform global shift rather than a re-ordering. Every pole stays inside the human band. The
-base model sits just below the human median on all six foundations (e.g. care 3.90 vs median 3.96,
-authority 3.33 vs 3.84), so `+C` pushes it toward the low end of human variation and `-C` back toward
-the median, neither one leaving the envelope. On the survey this vector is moderate, not alien.
+The range view: `+C` (red) lowers endorsement on most foundations (care 3.86 to 3.13, authority 3.33
+to 3.03), a broadly downward global shift. `-C` (blue) is mixed, raising equality and purity but
+collapsing loyalty and authority (their `-C` arm is absent: the readout went incoherent at that pole,
+the `pmass`->0 NaN that marks "do not compare"). The base model sits just below the human median on
+most foundations (care 3.86 vs median 3.96, authority 3.33 vs 3.84), and the coherent arms stay inside
+the human band. So the readable steer here is `+C`; the strong `-C` pole is past this vector's coherent
+range (see the C-sweep note for the MFV path, which hits the same wall).
 
 ### Side instruments: the off-axis nulls
 
