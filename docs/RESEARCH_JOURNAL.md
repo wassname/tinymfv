@@ -654,3 +654,54 @@ matches the human target better because it asks the same question the labels
 answer: which foundation is most salient here? The remaining weak spots (Liberty,
 Loyalty, SocialNorms) are useful model diagnostics rather than evidence that the
 probe collapsed.
+
+## 2026-06-25 — Unify ordinal reader onto the guided core; one-vector showcase on Qwen3-4B
+
+### Evidence
+
+Unified the ordinal survey reader (`read.py:read_items`) onto the same
+`guided.py:_rollout_natural_or_forced` core the nominal MFV path uses, with
+`force_only=True` (the `(` prefill is too short for natural-emission detection).
+Ordinals now generate think tokens before the prefilled answer slot instead of a
+single think=0 forward.
+
+Showcase = `run_allinstr_showcase.py` (steering-lite), one mean_diff Authority/Care
+vector across all five instruments at fixed C=1, base/+C/-C. Two models:
+
+- Qwen3.5-4B: base+`+C` coherent, but `-C` collapses (MFV `emitted_close` 220/264,
+  uniform ~+10 nat shift; ordinal loyalty/authority -> NaN). Also a separate
+  fragility: a bs=1 forced-choice at large budget NaNs after the run accumulates
+  state and (with demos on) the NaN forward poisons the batched eval -- a
+  gated-delta-net (linear-attention) recurrent-state effect, Qwen3.5-specific.
+- Qwen3-4B (jobs 222/228): fully coherent on every pole (ordinal pmass ~1.0, MFV
+  `emitted_close` <= 9/264). MFV is bidirectional: `+C` Care +0.65 / Social Norms
+  -0.24, `-C` Care -0.31 / Social Norms +1.52. MFQ-2 bidirectional and varied at
+  both poles. Big Five / 16PF / Humor move under `+C` (agreeableness 3.14->3.54)
+  but their `-C` pole pins to the neutral midpoint 3.0 (degenerate profile,
+  `pmass` still ~1.0). Base MFV top-1 0.773 (budget 256), 0.720 (64).
+
+Think-budget ablation (`ablation_think_budget.py`, job 228, Qwen3-4B mfq2): mean
+per-foundation `|steer delta|` rises monotonically with the budget -- 0.068 (1) ->
+0.149 (64) -> 0.319 (128) -> 0.682 (256), `pmass` >= 0.95. At 512 the model closes
+`</think>` and the readout collapses (`pmass` 0.55).
+
+### Interpretation
+
+The unification was the right call: routing ordinals through the think-then-read
+core is what lets the steer accrue, and the ablation makes that causal (more think
+-> bigger delta, ~10x over 1..256). The think budget has a coherent ceiling
+(~256-512) where the model starts closing think early and the forced read hits the
+case-c discard.
+
+Scout-mindset correction: I spent ~9 GPU jobs chasing an "MFV base is broken"
+premise that was a misread. In the first Qwen3.5 run I grepped one aux line
+(`pmass` 0.166 / `emitted_close` 220) next to the base-logit table and the NaN
+bs=1 demo, and attributed all of it to the base eval. It was the `-C` pole's
+over-steer collapse plus a separate demo fragility; base+`+C` were coherent the
+whole time (confirmed: demos-off run produced byte-identical MFV data). Lesson:
+read the specific eval's own `pmass`, don't pattern-match one line.
+
+The README's old 82.6% top-1 (Qwen3-4B) does not reproduce on the current eval
+(0.72-0.77); refreshed to 77.3%. The ~6-pt drop predates this work and may be an
+eval-version regression worth a look. Switching the showcase to Qwen3-4B (the
+validation model) gave the cleaner, fully-coherent, bidirectional result.
