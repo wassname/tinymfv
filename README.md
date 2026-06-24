@@ -188,16 +188,15 @@ Agreement, Qwen3-4B on `classic`:
 Per-class top-1 recall is uneven (Care/Fairness/Sanctity ~1.0; Loyalty 0.56, Liberty 0.53). The
 weak spots match the usual MFT pattern: binding foundations cluster, liberty overlaps care/harm.
 
-An earlier build reported 82.6% on the same model. That number used the old readout that scored the
-first token of each foundation *word*; the canonical eval now scores the option *index digit* instead,
-deliberately, because the words tokenize into uneven first pieces (`fair`, `loy`, `san`) whose unequal
-priors leaked into the softmax (see `guided.py`). The digit readout is less biased but reads ~5 points
-lower top-1. No lever in the current code recovers the 82.6%: think budget (0.72 at 64, 0.77 at 256,
-512 collapses), BMA over 8 stochastic thinks (0.72), model scale (Qwen3-8B also 0.773), and even
-reinstating the old word-first-token gather (0.788, `scripts/probe_word_readout.py`). So the 82.6%
-came from the broader 2026-05-08 eval pipeline, not the readout alone, and the current rigorous eval
-tops out around 0.77-0.79. 0.773 is the canonical (digit) number; the gap to 0.826 is a superseded
-pipeline, not a model or config shortfall.
+An earlier build's table reported 82.6% here, but that number does not reproduce, even by running its
+own original code. Checking out the exact 2026-05-08 eval (commit `b20ec56`, the word-first-token
+readout) and running it on this model gives top-1 0.780, not 0.826. Every other route agrees on ~0.78:
+the canonical digit readout 0.773, the word readout in the current core 0.788
+(`scripts/probe_word_readout.py`), think budget 0.72-0.77, BMA 0.72, and Qwen3-8B 0.773. So this
+model's MFV top-1 is ~0.78 robustly; the 82.6% was a stale/erroneous table entry, not a target the
+model reaches under any eval version. The canonical eval scores the option *index digit* (not the
+foundation word) on purpose: the words tokenize into uneven first pieces (`fair`, `loy`, `san`) whose
+unequal priors leak into the softmax (see `guided.py`).
 
 Sensitivity to steering: a small calibrated vector registers as a shift in `Δ log p[f]`. On the
 Qwen3-4B showcase the base MFV readout is coherent (`emitted_close` 4/264, `pmass` >= 0.985, top-1

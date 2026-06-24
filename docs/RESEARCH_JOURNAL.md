@@ -707,8 +707,11 @@ that scored the first token of each foundation *word*; the canonical eval now
 scores the option *index digit* (deliberately, to drop the uneven-first-piece
 word prior, guided.py:345). The digit readout reads ~5 pts lower. Config levers
 within the digit readout do NOT recover it: top-1 0.72 (think 64), 0.77 (256),
-0.72 (BMA n_samples=8, temp 0.7) -- so 0.773 is the honest ceiling for the
-debiased eval. Reaching 0.83 needs the superseded word readout, which would be a
-method change for the sake of a number (research poison), so 0.773 stands as the
-correct current value. Switching the showcase to Qwen3-4B (the validation model)
-gave the cleaner, fully-coherent, bidirectional result.
+0.72 (BMA n_samples=8, temp 0.7). UPDATE: the 82.6% does not reproduce even by
+running its OWN original code -- a git worktree at commit b20ec56 (the 2026-05-08
+word-readout eval) on Qwen3-4B gives top1 0.780 (job 233), and the word readout in
+the current core gives 0.788 (probe_word_readout.py). So this model's MFV top-1 is
+~0.78 across every eval version (digit 0.773 / word-current 0.788 / word-original
+0.780); the 82.6% was a stale/erroneous table entry, not a reachable target. 0.773
+is the canonical (digit) value. Switching the showcase to Qwen3-4B gave the
+cleaner, fully-coherent, bidirectional result.
