@@ -54,6 +54,28 @@ def human_matrix(instr) -> tuple[list[str], np.ndarray]:
     return countries, _frac(raw, instr.human_scale_max)
 
 
+def human_haze(instr, n_per_country: int = 200, seed: int = 0) -> np.ndarray:
+    """Synthetic individual-respondent cloud (n x K, 0-1 fraction) for instruments that ship only
+    society-level stats (big5/16pf/humor: no raw per-person data like mfq2's Atari file). For each
+    (country, factor) we resample n Normal(mean, sd) draws from the published country mean+sd, so the
+    cloud carries BOTH between-country (different means) and within-country (sd) human spread. Caveat:
+    factors are drawn independently, so this marginal resample loses the cross-factor correlation a
+    real respondent matrix has -- it is a backdrop envelope, not a covariance estimate, and is NOT
+    used as the PCA basis (that stays the society means M)."""
+    dims = instr.dimensions
+    rng = np.random.default_rng(seed)
+    stats: dict[tuple[str, str], tuple[float, float]] = {}
+    with open(instr.human_csv, newline="") as fh:
+        for r in csv.DictReader(fh):
+            stats[(r["country"], r["foundation"])] = (float(r["mean"]), float(r["sd"]))
+    countries = sorted({c for (c, _f) in stats})
+    blocks = []
+    for c in countries:
+        cols = [rng.normal(stats[(c, f)][0], stats[(c, f)][1], n_per_country) for f in dims]
+        blocks.append(np.clip(np.stack(cols, axis=1), 1.0, instr.human_scale_max))
+    return _frac(np.concatenate(blocks, axis=0), instr.human_scale_max)
+
+
 def human_strip(instr) -> dict[str, list[tuple[str, float]]]:
     """{factor: [(country, mean_on_model_scale)]}. Human 1-H rescaled to model 1-M for the range."""
     h = read_human_csv(instr.human_csv)
@@ -87,12 +109,18 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float) 
 
     countries, Mfrac = human_matrix(instr)
     labels = (f"base (c=0)", f"+C={C:+.2f}", f"-C={-C:+.2f}")
-    # mfq2 has per-respondent Atari data -> scatter the individual cloud behind the societies and
-    # fit the ipsative PCA on PEOPLE (better-conditioned, the real envelope). Other instruments: None.
-    respondents = T.maps.respondent_profiles(dims, instr.scale_max) if name == "mfq2" else None
+    # mfq2 has per-respondent Atari data -> scatter the REAL individual cloud behind the societies AND
+    # fit the ipsative PCA on it (better-conditioned, the true envelope). Other instruments have no raw
+    # per-person data, so scatter a marginal resample from each country's published mean+sd as the haze
+    # while keeping the PCA basis on the society means M.
+    if name == "mfq2":
+        respondents, haze = T.maps.respondent_profiles(dims, instr.scale_max), None
+    else:
+        respondents, haze = None, human_haze(instr)
     figm = T.maps.plot_ipsative_pca(instr, dims, countries, Mfrac,
                                     _frac(base, instr.scale_max), _frac(pos, instr.scale_max),
-                                    _frac(neg, instr.scale_max), respondents=respondents, labels=labels)
+                                    _frac(neg, instr.scale_max), respondents=respondents, haze=haze,
+                                    labels=labels)
     paths = [T.maps.save_both(figm, out / name, "map_pca_ipsative")]
     plt.close(figm)
 

@@ -141,19 +141,20 @@ def _axis_gloss(load1: np.ndarray, dims: list[str], n: int = 2) -> str:
 
 def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], M: np.ndarray,
                       base: np.ndarray, pos: np.ndarray | None, neg: np.ndarray | None,
-                      *, respondents: np.ndarray | None = None, boots: dict | None = None,
-                      pad=(0.18, 0.16),
+                      *, respondents: np.ndarray | None = None, haze: np.ndarray | None = None,
+                      boots: dict | None = None, pad=(0.18, 0.16),
                       labels: tuple[str, str, str] = ("baseline (c=0)", "honest (c=+2)", "dishonest (c=-2)")):
     """Ipsative culture map. M is societies x K (0-1 fraction); base / pos / neg are the length-K
     fraction vectors for the base model and its two steer poles (or None). `labels` is the legend
     text (base, +pole, -pole) -- override it for a non-honesty steer or a different coefficient.
-    `respondents` (n_resp x K, SAME 0-1 fraction scale as M) scatters individual respondents as a
-    grey haze and, crucially, becomes the PCA BASIS: fitting on people (thousands of points, real
-    covariance) beats fitting on a handful of noisy society means, and the cloud IS the honest
-    cross-cultural envelope the model is placed against. The crop then frames that cloud's core
-    (2-98 pct) unioned with the anchors. None -> old behaviour (fit on M, pad-based crop, no haze).
-    `boots` optionally maps the role keys 'base'/'honest'/'dis' -> (n x K) bootstrap fraction
-    matrices for the uncertainty cross. Returns the Figure."""
+    `respondents` (n_resp x K, SAME 0-1 fraction scale as M) is the PCA BASIS when given: fitting on
+    people (thousands of points, real covariance) beats fitting on a handful of noisy society means.
+    `haze` (n x K, same fraction scale) is the human cloud SCATTERED behind the societies and used
+    for the crop -- separate from the fit so instruments with only society-level mean+sd (big5/16pf/
+    humor: a marginal resample) get a backdrop without that resample dictating the axes. mfq2 passes
+    real `respondents` (also used as the haze when `haze` is None). With neither, fit on M, pad-crop,
+    no backdrop. `boots` optionally maps 'base'/'honest'/'dis' -> (n x K) bootstrap matrices. Returns
+    the Figure."""
     try:
         import textalloc as ta
     except ImportError:
@@ -161,6 +162,7 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     fit_on = respondents if respondents is not None else M
     _, Vt, var, mu, Pc = ipsative_pca(fit_on)          # signs already stabilized inside the helper
     P = (M @ Pc - mu) @ Vt[:2].T
+    cloud = haze if haze is not None else respondents  # what we scatter + crop to (fit is separate)
 
     def proj(v):
         return ((v @ Pc) - mu) @ Vt[:2].T if v is not None else None
@@ -169,8 +171,8 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     fig, ax = plt.subplots(figsize=(8.5, 7.5))
     ax.set_facecolor("#faf8f2")
     ax.grid(True, color="#eceadf", lw=0.3, zorder=0)
-    if respondents is not None:                        # grey haze = individual respondents (rasterized; SVG-safe)
-        Pi = (respondents @ Pc - mu) @ Vt[:2].T
+    if cloud is not None:                              # grey haze = human respondents (rasterized; SVG-safe)
+        Pi = (cloud @ Pc - mu) @ Vt[:2].T
         ax.scatter(Pi[:, 0], Pi[:, 1], s=4, c="#8f8a7e", alpha=0.14, edgecolors="none",
                    zorder=1, rasterized=True)
     ax.scatter(P[:, 0], P[:, 1], s=26, c=C_HUM, alpha=0.7, edgecolors="white", linewidths=0.5, zorder=3)
@@ -202,8 +204,8 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
         ax.annotate(lab, pt, xytext=dxy, textcoords="offset points", fontsize=9, color=col,
                     fontweight="bold", ha=ha, va="center", zorder=8)
     compass(ax, Vt[:2].T, dims, title=f"{instr.display} compass")
-    if respondents is not None:
-        # crop to the respondent-cloud core (2-98 pct) unioned with every anchor, so societies +
+    if cloud is not None:
+        # crop to the human-cloud core (2-98 pct) unioned with every anchor, so societies +
         # poles fill the frame instead of being buried in one corner of the full cloud.
         anc = np.vstack([P] + [p for p in (pb, ph, pf) if p is not None])
         cx, cy = np.percentile(Pi[:, 0], [2, 98]), np.percentile(Pi[:, 1], [2, 98])
