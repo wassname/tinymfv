@@ -23,10 +23,11 @@ here) is the tell that the prefill merged with the option and the readout went b
 """
 from __future__ import annotations
 
+import numpy as np
 import torch
-import torch.nn.functional as F
 from loguru import logger
 
+from .guided import _rollout_natural_or_forced
 from .instrument import Instrument, InstrItem
 
 
@@ -38,65 +39,85 @@ def resolve_answer_ids(tok, answer_space: list[str]) -> list[int]:
     return flat
 
 
-def build_prompt(tok, instr: Instrument, item: InstrItem) -> str:
-    """Chat-templated user turn + assistant prefill that forces the answer slot.
+def build_user_content(instr: Instrument, item: InstrItem) -> str:
+    """User-turn content (NOT chat-templated, NOT prefilled).
 
     The user turn is `task\\n\\nStatement: <prompt>`. For ordinal surveys the task (response-scale
     legend) is FRAME-SPECIFIC -- inverted reverses the legend, negated negates the content -- so it
     travels per-item in `meta['task']`. Falls back to the instrument-level `schema_hint`, or the
-    bare prompt (nominal vignettes)."""
+    bare prompt (nominal vignettes).
+
+    Chat-templating + the assistant prefill that forces the answer slot are applied downstream by
+    `_rollout_natural_or_forced` (so the readout shares the nominal MFV generate-think-then-read
+    core); this just assembles the legend + statement the model thinks about."""
     task = item.meta.get("task") or instr.schema_hint
-    content = f"{task}\n\nStatement: {item.prompt}" if task else item.prompt
-    text = tok.apply_chat_template(
-        [{"role": "user", "content": content}],
-        tokenize=False, add_generation_prompt=True, enable_thinking=False,
-    )
-    return text + instr.prefill
+    return f"{task}\n\nStatement: {item.prompt}" if task else item.prompt
 
 
 @torch.no_grad()
 def read_items(model, tok, instr: Instrument, items: list[InstrItem], answer_ids: list[int],
-               *, batch_size: int = 36, verbose_first: bool = False) -> list[dict]:
+               *, max_think_tokens: int, batch_size: int = 36, verbose_first: bool = False) -> list[dict]:
     """Score a list of InstrItems (one frame's worth, or any subset). Returns per-item rows with
-    the keys `per_item_categorical` consumes: id, frame, p, pmass_allowed, dimension, sign, human_label."""
-    device = next(model.parameters()).device
+    the keys `per_item_categorical` consumes: id, frame, p, pmass_allowed, dimension, sign, human_label.
+
+    Goes through the SAME `_rollout_natural_or_forced` core the nominal MFV forced-choice path uses,
+    so steering registers: the model generates up to `max_think_tokens` think tokens, then we read
+    the answer slot under the assistant prefill. The only per-instrument difference vs the nominal
+    path is the answer-token set (`answer_ids`) + reducer (downstream). The legend already lives in
+    the user-turn content, so we pass `schema_hint=""` and mirror the nominal nudge `"Just answer"`.
+
+    `_rollout_natural_or_forced` forwards the whole batch at once, so we chunk `user_prompts` here
+    and concatenate, preserving item order.
+
+    Floor: `max_think_tokens >= 1`. The rollout core calls HF `generate(max_new_tokens=...)`, which
+    rejects 0 (`max_new_tokens must be greater than 0`). think=1 is the minimum budget.
+    """
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     tok.padding_side = "left"
-    gid = torch.tensor(answer_ids, device=device)
 
     out: list[dict] = []
     for i in range(0, len(items), batch_size):
         chunk = items[i:i + batch_size]
-        texts = [build_prompt(tok, instr, it) for it in chunk]
-        enc = tok(texts, return_tensors="pt", padding=True, add_special_tokens=False).to(device)
-        logits = model(**enc).logits[:, -1, :].float()        # [B, V] next-token
-        logp = F.log_softmax(logits, dim=-1)
-        p_a = logp[:, gid].exp()                              # [B, A] prob on each answer token
-        pmass = p_a.sum(dim=-1)                               # [B] coherence check: mass on allowed tokens
-        # Renormalize within allowed. INTENTIONALLY NOT NaN-guarded: at full coherence collapse
-        # pmass -> 0 so p_norm -> NaN and poisons that item's factor. That is the honest signal, a
-        # distribution renormalized from ~zero mass is NOT comparable to one from real mass (the mean
-        # of 10 != the mean of 130), so it must not be silently turned into a comparable-looking
-        # number. NaN marks "do not compare". Do not "fix" this with a softmax/eps fallback.
-        p_norm = p_a / pmass[:, None]                         # [B, A] within allowed (NaN at collapse, by design)
+        user_prompts = [build_user_content(instr, it) for it in chunk]
+        # ordinal frames are already separate InstrItems, so single-pass (no reversed-enum two-pass;
+        # frame debias is downstream in canonicalize_to_forward). force_only: the "(" prefill is too
+        # short for natural-emission detection (matches by chance in the think trace), so always read
+        # the forced answer slot. n_samples=1, temperature=0 -> deterministic.
+        _thinks, slots = _rollout_natural_or_forced(
+            model, tok, user_prompts,
+            schema_hint="", max_think_tokens=max_think_tokens,
+            scoring_slots=[("Just answer", instr.prefill)],
+            gather_token_ids=answer_ids,
+            n_samples=1, temperature=0.0, force_only=True,
+            verbose=verbose_first and i == 0,
+        )
         for j, it in enumerate(chunk):
+            slot = slots[j][0]
+            # lp_gather[k] is the full-vocab log_softmax logprob of answer token k at the answer slot.
+            p_a = np.exp(np.asarray(slot["lp_gather"], dtype=float))   # [A] prob on each answer token
+            pmass = float(slot["pmass_allowed"])                       # mass on allowed tokens (coherence)
+            # Renormalize within allowed. INTENTIONALLY NOT NaN-guarded: at full coherence collapse
+            # pmass -> 0 so p_norm -> NaN and poisons that item's factor. That is the honest signal, a
+            # distribution renormalized from ~zero mass is NOT comparable to one from real mass (the mean
+            # of 10 != the mean of 130), so it must not be silently turned into a comparable-looking
+            # number. NaN marks "do not compare". Do not "fix" this with a softmax/eps fallback.
+            p_norm = p_a / p_a.sum()                                   # [A] within allowed (NaN at collapse, by design)
             out.append({
                 "id": it.id, "frame": it.frame,
-                "p": p_norm[j].cpu().numpy(),
-                "pmass_allowed": float(pmass[j]),
+                "p": p_norm,
+                "pmass_allowed": pmass,
                 "dimension": it.dimension, "sign": it.sign,
                 "human_label": it.human_label,
             })
         if verbose_first and i == 0:
-            top = logp[0].topk(10)
-            toks = " ".join(f"{tok.decode([int(t)])!r}:{float(p.exp()):.3f}"
-                            for t, p in zip(top.indices, top.values))
+            slot0 = slots[0][0]
+            answer_p = {a: float(np.exp(lp)) for a, lp in zip(instr.answer_space, slot0["lp_gather"])}
             logger.debug(
-                f"\n=== TRACE read first item ({instr.name}, special tokens on) ===\n"
-                f"--- PROMPT+PREFILL ---\n{texts[0]}\n"
-                f"--- top-10 next tokens ---\n{toks}\n"
+                f"\n=== TRACE read first item ({instr.name}, think={max_think_tokens}) ===\n"
+                f"--- top-5 next tokens at answer slot ---\n{slot0['top5_str']}\n"
+                f"--- answer_space probs ---\n{answer_p}\n"
                 f"SHOULD: top tokens are the answer_space {instr.answer_space} (format locked by the "
-                f"{instr.prefill!r} prefill); pmass_allowed={float(pmass[0]):.3f} near 1.0 -> coherent. "
-                f"ELSE the prefill or chat template is off.\n")
+                f"{instr.prefill!r} prefill); pmass_allowed={float(slot0['pmass_allowed']):.3f} near 1.0 "
+                f"-> coherent. ELSE the prefill or chat template is off.\n")
     return out

@@ -25,7 +25,7 @@ from .eval import evaluate, CONDITIONS
 from .guided import guided_rollout_forced_choice, _DEFAULT_FORCED_FOUNDATIONS
 from .instrument import Instrument, InstrItem, per_item_categorical
 from .instruments import get as get_instrument, INSTRUMENTS, build_instrument
-from .read import read_items, resolve_answer_ids, build_prompt
+from .read import read_items, resolve_answer_ids, build_user_content
 from .administer import administer
 
 

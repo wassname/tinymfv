@@ -51,16 +51,20 @@ class AdministerResult(TypedDict):
     mean_pmass_allowed: float       # coherence check (mass on valid answer tokens)
 
 
-def administer(model, tok, instr: Instrument, *, batch_size: int = 36) -> AdministerResult:
+def administer(model, tok, instr: Instrument, *, batch_size: int = 36,
+               max_think_tokens: int = 64) -> AdministerResult:
     assert instr.kind == "ordinal", "administer() is the ordinal survey readout; use evaluate() for nominal MFV"
     # Every ordinal item must carry its frame-specific response-scale legend in meta['task']; without
-    # it build_prompt would silently emit a bare statement (no legend) and the profile would be junk
-    # while pmass still looks fine. Fail loud.
+    # it build_user_content would silently emit a bare statement (no legend) and the profile would be
+    # junk while pmass still looks fine. Fail loud.
     assert all("task" in it.meta for it in instr.items), f"{instr.name}: ordinal items need meta['task']"
     w = np.arange(1, instr.scale_max + 1, dtype=float)
     answer_ids = resolve_answer_ids(tok, instr.answer_space)
+    # max_think_tokens=64 is the spec's "light" default: the model thinks before the prefilled answer
+    # slot, so an activation steer accrues over the trace before being read. Floor is 1 (the shared
+    # rollout core's HF generate() rejects max_new_tokens=0).
     per_row = read_items(model, tok, instr, instr.items, answer_ids,
-                         batch_size=batch_size, verbose_first=True)
+                         max_think_tokens=max_think_tokens, batch_size=batch_size, verbose_first=True)
     items = per_item_categorical(per_row, instr.kind)            # {id: {p, pmass, dimension, sign, ...}}
 
     profile = reduce_ordinal(items, instr)                       # per-factor keyed agreement

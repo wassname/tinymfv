@@ -97,6 +97,7 @@ def _rollout_natural_or_forced(
     temperature: float = 0.0,
     top_p: float = 1.0,
     skip_special_tokens: bool = False,
+    force_only: bool = False,
     verbose: bool = False,
 ) -> tuple[list[tuple[str, int, bool]], list[list[dict]]]:
     """Hybrid natural + batched-forced scoring.
@@ -205,8 +206,10 @@ def _rollout_natural_or_forced(
         assert prefill_ids, f"empty prefill ids for {prefill!r}"
         P, J = len(prefix_ids), len(prefill_ids)
 
-        # Per-sample natural-emission window detection for THIS slot's prefill.
-        windows: list[tuple[int, int] | None] = [
+        # Per-sample natural-emission window detection for THIS slot's prefill. force_only skips it
+        # (always read the forced slot): a short prefill like the ordinal "(" matches by chance
+        # anywhere in the think trace, which would read logits mid-think instead of at the answer slot.
+        windows: list[tuple[int, int] | None] = [None] * B if force_only else [
             _find_natural_prefill_window(phase1_ids[i, prompt_len:], prefill, tok, pad_id)
             for i in range(B)
         ]
