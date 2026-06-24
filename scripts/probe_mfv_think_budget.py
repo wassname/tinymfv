@@ -30,6 +30,9 @@ def main() -> None:
     ap.add_argument("--model", default="Qwen/Qwen3.5-4B")
     ap.add_argument("--budgets", type=int, nargs="*", default=[8, 16, 64, 256])
     ap.add_argument("--batch-size", type=int, default=16)
+    ap.add_argument("--n-samples", type=int, default=1,
+                    help="BMA over N stochastic think traces (needs temperature>0 to differ)")
+    ap.add_argument("--temperature", type=float, default=0.0)
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args()
 
@@ -43,10 +46,12 @@ def main() -> None:
     logger.info(f"SHOULD: pmass climbs as the budget shrinks (fewer </think> closes -> "
                 f"fewer case-(c) collapses). If pmass stays ~0.17 even at budget=8, the bug "
                 f"is NOT just case (c) and needs the code fix, not a config change.")
+    logger.info(f"n_samples={args.n_samples} temperature={args.temperature}")
     logger.info("budget  pmass   top1   emitted_close")
     for b in args.budgets:
         rep = evaluate(model, tok, name="classic", max_think_tokens=b,
-                       batch_size=args.batch_size, verbose=0)
+                       batch_size=args.batch_size, verbose=0,
+                       n_samples=args.n_samples, temperature=args.temperature)
         logger.info(f"{b:>6}  {rep['mean_pmass_allowed']:.3f}  {rep['top1_acc']:.3f}")
 
 
