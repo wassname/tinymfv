@@ -176,7 +176,7 @@ def draw_steer(ax, xs: float, cs: list[float], yv: np.ndarray, base_y: float,
         for c, y in zip(cs, yv):
             if c == 0 or c == cs[0] or c == cs[-1]:                     # base drawn above; poles = head only
                 continue
-            ax.plot(xs + (dx if c > 0 else -dx), float(y), "o", ms=ms * 0.85, zorder=7,
+            ax.plot(xs + (dx if c > 0 else -dx), float(y), "o", ms=ms * 0.6, zorder=7,
                     color=POS_COL if c > 0 else NEG_COL)
     for pole_y, col, xo in [(float(yv[-1]), POS_COL, xs + dx), (float(yv[0]), NEG_COL, xs - dx)]:
         if abs(pole_y - base_y) > 1e-9:
@@ -217,7 +217,7 @@ def draw_range_panel(ax, instr: Instrument, dims: list[str], cs: list[float], pr
         yv = np.array([prof[c][i] for c in cs])
         ys += yv.tolist()
         base_y = float(yv[list(cs).index(0.0)])
-        draw_steer(ax, xs, cs, yv, base_y, dots=False)             # main range: arms only, no step dots
+        draw_steer(ax, xs, cs, yv, base_y, dots=True)              # joint dots at c=+-1,+-2 (poles = head only)
         if i == label_i:
             # Only the two pole labels, to the RIGHT of the steer column. No 'base' tag: the black dot
             # between the two coloured arms is self-evidently the unsteered model, and on a near-collapsed
