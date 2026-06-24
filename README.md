@@ -4,21 +4,22 @@ Map a language model's moral and value profile against human cultures, and measu
 intervention (weight steering, a prompt, a fine-tune) moves it. One answer-token logprob reader
 runs many questionnaires; the default is the Clifford moral-foundation vignettes (MFV).
 
-![LLM vs 19 human societies on the moral-foundations map](docs/img/map_pca_ipsative.png)
+![LLM vs 19 human societies on the moral-foundations map](docs/img/showcase/mfq2/map_pca_ipsative.png)
 
 The map places 19 human societies (grey, MFQ-2 means from Atari et al. 2023) and a local model
 (baseline plus steered poles) on the same relative-emphasis axes. The question the repo is built
 around: where does a model land relative to human cultures, and can we steer it across that space.
 
-![Steered MFQ-2 profile range per steering vector vs the human envelope](docs/img/range_mfq2.png)
+![Steered MFQ-2 profile range vs the human envelope](docs/img/showcase/mfq2/range.png)
 
-The range plot is the second view: each steering vector's c-sweep (blue = negative pole, red =
-positive) over the grey human cross-cultural band, per foundation. It answers "does any steer push
-a foundation outside the human range" at a glance.
+The range plot is the second view: the steer's c-sweep (blue = negative pole, red = positive) over
+the grey human cross-cultural band, per foundation. It answers "does any steer push a foundation
+outside the human range" at a glance.
 
 These two are the engine's whole output surface, produced by exactly two plotting functions
-(`plot_ipsative_pca` and `plot_range`). The images above are example outputs (MFQ-2, regenerated
-each run; the maps move into this repo from the steering experiment). Output paths:
+(`plot_ipsative_pca` and `plot_range`). The images above are real outputs from the Qwen3.5-4B
+showcase run below (regenerated each run; the maps move into this repo from the steering experiment).
+Output paths:
 
 ```
 figures/<instrument>/map.{png,svg}             # ipsative PCA culture map (all vectors on one map)
