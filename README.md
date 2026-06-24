@@ -192,10 +192,12 @@ An earlier build reported 82.6% on the same model. That number used the old read
 first token of each foundation *word*; the canonical eval now scores the option *index digit* instead,
 deliberately, because the words tokenize into uneven first pieces (`fair`, `loy`, `san`) whose unequal
 priors leaked into the softmax (see `guided.py`). The digit readout is less biased but reads ~5 points
-lower top-1. Three independent levers fail to recover the gap: think budget (0.72 at 64, 0.77 at 256,
-512 collapses), BMA over 8 stochastic thinks (0.72), and model scale (Qwen3-8B also reads exactly
-0.773). So 0.773 is the ceiling of the debiased eval, not a model or config shortfall; the 82.6% is a
-method artifact of the old word readout, not a regression to chase.
+lower top-1. No lever in the current code recovers the 82.6%: think budget (0.72 at 64, 0.77 at 256,
+512 collapses), BMA over 8 stochastic thinks (0.72), model scale (Qwen3-8B also 0.773), and even
+reinstating the old word-first-token gather (0.788, `scripts/probe_word_readout.py`). So the 82.6%
+came from the broader 2026-05-08 eval pipeline, not the readout alone, and the current rigorous eval
+tops out around 0.77-0.79. 0.773 is the canonical (digit) number; the gap to 0.826 is a superseded
+pipeline, not a model or config shortfall.
 
 Sensitivity to steering: a small calibrated vector registers as a shift in `Δ log p[f]`. On the
 Qwen3-4B showcase the base MFV readout is coherent (`emitted_close` 4/264, `pmass` >= 0.985, top-1
