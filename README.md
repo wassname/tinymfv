@@ -195,6 +195,13 @@ violations across foundations (Care +0.65 nats) while lowering Social Norms (the
 -0.24); `-C` does the opposite (Care -0.31, Social Norms +1.52). Both poles stay coherent. The MFV
 figure below shows the two arms moving apart.
 
+The readout earns the steer through its think budget: the survey reader generates the think tokens,
+the activation steer accrues over them, then the answer slot is read. So the same vector moves the
+profile more when given more think. On MFQ-2 the mean per-foundation `|steer delta|` grows with the
+budget, 0.068 (1 think token) -> 0.149 (64) -> 0.319 (128) -> 0.682 (256), with `pmass` staying >= 0.95.
+(Past ~512 the model closes `</think>` on its own and the readout collapses, so the budget has a
+coherent ceiling.)
+
 ## One vector across every instrument
 
 The same calibrated Authority/Care vector, administered through every instrument tinymfv supports
