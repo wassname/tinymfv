@@ -125,9 +125,13 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float) 
         respondents, haze = T.maps.respondent_profiles(dims, instr.scale_max), None
     else:
         respondents, haze = None, human_haze(instr)
-    # trajectory overlay only when the run swept more than the 3-point base/+-C (else the arrows suffice)
-    traj = {c: _frac(prof_c[c], instr.scale_max) for c in cs} if len(cs) > 3 else None
-    traj_inco = {c for c, pm in pmass.items() if pm < 0.9} if traj else None
+    # trajectory overlay only when the run swept more than the 3-point base/+-C (else the arrows suffice).
+    # Coherence gate is RELATIVE: keep a c only if its pmass stays within 95% of the base (c=0) pmass;
+    # below that the readout has degraded enough that the profile is not comparable, so drop it entirely.
+    base_pm = pmass[0.0]
+    coh_cs = [c for c in cs if pmass[c] >= 0.95 * base_pm]
+    traj = {c: _frac(prof_c[c], instr.scale_max) for c in coh_cs} if len(coh_cs) > 3 else None
+    traj_inco = None  # excluded (not drawn hollow) per the 95%-of-base coherence gate
     figm = T.maps.plot_ipsative_pca(instr, dims, countries, Mfrac,
                                     _frac(base, instr.scale_max), _frac(pos, instr.scale_max),
                                     _frac(neg, instr.scale_max), respondents=respondents, haze=haze,
@@ -138,7 +142,7 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float) 
     # SPLOM only for mfq2: real per-respondent joint (others ship independent-marginal haze, whose
     # off-diagonals would fabricate the correlation structure). Full + AI-zoom (macro + micro).
     if name == "mfq2":
-        proffrac = {c: _frac(prof_c[c], instr.scale_max) for c in cs}
+        proffrac = {c: _frac(prof_c[c], instr.scale_max) for c in coh_cs}
         for zoom, tag in [(False, "splom"), (True, "splom_zoom")]:
             figs = T.maps.plot_splom(instr, dims, respondents, Mfrac, _frac(base, instr.scale_max),
                                      proffrac, zoom=zoom, vec_label=vec_label)
@@ -262,7 +266,7 @@ def main() -> None:
     summary = json.loads((args.run_dir / "summary.json").read_text())
     C = float(summary["calibrated_C"])
     method = summary["method"]
-    vec_label = f"{method} (Authority/Care axis)"
+    vec_label = summary.get("vec_label", f"{method} (Authority/Care axis)")
     args.out.mkdir(parents=True, exist_ok=True)
 
     written: list[str] = []
