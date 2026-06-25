@@ -112,10 +112,13 @@ def canonicalize_to_forward(p: np.ndarray, frame: str, kind: Kind) -> np.ndarray
 def per_item_categorical(per_row: list[dict], kind: Kind) -> dict[str, dict]:
     """Collapse (item, frame) rows to one forward-orientation categorical per item id.
 
-    Each row has: id, frame, p (renormalized over answer_space, sums to 1), pmass_allowed,
-    dimension, sign, human_label. Returns {id: {p, pmass, dimension, sign, human_label, n_frames,
-    frame_spread}} where p is the mean of canonicalized frame distributions and frame_spread is
-    the max L1 gap between any two canonical frames (the acquiescence/negation diagnostic).
+    Each row has: id, frame, lp (raw logprobs at the M tokens), p (renormalized over answer_space),
+    pmass_allowed, dimension, sign, human_label. Returns {id: {lp, p, pmass, dimension, sign,
+    human_label, n_frames, frame_spread}} where p is the mean of canonicalized frame probability
+    vectors (kept for E + the human-comparison maps, preserving the NaN-at-collapse signal), lp is
+    the mean of canonicalized frame logprobs (the log-space primitive for the contrast C + log-odds;
+    averaging in log space is exact for the linear contrast), and frame_spread is the max L1 gap
+    between any two canonical probability frames (the acquiescence/negation diagnostic).
     """
     by_id: dict[str, list[dict]] = defaultdict(list)
     for r in per_row:
@@ -134,11 +137,13 @@ def per_item_categorical(per_row: list[dict], kind: Kind) -> dict[str, dict]:
         assert len({r.get("sign", 1) for r in rows}) == 1, f"{iid}: inconsistent sign across frames"
         assert len({r["frame"] for r in rows}) == len(rows), f"{iid}: duplicate frame in rows"
         canon = [canonicalize_to_forward(r["p"], r["frame"], kind) for r in rows]
+        canon_lp = [canonicalize_to_forward(r["lp"], r["frame"], kind) for r in rows]
         C = np.stack(canon)
         spread = float(max((np.abs(C[i] - C[j]).sum()
                             for i in range(len(C)) for j in range(i + 1, len(C))), default=0.0))
         r0 = rows[0]
         out[iid] = {
+            "lp": np.stack(canon_lp).mean(axis=0),
             "p": C.mean(axis=0),
             "pmass": float(np.mean([r["pmass_allowed"] for r in rows])),
             "dimension": r0.get("dimension"),

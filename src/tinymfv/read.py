@@ -84,7 +84,7 @@ def read_items(model, tok, instr: Instrument, items: list[InstrItem], answer_ids
         # frame debias is downstream in canonicalize_to_forward). force_only: the "(" prefill is too
         # short for natural-emission detection (matches by chance in the think trace), so always read
         # the forced answer slot. n_samples=1, temperature=0 -> deterministic.
-        _thinks, slots = _rollout_natural_or_forced(
+        thinks, slots = _rollout_natural_or_forced(
             model, tok, user_prompts,
             schema_hint="", max_think_tokens=max_think_tokens,
             scoring_slots=[("Just answer", instr.prefill)],
@@ -94,8 +94,12 @@ def read_items(model, tok, instr: Instrument, items: list[InstrItem], answer_ids
         )
         for j, it in enumerate(chunk):
             slot = slots[j][0]
-            # lp_gather[k] is the full-vocab log_softmax logprob of answer token k at the answer slot.
-            p_a = np.exp(np.asarray(slot["lp_gather"], dtype=float))   # [A] prob on each answer token
+            # lp = lp_gather: the full-vocab log_softmax logprob of each answer token at the answer
+            # slot. This is the RAW PRIMITIVE -- every readout (E, the logit contrast C, log-odds,
+            # entropy) is a pure function of it, and a steer effect is just a difference of lp. Keep
+            # it; do not throw it away by collapsing to a single number here.
+            lp = np.asarray(slot["lp_gather"], dtype=float)            # [A] raw logprobs (full-vocab norm)
+            p_a = np.exp(lp)                                           # [A] prob on each answer token
             pmass = float(slot["pmass_allowed"])                       # mass on allowed tokens (coherence)
             # Renormalize within allowed. INTENTIONALLY NOT NaN-guarded: at full coherence collapse
             # pmass -> 0 so p_norm -> NaN and poisons that item's factor. That is the honest signal, a
@@ -103,12 +107,15 @@ def read_items(model, tok, instr: Instrument, items: list[InstrItem], answer_ids
             # of 10 != the mean of 130), so it must not be silently turned into a comparable-looking
             # number. NaN marks "do not compare". Do not "fix" this with a softmax/eps fallback.
             p_norm = p_a / p_a.sum()                                   # [A] within allowed (NaN at collapse, by design)
+            think_text, n_think, emitted_close = thinks[j]
             out.append({
                 "id": it.id, "frame": it.frame,
+                "lp": lp,                                              # raw logprobs at the M scale tokens
                 "p": p_norm,
                 "pmass_allowed": pmass,
                 "dimension": it.dimension, "sign": it.sign,
                 "human_label": it.human_label,
+                "think": think_text, "n_think": n_think, "emitted_close": emitted_close,
             })
         if verbose_first and i == 0:
             slot0 = slots[0][0]

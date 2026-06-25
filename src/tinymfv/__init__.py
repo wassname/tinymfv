@@ -26,6 +26,7 @@ from .guided import guided_rollout_forced_choice, _DEFAULT_FORCED_FOUNDATIONS
 from .instrument import Instrument, InstrItem, per_item_categorical
 from .instruments import get as get_instrument, INSTRUMENTS, build_instrument
 from .read import read_items, resolve_answer_ids, build_user_content
+from .readouts import expected_score, logit_contrast, agree_logodds, entropy
 from .administer import administer
 
 
@@ -44,6 +45,8 @@ def __getattr__(name: str):
 __all__ = [
     # entrypoints
     "evaluate", "administer", "get_instrument", "read_items",
+    # ordinal readouts (pure functions of the raw answer-token logprobs)
+    "expected_score", "logit_contrast", "agree_logodds", "entropy",
     # types consumers build / subset
     "Instrument", "InstrItem",
     # data API
