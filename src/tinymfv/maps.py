@@ -118,16 +118,49 @@ def compass(ax_main, L: np.ndarray, labels: list[str], title: str = "compass",
     cax = ax_main.inset_axes(list(box))
     cax.patch.set_alpha(0.0)
     cax.add_patch(plt.Circle((0, 0), circle_r, fill=False, color="#bbbbbb", lw=0.7))
+    tx, ty, tips_x, tips_y = [], [], [], []
     for j, lab in enumerate(labels):
         x, y = L[j]
         cax.annotate("", xy=(x, y), xytext=(0, 0), arrowprops=dict(arrowstyle="->", color=color, lw=1.1))
         r = np.hypot(x, y)
-        cax.text(x / r * (r + 0.07), y / r * (r + 0.07), lab.capitalize(), fontsize=8,
-                 fontweight="bold", color=color, ha="left" if x >= 0 else "right",
-                 va="bottom" if y >= 0 else "top", clip_on=False)
+        tx.append(x / r * (r + 0.07)); ty.append(y / r * (r + 0.07)); tips_x.append(x); tips_y.append(y)
     cax.set_xlim(-1.5, 1.5); cax.set_ylim(-1.5, 1.5)
+    placed = False
+    try:                                                       # textalloc spreads colliding tip labels
+        import textalloc as ta
+        ta.allocate_text(ax_main.figure, cax, tx, ty, [l.capitalize() for l in labels],
+                         x_scatter=tips_x + [0], y_scatter=tips_y + [0], textsize=7.5,
+                         linecolor=color, linewidth=0.5, textcolor=color, draw_lines=True)
+        placed = True
+    except Exception:
+        placed = False
+    if not placed:
+        for j, lab in enumerate(labels):
+            x, y = L[j]; r = np.hypot(x, y)
+            cax.text(x / r * (r + 0.07), y / r * (r + 0.07), lab.capitalize(), fontsize=7.5,
+                     fontweight="bold", color=color, ha="left" if x >= 0 else "right",
+                     va="bottom" if y >= 0 else "top", clip_on=False)
     cax.set_aspect("equal"); cax.axis("off")
     cax.set_title(title, fontsize=10, fontweight="bold", color=color, pad=3)
+
+
+def _minimap(ax_main, cloud_full: np.ndarray, societies: np.ndarray, base_pt, view, box) -> None:
+    """Macro overview inset: the FULL human cloud + all societies + the model base, with a red
+    rectangle marking the zoomed main frame -- so a tightly-cropped map still shows where its
+    window sits in the whole space (and any off-frame society stays visible here)."""
+    from matplotlib.patches import Rectangle
+    xlo, xhi, ylo, yhi = view
+    mm = ax_main.inset_axes(list(box))
+    mm.scatter(cloud_full[:, 0], cloud_full[:, 1], s=2, c="#8f8a7e", alpha=0.12,
+               edgecolors="none", rasterized=True, zorder=1)
+    mm.scatter(societies[:, 0], societies[:, 1], s=5, c=C_HUM, alpha=0.8, edgecolors="none", zorder=2)
+    if base_pt is not None:
+        mm.plot(base_pt[0], base_pt[1], "o", ms=3, color=C_BASE, zorder=3)
+    mm.add_patch(Rectangle((xlo, ylo), xhi - xlo, yhi - ylo, fill=False, ec=POS_COL, lw=1.0, zorder=4))
+    mm.set_xticks([]); mm.set_yticks([])
+    mm.set_title("full space", fontsize=6.5, color="0.4", pad=2)
+    for s in mm.spines.values():
+        s.set_color("0.7"); s.set_linewidth(0.5)
 
 
 def _axis_gloss(load1: np.ndarray, dims: list[str], n: int = 2) -> str:
@@ -232,34 +265,152 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
             ax.annotate(f"c={cend:+.0f}", pend, xytext=(4, 4), textcoords="offset points",
                         fontsize=7, color=POS_COL if cend > 0 else NEG_COL, zorder=8,
                         bbox=dict(boxstyle="round,pad=0.1", fc="#faf8f2", ec="none", alpha=0.7))
+    # The synthetic haze (big5/16pf/humor: independent-marginal resample) is far wider than the
+    # societies, so cropping to its 2-98 pct buries the societies + steer in a tiny central blob.
+    # There we zoom to the SOCIETIES + steer anchors (the haze still scatters but clips) and add a
+    # minimap showing where that frame sits in the full human cloud. mfq2's cloud is real
+    # per-respondent spread (well-conditioned), so it stays the crop reference.
+    synthetic = haze is not None and respondents is None
     if cloud is not None:
-        # crop to the human-cloud core (2-98 pct) unioned with every anchor, so societies +
-        # poles fill the frame instead of being buried in one corner of the full cloud.
         anc_extra = [traj_pts] if traj_pts is not None else []
         anc = np.vstack([P] + [p for p in (pb, ph, pf) if p is not None] + anc_extra)
-        cx, cy = np.percentile(Pi[:, 0], [2, 98]), np.percentile(Pi[:, 1], [2, 98])
-        wx0, wx1 = min(cx[0], anc[:, 0].min()), max(cx[1], anc[:, 0].max())
-        wy0, wy1 = min(cy[0], anc[:, 1].min()), max(cy[1], anc[:, 1].max())
+        ref = P if synthetic else Pi
+        cx, cy = np.percentile(ref[:, 0], [2, 98]), np.percentile(ref[:, 1], [2, 98])
+        wx0, wx1 = min(cx[0], np.nanmin(anc[:, 0])), max(cx[1], np.nanmax(anc[:, 0]))
+        wy0, wy1 = min(cy[0], np.nanmin(anc[:, 1])), max(cy[1], np.nanmax(anc[:, 1]))
         sx, sy = wx1 - wx0, wy1 - wy0
         ax.set_xlim(wx0 - 0.05 * sx, wx1 + 0.05 * sx + pad[0] * sx)   # right/top headroom for compass inset
         ax.set_ylim(wy0 - 0.05 * sy, wy1 + 0.05 * sy + pad[1] * sy)
     else:
         x0, x1 = ax.get_xlim(); y0, y1 = ax.get_ylim()  # modest top-right headroom for the compass inset
         ax.set_xlim(x0, x1 + pad[0] * (x1 - x0)); ax.set_ylim(y0, y1 + pad[1] * (y1 - y0))
-    # compass last, in the least-crowded corner: the +c trajectory often heads toward the same
+    # compass + minimap in the least-crowded corners: the +c trajectory often heads toward the same
     # loading the compass shows (e.g. +authority), so a fixed top-right box collides with it.
     xlo, xhi = ax.get_xlim(); ylo, yhi = ax.get_ylim()
     allpts = np.vstack([P] + [p for p in (pb, ph, pf) if p is not None]
                        + ([traj_pts] if traj_pts is not None else []))
     fx = (allpts[:, 0] - xlo) / (xhi - xlo); fy = (allpts[:, 1] - ylo) / (yhi - ylo)
-    corners = {"TR": (0.62, 0.70), "TL": (0.04, 0.70), "BR": (0.62, 0.03), "BL": (0.04, 0.03)}
-    def crowd(bx, by):
+    corners = {"TR": (0.62, 0.70), "TL": (0.04, 0.70), "BR": (0.62, 0.04), "BL": (0.04, 0.04)}
+    def crowd(name):
+        bx, by = corners[name]
         return int(((fx >= bx) & (fx <= bx + 0.30) & (fy >= by) & (fy <= by + 0.27)).sum())
-    bx, by = min(corners.values(), key=lambda b: crowd(*b))
-    compass(ax, Vt[:2].T, dims, title=f"{instr.display} compass", box=(bx, by, 0.30, 0.27))
+    ranked = sorted(corners, key=crowd)
+    want_minimap = synthetic and cloud is not None
+    comp_corner = ranked[1] if want_minimap else ranked[0]
+    if want_minimap:
+        mb = corners[ranked[0]]
+        _minimap(ax, Pi, P, pb, (xlo, xhi, ylo, yhi), box=(mb[0], mb[1], 0.26, 0.26))
+    cb = corners[comp_corner]
+    compass(ax, Vt[:2].T, dims, title=f"{instr.display} compass", box=(cb[0], cb[1], 0.30, 0.27))
     ax.set_xlabel(f"PC1 ({var[0]*100:.0f}% var) · {_axis_gloss(Vt[0], dims)}")
     ax.set_ylabel(f"PC2 ({var[1]*100:.0f}% var) · {_axis_gloss(Vt[1], dims)}")
     ax.set_title(f"{instr.name}: ipsative culture map ({len(countries)} societies)", fontsize=10)
+    return fig
+
+
+# --- foundation scatter-plot matrix (SPLOM) -----------------------------------------------------
+
+def plot_splom(instr: Instrument, dims: list[str], cloud: np.ndarray, M: np.ndarray,
+               base: np.ndarray, prof_by_c: dict[float, np.ndarray], *,
+               select: int | None = None, zoom: bool = False, vec_label: str = ""):
+    """Scatter-plot matrix of the foundations: the ipsative map's 2-PC projection seen pair by pair,
+    so the steer's path is read in each raw foundation-plane, not just the top-2 PCs.
+
+      lower triangle : human joint scatter (REAL covariance) -- respondents recede (light), society
+                       means sit darker, and the AI base -> +-c trajectory dominates (saturated).
+      diagonal       : that foundation's human marginal (hist) with the AI base/+-c as vertical rules.
+      upper triangle : Pearson r as a number sized+coloured by |r| (red +, blue -) -- the correlation
+                       the lower scatter shows, given once as a value rather than a duplicate cloud.
+
+    Foundations are ordered by ipsative PC1 loading so correlated factors sit adjacent (block
+    structure) and the order matches plot_ipsative_pca. `cloud`/`M`/`base`/`prof_by_c` are 0-1
+    fraction; displayed on the native 1..scale_max scale. `select` keeps the N foundations the steer
+    moves most (largest |+c - -c| span); None keeps all. `zoom=True` frames each axis to the AI
+    trajectory +-margin (micro: the small steer move); False frames to the human 2-98 pct (macro:
+    AI vs the whole human spread). mfq2 ONLY -- the other instruments ship an independent-marginal
+    haze (no real joint), so their off-diagonals would FABRICATE the correlation structure."""
+    cs = sorted(prof_by_c)
+    K = len(dims)
+    _, Vt, *_ = ipsative_pca(cloud if cloud is not None else M)
+    order = list(np.argsort(Vt[0])[::-1])                      # high +PC1 first (matches the map axis)
+    if select is not None and select < K:
+        span = np.abs(prof_by_c[cs[-1]] - prof_by_c[cs[0]])
+        keep = set(np.argsort(span)[::-1][:select].tolist())
+        order = [i for i in order if i in keep]
+    n = len(order)
+    smax = instr.scale_max
+    nat = lambda fr: 1.0 + np.asarray(fr) * (smax - 1)
+    cloud_n, M_n = nat(cloud), nat(M)
+    prof_n = {c: nat(prof_by_c[c]) for c in cs}
+
+    # per-foundation display range (shared down each col / across each row)
+    # NaN-safe: a collapsed pole reads NaN ("do not compare"); nan-reduce the trajectory and fall
+    # back to the human spread when a foundation's whole steer arm collapsed.
+    rng: dict[int, tuple[float, float]] = {}
+    for f in order:
+        tv = np.array([prof_n[c][f] for c in cs])
+        tlo, thi = (np.nanmin(tv), np.nanmax(tv)) if np.isfinite(tv).any() else (np.nan, np.nan)
+        hlo, hhi = np.percentile(cloud_n[:, f], [2, 98])
+        if zoom and np.isfinite(tlo):
+            lo, hi = tlo, thi
+            m = max(0.20 * (hi - lo), 0.06 * (smax - 1))
+        else:
+            lo = np.nanmin([hlo, tlo]); hi = np.nanmax([hhi, thi])
+            m = 0.04 * (hi - lo)
+        rng[f] = (lo - m, hi + m)
+
+    fig, axes = plt.subplots(n, n, figsize=(1.55 * n + 0.6, 1.55 * n + 0.6), squeeze=False)
+    rngen = np.random.default_rng(0)
+    for r in range(n):
+        fr = order[r]
+        for c in range(n):
+            fc = order[c]
+            ax = axes[r][c]
+            ax.tick_params(labelsize=6, length=2)
+            if r == c:                                          # marginal + AI rules
+                ax.hist(cloud_n[:, fr], bins=22, range=rng[fr], color=CLOUD_GREY,
+                        alpha=0.55, edgecolor="none")
+                for cc in cs:
+                    if not np.isfinite(prof_n[cc][fr]):
+                        continue
+                    col = "black" if cc == 0 else (POS_COL if cc > 0 else NEG_COL)
+                    ax.axvline(prof_n[cc][fr], color=col, lw=(1.6 if cc == 0 else 0.9), zorder=5)
+                ax.set_xlim(*rng[fr]); ax.set_yticks([])
+                ax.text(0.5, 0.86, dims[fr], transform=ax.transAxes, ha="center", va="top",
+                        fontsize=7.5, fontweight="bold", color="0.25")
+            elif r > c:                                         # joint scatter + trajectory
+                ax.scatter(cloud_n[:, fc], cloud_n[:, fr], s=3, color=CLOUD_GREY, alpha=0.10,
+                           edgecolors="none", zorder=1, rasterized=True)
+                ax.scatter(M_n[:, fc], M_n[:, fr], s=9, color=COUNTRY_GREY, alpha=0.75,
+                           edgecolors="none", zorder=2)
+                px = [prof_n[cc][fc] for cc in cs]; py = [prof_n[cc][fr] for cc in cs]
+                ax.plot(px, py, "-", color="0.5", lw=0.7, zorder=4)
+                cmax = max(abs(cc) for cc in cs) or 1.0
+                for cc in cs:
+                    col = "black" if cc == 0 else (POS_COL if cc > 0 else NEG_COL)
+                    ax.scatter(prof_n[cc][fc], prof_n[cc][fr], s=(34 if cc == 0 else 14 + 18 * abs(cc) / cmax),
+                               color=col, edgecolors="white", linewidths=0.4, zorder=6)
+                ax.set_xlim(*rng[fc]); ax.set_ylim(*rng[fr])
+            else:                                               # upper: correlation as a value
+                rp = float(np.corrcoef(cloud_n[:, fc], cloud_n[:, fr])[0, 1])
+                ax.text(0.5, 0.5, f"{rp:+.2f}", transform=ax.transAxes, ha="center", va="center",
+                        fontsize=7 + 11 * abs(rp), color=POS_COL if rp > 0 else NEG_COL)
+                ax.set_xticks([]); ax.set_yticks([])
+                ax.spines[:].set_visible(False)
+            if r != c:
+                ax.spines[["top", "right"]].set_visible(False)
+            if c != 0 or r == 0:
+                ax.set_yticklabels([])
+            if r != n - 1:
+                ax.set_xticklabels([])
+            if r == n - 1:
+                ax.set_xlabel(dims[fc], fontsize=7)
+            if c == 0 and r != 0:
+                ax.set_ylabel(dims[fr], fontsize=7)
+    scope = "zoomed to AI steer +-margin" if zoom else "full human range (2-98 pct)"
+    fig.suptitle(f"{instr.display} foundation pairs: human joint (grey) vs AI base->steer ({vec_label})\n"
+                 f"lower=scatter, diag=marginal, upper=Pearson r · {scope}", fontsize=9)
+    fig.tight_layout(rect=(0, 0, 1, 0.97))
     return fig
 
 

@@ -135,6 +135,16 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float) 
     paths = [T.maps.save_both(figm, out / name, "map_pca_ipsative")]
     plt.close(figm)
 
+    # SPLOM only for mfq2: real per-respondent joint (others ship independent-marginal haze, whose
+    # off-diagonals would fabricate the correlation structure). Full + AI-zoom (macro + micro).
+    if name == "mfq2":
+        proffrac = {c: _frac(prof_c[c], instr.scale_max) for c in cs}
+        for zoom, tag in [(False, "splom"), (True, "splom_zoom")]:
+            figs = T.maps.plot_splom(instr, dims, respondents, Mfrac, _frac(base, instr.scale_max),
+                                     proffrac, zoom=zoom, vec_label=vec_label)
+            paths.append(T.maps.save_both(figs, out / name, tag))
+            plt.close(figs)
+
     figr = T.maps.plot_range(instr, dims, cs, prof, humans, None, vec_label)
     paths.append(T.maps.save_both(figr, out / name, "range"))
     plt.close(figr)
