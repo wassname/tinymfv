@@ -116,7 +116,7 @@ def compass(ax_main, L: np.ndarray, labels: list[str], title: str = "compass",
     L = L / (lens.max() + 1e-9)
     circle_r = 0.8 * lens.min() / lens.max()
     cax = ax_main.inset_axes(list(box))
-    cax.patch.set_alpha(0.0)
+    cax.patch.set_facecolor("#faf8f2"); cax.patch.set_alpha(0.92)   # opaque: sits in the padded legend strip
     cax.add_patch(plt.Circle((0, 0), circle_r, fill=False, color="#bbbbbb", lw=0.7))
     tx, ty, tips_x, tips_y = [], [], [], []
     for j, lab in enumerate(labels):
@@ -152,6 +152,7 @@ def _minimap(ax_main, cloud_full: np.ndarray, societies: np.ndarray, base_pt, vi
     from matplotlib.patches import Rectangle
     xlo, xhi, ylo, yhi = view
     mm = ax_main.inset_axes(list(box))
+    mm.set_facecolor("#faf8f2")                        # opaque: sits in the padded legend strip
     mm.scatter(cloud_full[:, 0], cloud_full[:, 1], s=2, c="#8f8a7e", alpha=0.12,
                edgecolors="none", rasterized=True, zorder=1)
     mm.scatter(societies[:, 0], societies[:, 1], s=5, c=C_HUM, alpha=0.8, edgecolors="none", zorder=2)
@@ -177,7 +178,7 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
                       base: np.ndarray, pos: np.ndarray | None, neg: np.ndarray | None,
                       *, respondents: np.ndarray | None = None, haze: np.ndarray | None = None,
                       traj: dict[float, np.ndarray] | None = None, traj_incoherent: set | None = None,
-                      boots: dict | None = None, pad=(0.18, 0.16),
+                      boots: dict | None = None,
                       labels: tuple[str, str, str] = ("baseline (c=0)", "honest (c=+2)", "dishonest (c=-2)")):
     """Ipsative culture map. M is societies x K (0-1 fraction); base / pos / neg are the length-K
     fraction vectors for the base model and its two steer poles (or None). `labels` is the legend
@@ -221,7 +222,6 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
     placed_boxes = []
-    soc_labels = []                                    # kept artists, pruned later if under compass/minimap
     for i in np.argsort(P[:, 0]):                      # left-to-right; leftmost wins contested space
         t = ax.annotate(countries[i], (P[i, 0], P[i, 1]), fontsize=7, color="#555555",
                         xytext=(3, 2), textcoords="offset points", zorder=6)
@@ -229,7 +229,7 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
         if any(bb.overlaps(b) for b in placed_boxes):
             t.remove()
         else:
-            placed_boxes.append(bb); soc_labels.append(t)
+            placed_boxes.append(bb)
     for key, col, pt in [("base", C_BASE, pb), ("honest", C_HON, ph), ("dis", C_DIS, pf)]:
         if boots and key in boots and pt is not None:
             bp = (np.asarray(boots[key]) @ Pc - mu) @ Vt[:2].T
@@ -271,11 +271,11 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
             ax.annotate(f"c={cend:+.0f}", pend, xytext=(4, 4), textcoords="offset points",
                         fontsize=7, color=POS_COL if cend > 0 else NEG_COL, zorder=8,
                         bbox=dict(boxstyle="round,pad=0.1", fc="#faf8f2", ec="none", alpha=0.7))
-    # Crop to the SOCIETIES + steer anchors for EVERY instrument. The human cloud (mfq2's real
-    # per-respondent spread, or big5/16pf/humor's independent-marginal resample) is far wider than the
-    # societies, so letting it set the frame buries the societies + steer in a tiny central blob. The
-    # cloud still scatters as a backdrop (clipped at the frame); the minimap below shows where this
-    # tight frame sits in the full cloud, so the macro spread is not lost.
+    # Crop to the SOCIETIES + steer anchors for EVERY instrument (the human cloud is far wider and would
+    # bury them in a central blob; it stays a clipped backdrop). Then PAD THE BOTTOM to reserve a clean
+    # strip for the legend insets -- deterministic placement, identical on every plot, no overlap with
+    # data or labels regardless of where the trajectory heads.
+    PAD_B = 0.52                                          # bottom legend strip = PAD_B of the data y-range
     if cloud is not None:
         anc_extra = [traj_pts] if traj_pts is not None else []
         anc = np.vstack([P] + [p for p in (pb, ph, pf) if p is not None] + anc_extra)
@@ -283,47 +283,17 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
         wx0, wx1 = min(cx[0], np.nanmin(anc[:, 0])), max(cx[1], np.nanmax(anc[:, 0]))
         wy0, wy1 = min(cy[0], np.nanmin(anc[:, 1])), max(cy[1], np.nanmax(anc[:, 1]))
         sx, sy = wx1 - wx0, wy1 - wy0
-        ax.set_xlim(wx0 - 0.05 * sx, wx1 + 0.05 * sx + pad[0] * sx)   # right/top headroom for compass inset
-        ax.set_ylim(wy0 - 0.05 * sy, wy1 + 0.05 * sy + pad[1] * sy)
+        dview = (wx0 - 0.05 * sx, wx1 + 0.05 * sx, wy0 - 0.05 * sy, wy1 + 0.05 * sy)  # data frame, no pad
     else:
-        x0, x1 = ax.get_xlim(); y0, y1 = ax.get_ylim()  # modest top-right headroom for the compass inset
-        ax.set_xlim(x0, x1 + pad[0] * (x1 - x0)); ax.set_ylim(y0, y1 + pad[1] * (y1 - y0))
-    # compass + minimap in the least-crowded corners: the +c trajectory often heads toward the same
-    # loading the compass shows (e.g. +authority), so a fixed top-right box collides with it.
-    xlo, xhi = ax.get_xlim(); ylo, yhi = ax.get_ylim()
-    allpts = np.vstack([P] + [p for p in (pb, ph, pf) if p is not None]
-                       + ([traj_pts] if traj_pts is not None else []))
-    corners = {"TR": (0.62, 0.70), "TL": (0.04, 0.70), "BR": (0.62, 0.04), "BL": (0.04, 0.04)}
-    # crowd score counts data points AND the already-drawn text labels (society codes, steer/trajectory
-    # labels) inside each corner box -- so the compass avoids landing on labels, not only on dots.
-    fig.canvas.draw()
-    rend = fig.canvas.get_renderer()
-    pts_disp = ax.transData.transform(allpts)
-    txt_disp = np.array([((e.x0 + e.x1) / 2, (e.y0 + e.y1) / 2)
-                         for t in ax.texts for e in [t.get_window_extent(rend)]])
-    occ = np.vstack([pts_disp, txt_disp]) if len(txt_disp) else pts_disp
-    def crowd(name):
-        bx, by = corners[name]
-        p0 = ax.transAxes.transform((bx, by)); p1 = ax.transAxes.transform((bx + 0.30, by + 0.27))
-        return int(((occ[:, 0] >= p0[0]) & (occ[:, 0] <= p1[0]) &
-                    (occ[:, 1] >= p0[1]) & (occ[:, 1] <= p1[1])).sum())
-    ranked = sorted(corners, key=crowd)
-    want_minimap = cloud is not None
-    comp_corner = ranked[1] if want_minimap else ranked[0]
-    if want_minimap:
-        mb = corners[ranked[0]]
-        _minimap(ax, Pi, P, pb, (xlo, xhi, ylo, yhi), box=(mb[0], mb[1], 0.26, 0.26))
-    cb = corners[comp_corner]
-    compass(ax, Vt[:2].T, dims, title=f"{instr.display} compass", box=(cb[0], cb[1], 0.30, 0.27))
-    # final guard: drop any society label still sitting under the compass (or minimap) inset box, so the
-    # legend never overlaps a code. Labels are lower-priority than the legend -> omit, don't relocate.
-    reserved = [(cb[0], cb[1], 0.30, 0.27)] + ([(mb[0], mb[1], 0.26, 0.26)] if want_minimap else [])
-    boxes_disp = [(ax.transAxes.transform((bx, by)), ax.transAxes.transform((bx + w, by + h)))
-                  for bx, by, w, h in reserved]
-    for t in soc_labels:
-        e = t.get_window_extent(renderer)
-        if any(e.x1 >= p0[0] and e.x0 <= p1[0] and e.y1 >= p0[1] and e.y0 <= p1[1] for p0, p1 in boxes_disp):
-            t.remove()
+        x0, x1 = ax.get_xlim(); y0, y1 = ax.get_ylim()
+        dview = (x0, x1, y0, y1); sy = y1 - y0
+    ax.set_xlim(dview[0], dview[1])
+    ax.set_ylim(dview[2] - PAD_B * sy, dview[3])
+    # legend strip along the padded bottom: minimap bottom-right (it reads like a small map), compass
+    # bottom-left. Both insets are opaque (set in compass()/_minimap) so the faint haze stays behind them.
+    if cloud is not None:
+        _minimap(ax, Pi, P, pb, dview, box=(0.70, 0.015, 0.29, 0.29))
+    compass(ax, Vt[:2].T, dims, title=f"{instr.display} compass", box=(0.0, 0.015, 0.40, 0.29))
     ax.set_xlabel(f"PC1 ({var[0]*100:.0f}% var) · {_axis_gloss(Vt[0], dims)}")
     ax.set_ylabel(f"PC2 ({var[1]*100:.0f}% var) · {_axis_gloss(Vt[1], dims)}")
     ax.set_title(f"{instr.name}: ipsative culture map ({len(countries)} societies)", fontsize=10)
