@@ -273,22 +273,25 @@ def _rollout_natural_or_forced(
                 assert answer_pos < len(step_scores), (
                     f"answer_pos={answer_pos} ≥ len(step_scores)={len(step_scores)}"
                 )
-                # nan_to_num: quantized + adapted forwards occasionally
-                # emit non-finite raw logits at a single generated step;
-                # ±1e4 bound keeps log_softmax stable without changing the
-                # argmax for well-behaved rows.
+                # A non-finite answer-slot logit means the (often steered/quantized) forward
+                # pass blew up here. Do NOT clamp it to a plausible value -- that fabricates a
+                # confident answer from garbage. Mark the row incoherent (pmass=0, lp=NaN), the
+                # same "do not compare" signal as case (c), which the rest of the pipeline
+                # already handles. (Was torch.nan_to_num clamp to +-1e4: silent corruption.)
                 raw = step_scores[answer_pos][i].float()
-                lp_vec = F.log_softmax(
-                    torch.nan_to_num(raw, nan=0.0, posinf=1e4, neginf=-1e4), dim=-1
-                )
+                if not torch.isfinite(raw).all():
+                    slots[i].append({
+                        "pmass_allowed": 0.0,
+                        "nll_json": float("nan"),
+                        "top5_str": "",
+                        "lp_gather": [float("nan")] * len(gather_token_ids),
+                    })
+                    continue
+                lp_vec = F.log_softmax(raw, dim=-1)
                 gen_ids_full = phase1_ids[i, prompt_len:]
                 nat_nll_sum = 0.0
                 for k in range(start_pos, answer_pos):
-                    raw_k = step_scores[k][i].float()
-                    step_lp = F.log_softmax(
-                        torch.nan_to_num(raw_k, nan=0.0, posinf=1e4, neginf=-1e4),
-                        dim=-1,
-                    )
+                    step_lp = F.log_softmax(step_scores[k][i].float(), dim=-1)
                     nat_nll_sum += float(-step_lp[gen_ids_full[k]].item())
                 nll_val = nat_nll_sum / max(1, answer_pos - start_pos)
             elif not emitted_close_i:

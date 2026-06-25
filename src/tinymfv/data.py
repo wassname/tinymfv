@@ -106,13 +106,18 @@ def load_vignettes(name: ConfigName = "classic") -> list[dict]:
         raise ValueError(f"Unknown config {cfg!r}; expected one of {CONFIGS} or 'all'")
 
     by_cond = {c: {r["id"]: r for r in load_condition(cfg, c)} for c in CONDITIONS}
-    common = set.intersection(*[set(d) for d in by_cond.values()])
+    # The two condition files must describe the SAME vignettes. A silent inner-join here would
+    # let a missing rewrite or a bad generation step change N (and therefore every accuracy /
+    # profile number) without failing. Fail loud instead.
+    ids_ov, ids_sv = set(by_cond["other_violate"]), set(by_cond["self_violate"])
+    assert ids_ov == ids_sv, (
+        f"{cfg}: condition files disagree on vignette ids -- "
+        f"only in other_violate: {sorted(ids_ov - ids_sv)[:5]}; "
+        f"only in self_violate: {sorted(ids_sv - ids_ov)[:5]}. Fix the data, do not drop rows.")
     rows = []
     anchor = by_cond["other_violate"]
     _CORE_KEYS = {"id", "foundation", "foundation_coarse", "wrong", "text"}
     for vid, ov in anchor.items():
-        if vid not in common:
-            continue
         row = {
             "id": vid,
             "foundation": ov["foundation"],
