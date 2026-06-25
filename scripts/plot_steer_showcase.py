@@ -90,17 +90,57 @@ def human_strip(instr) -> dict[str, list[tuple[str, float]]]:
     return strip
 
 
-def read_profiles(run_dir: Path, name: str, dims: list[str]) -> tuple[dict[float, np.ndarray], dict[float, float]]:
+def read_profiles(run_dir: Path, name: str, dims: list[str], value_col: str = "mean"
+                  ) -> tuple[dict[float, np.ndarray], dict[float, float]]:
     """({c: profile-vector in factor order}, {c: pmass}) from <name>_profiles.csv. `c` is the signed
-    multiplier of calibrated C (0 = base); a single-multiplier run yields just {-1, 0, +1}."""
+    multiplier of calibrated C (0 = base); a single-multiplier run yields just {-1, 0, +1}.
+    value_col selects the readout: 'mean' = E (human-comparable, for the map/range vs human band);
+    'C' = the rank-centered logit contrast (the steer-legible signal, for the steer-effect plot)."""
     by_c: dict[float, dict[str, float]] = {}
     pmass: dict[float, float] = {}
     with open(run_dir / f"{name}_profiles.csv", newline="") as fh:
         for r in csv.DictReader(fh):
             c = float(r["c"])
-            by_c.setdefault(c, {})[r["foundation"]] = float(r["mean"])
+            by_c.setdefault(c, {})[r["foundation"]] = float(r[value_col])
             pmass[c] = float(r["pmass"])
     return {c: np.array([d[f] for f in dims]) for c, d in by_c.items()}, pmass
+
+
+def plot_ordinal_steer(run_dir: Path, out: Path, name: str, vec_label: str, C: float) -> Path:
+    """The steer-effect plot: per-factor change in the logit contrast C (steered minus base), +C (red)
+    vs -C (blue). This is the ordinal twin of the MFV dlogit dumbbell, and the figure that actually
+    shows what we steered for -- the E range saturates and hides it, the contrast does not. C_sd in the
+    CSV gives a per-factor SE over the 18 items for the error bars (uncertainty, not just the mean)."""
+    instr = get_instrument(name)
+    dims = instr.dimensions
+    cprof, pmass = read_profiles(run_dir, name, dims, value_col="C")
+    sdprof, _ = read_profiles(run_dir, name, dims, value_col="C_sd")
+    cs = sorted(cprof)
+    base = cprof[0.0]
+    pos_c = 1.0 if 1.0 in cprof else max(cs)
+    neg_c = -1.0 if -1.0 in cprof else min(cs)
+    n_items = 18  # mfq2/factor; SE = sd / sqrt(n). (big5/16pf/humor differ but this is a rough band.)
+    dpos, dneg = cprof[pos_c] - base, cprof[neg_c] - base
+    se = sdprof[0.0] / n_items ** 0.5
+    y = np.arange(len(dims))[::-1]
+    fig, ax = plt.subplots(figsize=(6.4, 4.2))
+    ax.axvline(0, color="0.6", lw=0.8, zorder=1)
+    POS, NEG = T.maps.POS_COL, T.maps.NEG_COL
+    for fi, yi in zip(range(len(dims)), y):
+        ax.plot([dneg[fi], dpos[fi]], [yi, yi], color="0.8", lw=1.0, zorder=2)
+        ax.errorbar(dpos[fi], yi, xerr=1.96 * se[fi], fmt="o", color=POS, ms=5, capsize=2, zorder=3)
+        ax.errorbar(dneg[fi], yi, xerr=1.96 * se[fi], fmt="o", color=NEG, ms=5, capsize=2, zorder=3)
+    ax.set_yticks(y); ax.set_yticklabels([d.capitalize() for d in dims])
+    ax.set_xlabel("Delta contrast C vs base  (nats; agree-minus-disagree, rank-weighted)")
+    ax.set_title(f"Steered {instr.display}: {vec_label}", fontsize=11)
+    ax.scatter([], [], color=POS, label=f"+C={C:+.2f}")
+    ax.scatter([], [], color=NEG, label=f"-C={-C:+.2f}")
+    ax.legend(fontsize=8, loc="best")
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout()
+    path = T.maps.save_both(fig, out / name, "foundation_dcontrast")
+    plt.close(fig)
+    return path
 
 
 def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float) -> list[Path]:
@@ -162,6 +202,10 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float) 
     figz = T.maps.plot_range_zoom(instr, dims, coh_cs, prof_coh, humans, vec_label)
     paths.append(T.maps.save_both(figz, out / name, "range_zoom"))
     plt.close(figz)
+
+    # steer-effect plot in the sensitive contrast readout (the E map/range above are for human
+    # comparison; this is "did the steer move it"). Parallels the MFV dlogit dumbbell.
+    paths.append(plot_ordinal_steer(run_dir, out, name, vec_label, C))
     return paths
 
 
