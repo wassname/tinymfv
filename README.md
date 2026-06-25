@@ -38,12 +38,13 @@ label distribution). `evaluate(model, tok, ...)` runs a forced-choice probe per 
 condition) and returns a dict with:
 
 - `profile`: mean `p[foundation]` across vignettes, on the same 7-way simplex as the human profile.
-- `top1_acc`, `mean_js`, `mean_nll_T`: agreement vs the human label (None if the config is unlabeled).
-- `mean_pmass_allowed`: the coherence canary -- mean probability mass on valid answer tokens at the
-  answer slot. It drops when the model refuses, rambles, or format-collapses, so a degenerate
-  intervention is visible independent of which answer it picks.
+- `top1_acc`, `informedness`, `mean_nll_T`: agreement vs the human label (None if the config is unlabeled).
+- `mean_pmass_allowed`: mean full-vocab probability mass on the allowed answer tokens at the answer
+  slot. This is answer-slot format coherence: it drops when the model wants to emit prose, refusal,
+  punctuation, or another out-of-space token, independent of which valid answer is top.
+- `mean_nll_prefill`: mean NLL/token of the forced assistant prefill that leads into the answer slot.
 - `per_row` (with `return_per_row=True`): the per-row 7-vec `p`, raw `score` (nats), `pmass_allowed`,
-  `top1`, `margin`. This is what the steering metrics below consume.
+  `nll_prefill`, `top1`, `margin`. This is what the steering metrics below consume.
 
 To measure a steering intervention, run `evaluate` twice (base vs steered, same vignettes) and diff
 the reports. The steering-lite package wraps this as `evaluate_with_vector(model, tok, vector=v)`,
@@ -83,7 +84,7 @@ more robust: use dlogit for effect size, SI for "did the steer do the intended s
   interventions register in nats before changing an argmax.
 - Position-bias control. Each row is scored twice (options forward and reversed) and the logprob
   vectors averaged, cancelling option-order effects ([Pezeshkpour & Hruschka 2023](https://arxiv.org/abs/2308.11483)).
-- A sliding think budget. `max_think_tokens` (0 / 64 dev default / 4096 / unbounded) is a knob you
+- A sliding think budget. `max_think_tokens` (0 / 64 dev default / 4096 / unbounded) is a setting you
   sweep: steering accrues over the think trace, so the same vector moves the profile more with more
   think, up to the point (~512) where the model closes `</think>` on its own and the readout collapses.
 - Two modes. dev (N=1, greedy, 64 think) is fast and granular, the default. full (N=4 sampled traces
@@ -91,10 +92,13 @@ more robust: use dlogit for effect size, SI for "did the steer do the intended s
 
 ## Instruments
 
-The reader is answer-space-agnostic: it gathers logprobs over a set of answer tokens at a prefilled
-slot (`src/tinymfv/instrument.py`). Forced-choice (nominal, the MFV default) reads a foundation
-choice; Likert (ordinal) reads a 1..M scale point for MFQ-2 / Big-Five / 16PF / humor-styles (spec
-and reducers landed; wiring through `evaluate()` is in progress).
+The reader is answer-space-agnostic: it gathers logprobs over answer tokens at a prefilled slot
+(`src/tinymfv/instrument.py`).
+
+- Nominal instruments, the MFV vignettes, read a foundation category and reduce to mean category
+  probability.
+- Ordinal instruments, MFQ-2 / Big-Five / 16PF / humor-styles, read a 1..M scale point and reduce to
+  keyed expected score `E`, logit contrast `C`, `logodds_agree`, entropy, and `pmass_allowed`.
 
 ## Scope
 

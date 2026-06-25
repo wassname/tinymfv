@@ -42,10 +42,10 @@ _SPECS = {
 }
 
 
-def _load_keying(survey_dir: Path, fallback_ids: list[str]) -> dict[str, int]:
+def _load_keying(survey_dir: Path, default_forward_ids: list[str]) -> dict[str, int]:
     p = survey_dir / "keying.json"
     if not p.exists():
-        return {i: 1 for i in fallback_ids}          # MFQ-2: no file -> every item +1
+        return {i: 1 for i in default_forward_ids}   # MFQ-2: every item is +1
     return {str(k): int(v) for k, v in json.loads(p.read_text()).items()}
 
 

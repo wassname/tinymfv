@@ -5,7 +5,7 @@ matters because the summaries answer different questions and have very different
 
   expected_score E   = sum_k k * p_k,  in [1, M]          human-comparable scale score
   logit_contrast C   = sum_k (k - mid) * lp_k             primary steer signal (sensitive, signed)
-  agree_logodds  LO  = lse(top) - lse(bottom)             readable 2-bin direction summary
+  logodds_agree  LO  = lse(top) - lse(bottom)             readable 2-bin direction summary
   entropy        H   = -sum_k p_k log p_k                 within-allowed coherence (uniform = ln M)
 
 Why E hides steering and C/LO do not (the whole reason this module exists):
@@ -51,7 +51,7 @@ def logit_contrast(lp: np.ndarray, scale_max: int) -> float:
     return float((np.asarray(lp, dtype=float) * w).sum())
 
 
-def agree_logodds(lp: np.ndarray, scale_max: int) -> float:
+def logodds_agree(lp: np.ndarray, scale_max: int) -> float:
     """LO = logsumexp(top n_side) - logsumexp(bottom n_side), n_side = scale_max // 2.
 
     The readable 2-bin direction summary: nats in favor of agreeing over disagreeing among the

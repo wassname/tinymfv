@@ -22,16 +22,13 @@ Headline metrics:
              steering-lite's surgical informedness.
 - mean_nll:  mean soft cross-entropy -sum_f p_human[f] log p_model[f], in nats.
 - mean_nll_T: same metric after fitting one temperature on the scored set.
-- mean_js:   legacy mean Jensen-Shannon divergence between model and label dist
-             (in nats, max = ln 2 ≈ 0.693).
 - gap[f]:    per-foundation perspective gap = mean p[f] (other_violate)
              - mean p[f] (self_violate). Detects perspective bias.
 """
 from __future__ import annotations
 import json
-import math
 import time
-from typing import Any
+from typing import Any, NotRequired, TypedDict
 
 import numpy as np
 import pandas as pd
@@ -58,6 +55,56 @@ _PROBE_TO_COARSE: dict[str, str] = {
 _COARSE_NORM = {"Social Norms": "SocialNorms"}
 
 
+class EvalRow(TypedDict):
+    id: str
+    condition: str
+    foundation_coarse: str
+    p: np.ndarray                  # answer distribution, renormalized over the allowed answer space
+    score: np.ndarray              # debiased pre-softmax answer evidence, nats
+    label: np.ndarray | None       # human answer distribution in the same order as p
+    top1: str
+    margin: float                  # score[top1] - score[top2], nats
+    pmass_allowed: float           # full-vocab mass on the allowed answer tokens at the answer slot
+    nll_prefill: float             # NLL/token of the forced assistant prefill before the answer slot
+    think_tokens: list[int]
+    think_tokens_rev: list[int]
+    emitted_close: list[bool]
+    emitted_close_rev: list[bool]
+    gen_text: list[str]
+    gen_text_rev: list[str]
+    lp_fwd_samples: list[list[float]]
+    lp_rev_samples: list[list[float]]
+
+
+class EvalInfo(TypedDict):
+    name: str
+    n_rows: int
+    n_labeled: int
+    elapsed_s: float
+    mean_nll: float | None
+    median_nll: float | None
+    median_nll_T: float | None
+    informedness: float | None
+    mean_pmass_allowed: float | None
+    mean_nll_prefill: float | None
+
+
+class EvalResult(TypedDict):
+    table: pd.DataFrame
+    profile: pd.DataFrame | None
+    mean_nll: float | None
+    mean_nll_T: float | None
+    median_nll_T: float | None
+    T: float | None
+    top1_acc: float | None
+    informedness: float | None
+    mean_pmass_allowed: float | None
+    mean_nll_prefill: float | None
+    info: EvalInfo
+    demos: dict[str, Any] | None
+    per_row: NotRequired[list[EvalRow]]
+
+
 def _label_dist(row: dict, foundations: list[str]) -> np.ndarray | None:
     """Build the 7-vec human label distribution for a vignette.
 
@@ -76,16 +123,6 @@ def _label_dist(row: dict, foundations: list[str]) -> np.ndarray | None:
     if s <= 0:
         return None
     return arr / s
-
-
-def _js_divergence(p: np.ndarray, q: np.ndarray) -> float:
-    """Jensen-Shannon divergence in nats. Symmetric, bounded by ln 2."""
-    p = p + 1e-12; q = q + 1e-12
-    p = p / p.sum(); q = q / q.sum()
-    m = 0.5 * (p + q)
-    kl_pm = float((p * np.log(p / m)).sum())
-    kl_qm = float((q * np.log(q / m)).sum())
-    return 0.5 * kl_pm + 0.5 * kl_qm
 
 
 def _soft_nll(p_human: np.ndarray, p_model: np.ndarray) -> float:
@@ -178,7 +215,7 @@ def evaluate(
     device: str | None = None,
     return_per_row: bool = False,
     verbose: int = 1,
-) -> dict[str, Any]:
+) -> EvalResult:
     """Run forced-choice 7-way probe per (vignette, condition).
 
     Args:
@@ -212,11 +249,11 @@ def evaluate(
             table, and the complete DEMO B (prompt + generation + SHOULD note).
 
     Returns:
-        Dict with `table`, `profile`, `mean_js`, `mean_nll`, `mean_nll_T`,
-        `median_nll_T`, `T`, `top1_acc`, `mean_pmass_allowed`, `mean_nll_json`, and `info`.
+        Dict with `table`, `profile`, `mean_nll`, `mean_nll_T`,
+        `median_nll_T`, `T`, `top1_acc`, `mean_pmass_allowed`, `mean_nll_prefill`, and `info`.
         With `return_per_row=True`, also includes `per_row` with per-row
         `p`, `score` (debiased logp per foundation), `pmass_allowed`,
-        `nll_json`, `gen_text` / `gen_text_rev` (full decoded gen, no stripping),
+        `nll_prefill`, `gen_text` / `gen_text_rev` (full decoded gen, no stripping),
         and `top1` / `margin`.
     """
     if vignettes is None:
@@ -233,7 +270,7 @@ def evaluate(
     foundations = list(_DEFAULT_FORCED_FOUNDATIONS)
 
     t0 = time.time()
-    per_row: list[dict] = []
+    per_row: list[EvalRow] = []
     total_calls = len(vignettes) * len(conditions)
     with tqdm(total=total_calls, desc=f"forced-choice {name}", mininterval=60, maxinterval=120) as pbar:
         for cond in conditions:
@@ -265,7 +302,7 @@ def evaluate(
                         "top1": res.top1,
                         "margin": res.margin,
                         "pmass_allowed": res.pmass_allowed,
-                        "nll_json": res.nll_json,
+                        "nll_prefill": res.nll_prefill,
                         "think_tokens": res.think_tokens,           # list[int], length N
                         "think_tokens_rev": res.think_tokens_rev,   # list[int], length N
                         "emitted_close": res.emitted_close,         # list[bool], length N
@@ -332,9 +369,6 @@ def evaluate(
     # === headline scalars (need labels) ===
     labeled_rows = [r for r in per_row if r["label"] is not None]
     if labeled_rows:
-        js_vals = np.array([_js_divergence(r["p"], r["label"]) for r in labeled_rows])
-        mean_js = float(js_vals.mean())
-        median_js = float(np.median(js_vals))
         y_pred = np.array([np.argmax(r["p"]) for r in labeled_rows])
         y_true = np.array([np.argmax(r["label"]) for r in labeled_rows])
         top1_acc = float(np.mean(y_pred == y_true))
@@ -371,7 +405,7 @@ def evaluate(
             "model_T": p_scaled.mean(axis=0),
         })
     else:
-        mean_js = median_js = top1_acc = informedness = None
+        top1_acc = informedness = None
         mean_nll = median_nll = mean_nll_T = median_nll_T = None
         T = None
         profile = None
@@ -380,8 +414,8 @@ def evaluate(
         float(np.mean([r["pmass_allowed"] for r in per_row]))
         if per_row else None
     )
-    mean_nll_json = (
-        float(np.mean([r["nll_json"] for r in per_row]))
+    mean_nll_prefill = (
+        float(np.mean([r["nll_prefill"] for r in per_row]))
         if per_row else None
     )
 
@@ -394,7 +428,7 @@ def evaluate(
         r0 = per_row[0]
         # one-line quantitative readout, kept at every verbose level (it IS the signal)
         aux = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in {
-            "top1_acc": top1_acc, "mean_js": mean_js, "mean_nll_T": mean_nll_T,
+            "top1_acc": top1_acc, "mean_nll_T": mean_nll_T,
             "T": T, "informedness": informedness, "mean_pmass_allowed": mean_pmass_allowed,
         }.items() if v is not None}
         logger.debug("aux stats: " + json.dumps(aux))
@@ -407,7 +441,7 @@ def evaluate(
                 "SHOULD: mass concentrates on the violated foundation; if it is flat or "
                 "pmass_allowed~0 the model did not answer in-format and the row is noise.\n"
                 + "  ".join(f"{f}={p:.3f}" for f, p in zip(foundations, r0["p"]))
-                + f"\n  top1={r0['top1']}  pmass_allowed={r0['pmass_allowed']:.3f}  nll_json={r0['nll_json']:.3f}"
+                + f"\n  top1={r0['top1']}  pmass_allowed={r0['pmass_allowed']:.3f}  nll_prefill={r0['nll_prefill']:.3f}"
             )
             if profile is not None:
                 logger.debug(
@@ -432,8 +466,8 @@ def evaluate(
                 f"{demo_prompt}{demo_gen}\n"
                 "SHOULD: a real chain-of-thought that ends in a moral-foundation choice. "
                 "If it is empty or degenerate the model is not reasoning at this budget; "
-                "if it answers a different foundation than DEMO A's top1, the readout and "
-                "free reasoning disagree (worth noting).\n--- end DEMO B ---\n"
+                "if it answers a different foundation than DEMO A's top1, inspect that row.\n"
+                "--- end DEMO B ---\n"
             )
         else:  # terse default: generation only, whitespace-collapsed to 64 chars, bracketed
             gen64 = " ".join(demo_gen.split())[:64]
@@ -451,8 +485,6 @@ def evaluate(
         "n_rows": n_rows,
         "n_labeled": n_labeled,
         "elapsed_s": elapsed,
-        "median_js": median_js,
-        "max_js": math.log(2),
         "mean_nll": mean_nll,
         "median_nll": median_nll,
         "median_nll_T": median_nll_T,
@@ -468,14 +500,13 @@ def evaluate(
         # "in-format"; a sharp drop after steering signals coherence loss.
         "mean_pmass_allowed": mean_pmass_allowed,
         # Mean NLL in nats/token over the assistant prefill content. Perplexity
-        # is exp(mean_nll_json).
-        "mean_nll_json": mean_nll_json,
+        # is exp(mean_nll_prefill).
+        "mean_nll_prefill": mean_nll_prefill,
     }
 
-    out: dict[str, Any] = {
+    out: EvalResult = {
         "table": table,
         "profile": profile,    # 7-row DataFrame: foundation, human, model, model_T
-        "mean_js": mean_js,
         "mean_nll": mean_nll,
         "mean_nll_T": mean_nll_T,  # temperature-scaled soft cross-entropy in nats
         "median_nll_T": median_nll_T,
@@ -483,11 +514,10 @@ def evaluate(
         "top1_acc": top1_acc,
         "informedness": informedness,  # macro Youden's J, model vs human argmax, in [-1, 1]
         "mean_pmass_allowed": mean_pmass_allowed,
-        "mean_nll_json": mean_nll_json,
+        "mean_nll_prefill": mean_nll_prefill,
         "info": info,
         "demos": demos,   # DEMO A (forced think + top1) + DEMO B (free reasoning); None if not verbose
     }
     if return_per_row:
         out["per_row"] = per_row
     return out
-

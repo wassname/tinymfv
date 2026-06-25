@@ -108,7 +108,7 @@ def _rollout_natural_or_forced(
     callers reshape via `[i*N + n]`.
 
     thinks[j] = (gen_text, n_think_tokens, emitted_close).
-    slots[j][k] = {pmass_allowed, nll_json, top5_str, lp_gather}.
+    slots[j][k] = {pmass_allowed, nll_prefill, top5_str, lp_gather}.
 
     Phase 1: batched generate, `min_new_tokens=max_new_tokens=max_think_tokens`
       → uniform-length cache. Capture `scores` (per-step logits) and `pkv`.
@@ -236,12 +236,12 @@ def _rollout_natural_or_forced(
         first_logp = F.log_softmax(prefix_out.logits[:, -1].float(), dim=-1)        # [B, V]
         first_nll = -first_logp.gather(1, prefill_t[:, :1]).squeeze(-1)              # [B]
         if J == 1:
-            forced_nll_json = first_nll
+            forced_nll_prefill = first_nll
         else:
             next_logp = F.log_softmax(prefill_out.logits[:, :-1].float(), dim=-1)   # [B, J-1, V]
             next_ids = prefill_t[:, 1:].unsqueeze(-1)                                # [B, J-1, 1]
             tail_nll = -next_logp.gather(2, next_ids).squeeze(-1).sum(dim=1)         # [B]
-            forced_nll_json = (first_nll + tail_nll) / J
+            forced_nll_prefill = (first_nll + tail_nll) / J
 
         if verbose:
             real0 = phase1_ids[0][phase1_ids[0] != pad_id]
@@ -282,7 +282,7 @@ def _rollout_natural_or_forced(
                 if not torch.isfinite(raw).all():
                     slots[i].append({
                         "pmass_allowed": 0.0,
-                        "nll_json": float("nan"),
+                        "nll_prefill": float("nan"),
                         "top5_str": "",
                         "lp_gather": [float("nan")] * len(gather_token_ids),
                     })
@@ -297,18 +297,18 @@ def _rollout_natural_or_forced(
             elif not emitted_close_i:
                 # Case (b) interrupted: forced
                 lp_vec = forced_lp_last[i]
-                nll_val = float(forced_nll_json[i].item())
+                nll_val = float(forced_nll_prefill[i].item())
             else:
                 # Case (c) emitted </think> but no natural answer slot found.
                 # Model "finished thinking" without producing JSON — coherence
                 # collapse at the answer slot. pmass=0.0 is the honest measurement
                 # (no probability mass on allowed tokens at a non-existent slot)
                 # and lets c_scan see the failure as a real signal rather than
-                # crashing on NaN. nll_json stays NaN (genuinely undefined: no
-                # JSON tokens were emitted to score).
+                # crashing on NaN. nll_prefill stays NaN (genuinely undefined:
+                # no prefill tokens were emitted to score).
                 slots[i].append({
                     "pmass_allowed": 0.0,
-                    "nll_json": float("nan"),
+                    "nll_prefill": float("nan"),
                     "top5_str": "",
                     "lp_gather": [float("nan")] * len(gather_token_ids),
                 })
@@ -321,7 +321,7 @@ def _rollout_natural_or_forced(
             )
             slots[i].append({
                 "pmass_allowed": float(lp_vec[gid_t].exp().sum().item()),
-                "nll_json": nll_val,
+                "nll_prefill": nll_val,
                 "top5_str": top5_str,
                 "lp_gather": lp_vec[gid_t].cpu().tolist(),
             })
@@ -442,8 +442,8 @@ class ForcedChoiceResult:
     pmass_allowed: float
     # Mean negative log-likelihood in nats/token over the assistant prefill
     # content, averaged across samples and fwd + rev framings. Perplexity is
-    # `exp(nll_json)`.
-    nll_json: float
+    # `exp(nll_prefill)`.
+    nll_prefill: float
 
 
 def _resolve_first_token_ids(tok, words: list[str]) -> tuple[list[int], dict[str, int]]:
@@ -599,14 +599,14 @@ def guided_rollout_forced_choice(
         order_sorted = sorted(range(K), key=lambda k: -score[k])
         top1 = foundations[order_sorted[0]]
         margin = score[order_sorted[0]] - score[order_sorted[1]]
-        # Average pmass_allowed and nll_json across N samples per direction, then across
+        # Average pmass_allowed and nll_prefill across N samples per direction, then across
         # fwd + rev framings.
         pm_f = sum(slots_fwd[j][0]["pmass_allowed"] for j in idx) / N
         pm_r = sum(slots_rev[j][0]["pmass_allowed"] for j in idx) / N
         pm = 0.5 * (pm_f + pm_r)
-        nll_f = sum(slots_fwd[j][0]["nll_json"] for j in idx) / N
-        nll_r = sum(slots_rev[j][0]["nll_json"] for j in idx) / N
-        nll_json = 0.5 * (nll_f + nll_r)
+        nll_f = sum(slots_fwd[j][0]["nll_prefill"] for j in idx) / N
+        nll_r = sum(slots_rev[j][0]["nll_prefill"] for j in idx) / N
+        nll_prefill = 0.5 * (nll_f + nll_r)
         results.append(ForcedChoiceResult(
             user_prompt=user_prompts[i],
             gen_text=gens_fwd,
@@ -624,7 +624,7 @@ def guided_rollout_forced_choice(
             emitted_close=close_fwd_list,
             emitted_close_rev=close_rev_list,
             pmass_allowed=float(pm),
-            nll_json=float(nll_json),
+            nll_prefill=float(nll_prefill),
         ))
 
     return results
@@ -665,4 +665,3 @@ def free_generation_demo(
     out = model.generate(**enc, **gen_kwargs)
     gen_text = tok.decode(out[0, enc.input_ids.shape[1]:], skip_special_tokens=False)
     return prompt_text, gen_text
-

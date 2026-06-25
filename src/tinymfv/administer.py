@@ -6,7 +6,7 @@ This is the survey counterpart to `tinymfv.evaluate` (the vignette forced-choice
     per_item_categorical  (canonicalize each frame to forward, average -> one dist per item)
     reduce_ordinal        (E[scale point] per item, reverse-key, pool to a per-factor profile)
 
-The profile vector (per `instr.dimensions`) is the load-bearing output; `per_item_categorical`'s
+The profile vector (per `instr.dimensions`) is the main output; `per_item_categorical`'s
 canonicalization makes it algebraically identical to the experiment's `admin.administer` per-factor
 means (verified by the reducer parity check), so this is a drop-in for the maps.
 
@@ -21,7 +21,7 @@ import numpy as np
 
 from .instrument import Instrument, per_item_categorical, reduce_ordinal, canonicalize_to_forward
 from .read import read_items, resolve_answer_ids
-from .readouts import expected_score, logit_contrast, agree_logodds, entropy
+from .readouts import expected_score, logit_contrast, logodds_agree, entropy
 
 
 class ItemRow(TypedDict):
@@ -31,8 +31,8 @@ class ItemRow(TypedDict):
     keyed_E: float                  # E reverse-keyed for sign<0 items (== old keyed_agreement)
     C: float                        # rank-centered logit contrast (primary steer signal)
     keyed_C: float                  # C reverse-keyed (negated) for sign<0 items
-    logodds: float                  # agree-vs-disagree log-odds (readable direction summary)
-    keyed_logodds: float
+    logodds_agree: float            # agree-vs-disagree log-odds (readable direction summary)
+    keyed_logodds_agree: float
     entropy: float                  # within-allowed entropy, nats (coherence the pmass gate misses)
     pmass_allowed: float
     frame_spread: float
@@ -60,7 +60,7 @@ class AdministerResult(TypedDict):
     profile_C: np.ndarray           # [len(dimensions)] per-factor keyed contrast (the steer map input)
     profile: np.ndarray             # alias of profile_E (kept so existing E maps keep working)
     dimensions: list[str]           # factor order, matches the profiles
-    foundations: list[dict]         # one per factor: foundation, mean(E), C, logodds, sd, ci95*, f_<frame>
+    foundations: list[dict]         # one per factor: foundation, mean(E), C, logodds_agree, sd, ci95*, f_<frame>
     per_item: list[ItemRow]         # one per item, frame-averaged readouts
     per_item_frame: list[ItemFrameRow]  # one per (item, frame): raw lp + think + readouts
     mean_pmass_allowed: float       # coherence check (mass on valid answer tokens)
@@ -88,16 +88,16 @@ def administer(model, tok, instr: Instrument, *, batch_size: int = 36,
     # per-item frame-averaged readouts. E and entropy come from the averaged probability vector (so the
     # NaN-at-collapse signal survives); C and log-odds come from the averaged logprobs (the sensitive
     # log-space readouts). Reverse-keying (sign<0): E reflects to M+1-E, while the midpoint-centered
-    # contrast C and the log-odds simply negate (reflecting the scale negates a centered weight).
+    # contrast C and the agree-vs-disagree log-odds negate.
     per_item_rows = []
     for iid, it in items.items():
         lp, p, sign = it["lp"], it["p"], it["sign"]
-        E, Cval, LO = expected_score(p, M), logit_contrast(lp, M), agree_logodds(lp, M)
+        E, Cval, LO = expected_score(p, M), logit_contrast(lp, M), logodds_agree(lp, M)
         per_item_rows.append({
             "id": iid, "foundation": it["dimension"],
             "E": E, "keyed_E": (M + 1 - E) if sign < 0 else E,
             "C": Cval, "keyed_C": -Cval if sign < 0 else Cval,
-            "logodds": LO, "keyed_logodds": -LO if sign < 0 else LO,
+            "logodds_agree": LO, "keyed_logodds_agree": -LO if sign < 0 else LO,
             "entropy": entropy(p, M), "pmass_allowed": it["pmass"], "frame_spread": it["frame_spread"],
         })
 
@@ -134,7 +134,7 @@ def administer(model, tok, instr: Instrument, *, batch_size: int = 36,
     for j, d in enumerate(instr.dimensions):
         e_vals = np.array([row["keyed_E"] for row in per_item_rows if row["foundation"] == d])
         c_vals = np.array([row["keyed_C"] for row in per_item_rows if row["foundation"] == d])
-        lo_vals = np.array([row["keyed_logodds"] for row in per_item_rows if row["foundation"] == d])
+        lo_vals = np.array([row["keyed_logodds_agree"] for row in per_item_rows if row["foundation"] == d])
         profile_C[j] = float(np.mean(c_vals))
         e_lo, e_hi = _ci(e_vals); c_lo, c_hi = _ci(c_vals)
         per_fr = {fr: float(np.mean(by_dim_frame[(d, fr)])) for fr in frames}
@@ -144,7 +144,7 @@ def administer(model, tok, instr: Instrument, *, batch_size: int = 36,
             "ci95_lo": e_lo, "ci95_hi": e_hi,
             "C": float(profile_C[j]), "C_sd": float(c_vals.std(ddof=1)),
             "C_ci95_lo": c_lo, "C_ci95_hi": c_hi,
-            "logodds": float(np.mean(lo_vals)),
+            "logodds_agree": float(np.mean(lo_vals)),
             "framing_spread": float(max(per_fr.values()) - min(per_fr.values())),
             **{f"f_{fr}": v for fr, v in per_fr.items()},
         })

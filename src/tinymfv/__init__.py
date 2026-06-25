@@ -1,10 +1,11 @@
-"""tinymfv: tiny moral-foundations vignettes eval.
+"""tinymfv: tiny moral/value instruments for local LLMs.
 
-Forced-choice 7-way scoring on Clifford 2015 vignettes (classic) +
-paraphrase configs (scifi, ai-actor). Default condition is
-`other_violate` (the canonical Clifford framing); `self_violate` is
-available as an opt-in ablation. Each row internally does a fwd + rev
-enum-order pass for position-bias debias (inside guided_rollout).
+One answer-token reader, two reducer families:
+
+- nominal MFV vignettes: answer = foundation category; `evaluate` reports a
+  7-way profile plus label-match metrics.
+- ordinal Likert questionnaires: answer = scale point; `administer` reports
+  E, C, agree-vs-disagree log-odds, entropy, and pmass diagnostics.
 
 High-level usage:
 
@@ -16,17 +17,17 @@ High-level usage:
     rep = evaluate(model, tok, name="classic")
     print(rep["table"])         # per-foundation
     print(rep["top1_acc"])      # argmax accuracy vs label
-    print(rep["mean_js"])       # JS divergence vs label dist (in nats)
+    print(rep["mean_nll_T"])    # temperature-scaled soft NLL vs label dist
 
 Lower-level: see `guided_rollout_forced_choice` in `tinymfv.guided`.
 """
 from .data import load_vignettes, load_all_vignettes, CONFIGS, ConfigName
-from .eval import evaluate, CONDITIONS
+from .eval import evaluate, CONDITIONS, EvalResult, EvalRow, EvalInfo
 from .guided import guided_rollout_forced_choice, _DEFAULT_FORCED_FOUNDATIONS
-from .instrument import Instrument, InstrItem, per_item_categorical
+from .instrument import Instrument, InstrItem, per_item_categorical, reduce_nominal, reduce_ordinal
 from .instruments import get as get_instrument, INSTRUMENTS, build_instrument
 from .read import read_items, resolve_answer_ids, build_user_content
-from .readouts import expected_score, logit_contrast, agree_logodds, entropy
+from .readouts import expected_score, logit_contrast, logodds_agree, entropy
 from .administer import administer
 
 
@@ -41,17 +42,16 @@ def __getattr__(name: str):
 
 
 # The front door. Other symbols above stay importable (e.g. read_items for item subsets,
-# per_item_categorical, build_instrument) but are plumbing, kept out of `import *`.
+# per_item_categorical, build_instrument) but are helper internals, kept out of `import *`.
 __all__ = [
     # entrypoints
     "evaluate", "administer", "get_instrument", "read_items",
     # ordinal readouts (pure functions of the raw answer-token logprobs)
-    "expected_score", "logit_contrast", "agree_logodds", "entropy",
+    "expected_score", "logit_contrast", "logodds_agree", "entropy",
     # types consumers build / subset
-    "Instrument", "InstrItem",
+    "Instrument", "InstrItem", "EvalResult", "EvalRow", "EvalInfo", "reduce_nominal", "reduce_ordinal",
     # data API
     "load_vignettes", "load_all_vignettes", "CONFIGS", "ConfigName", "CONDITIONS",
     # lower-level rollout + lazy plotting
     "guided_rollout_forced_choice", "maps",
 ]
-

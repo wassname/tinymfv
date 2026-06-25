@@ -22,7 +22,7 @@ asymmetric and risks double-flipping. Both kinds unify on one rule:
   ordinal `inverted`/`negated` frames reverse the probability vector (the distribution-level
   analog of agreement = M+1 - E). The per-item object is then the mean of these canonical
   distributions over frames -- a single forward-orientation categorical, used IDENTICALLY for:
-    - metrics: soft-NLL / JS / temperature T vs the forward human histogram (both kinds), plus
+    - metrics: soft-NLL / temperature T vs the forward human histogram (both kinds), plus
       an ORDINAL metric (mean |E_model - E_human|) so the certifying metric is sensitive to the
       expectation the profile actually uses; top1 / informedness only for nominal (an argmax
       flip metric is meaningless on an ordered scale: 4-vs-5 != 1-vs-5).
@@ -79,7 +79,7 @@ class Instrument:
                 f"got {self.answer_space}")
         if self.kind == "nominal" and self.answer_to_dim is None:
             self.answer_to_dim = {a: a for a in self.answer_space}
-        # Cross-scale caveat: a 1-7 human histogram (HSQ) cannot share a 5-way soft-NLL/JS
+        # Cross-scale caveat: a 1-7 human histogram (HSQ) cannot share a 5-way soft-NLL
         # with a 1-5 model directly. Calibration for such
         # instruments must project both to a common support (or report 0-1 endorsement only).
         # Enforced loudly rather than silently mis-comparing:
@@ -155,7 +155,21 @@ def per_item_categorical(per_row: list[dict], kind: Kind) -> dict[str, dict]:
     return out
 
 
-# --- profile reducer: the ordinal kind-specific summary (nominal evaluate folds its profile inline) ---
+# --- profile reducers: same per-item categorical, different profile summary ---
+
+def reduce_nominal(items: dict[str, dict], instr: Instrument) -> np.ndarray:
+    """Nominal profile = mean category probability per dimension.
+
+    For MFV, the answer is the foundation. The reducer maps answer tokens into profile dimensions
+    and averages the canonical per-item categorical distributions.
+    """
+    assert instr.kind == "nominal", "reduce_nominal expects a nominal instrument"
+    assert instr.answer_to_dim is not None, f"{instr.name}: nominal instrument needs answer_to_dim"
+    by_dim: dict[str, list[float]] = {d: [] for d in instr.dimensions}
+    for it in items.values():
+        for answer, p in zip(instr.answer_space, it["p"]):
+            by_dim[instr.answer_to_dim[answer]].append(float(p))
+    return np.array([float(np.mean(by_dim[d])) for d in instr.dimensions])
 
 def reduce_ordinal(items: dict[str, dict], instr: Instrument) -> np.ndarray:
     """Likert profile = mean keyed agreement per dimension; agreement = E[scale point].
