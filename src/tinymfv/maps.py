@@ -435,6 +435,7 @@ def draw_steer(ax, xs: float, cs: list[float], yv: np.ndarray, base_y: float,
     (the zoom labels them c=X and wants them; the main range does not -- there they only clutter a short
     arm into a blob). The +c arm is nudged +dx in x and the -c arm -dx, so a NON-bidirectional steer
     (both poles the same side of base) reads as two short PARALLEL arms rather than overlapping."""
+    assert list(cs) == sorted(cs) and 0.0 in cs, f"draw_steer needs sorted cs with c=0 (yv[-1]=+pole, yv[0]=-pole), got {cs}"
     ax.plot(xs, base_y, "o", ms=ms, color="black", zorder=7)            # base: the unsteered model
     if dots:
         for c, y in zip(cs, yv):
@@ -512,16 +513,19 @@ def draw_range_panel(ax, instr: Instrument, dims: list[str], cs: list[float], pr
 
 
 def plot_range(instr: Instrument, dims: list[str], cs: list[float], prof: dict, humans: dict,
-               cloud: np.ndarray | None, vec: str):
+               cloud: np.ndarray | None, vec: str, *, ylabel: str | None = None):
     """Single-axes range figure for one steering vector. Returns the Figure.
 
     The dot/line encoding legend belongs in the figure CAPTION, not the image: a paragraph of
     legend text in the suptitle forces the figure wide to fit one line and squashes the panel.
-    The axes title already names the geometry (tail=-c, arrow=+c)."""
+    The axes title already names the geometry (tail=-c, arrow=+c).
+
+    `ylabel` overrides the default ordinal "<instr> mean (1-M)" -- nominal MFV passes its own
+    "relative emphasis (z across foundations)" since its y-values are z-scores, not a 1-M scale."""
     figw = max(6.4, 1.5 * len(dims) + 1.5)
     fig, ax = plt.subplots(figsize=(figw, 4.8))
     draw_range_panel(ax, instr, dims, cs, prof, humans, cloud, vec)
-    ax.set_ylabel(f"{instr.display} mean (1-{instr.scale_max})")
+    ax.set_ylabel(ylabel or f"{instr.display} mean (1-{instr.scale_max})")
     fig.suptitle(f"Steered {instr.display}: {vec}", fontsize=11)
     fig.tight_layout()
     return fig

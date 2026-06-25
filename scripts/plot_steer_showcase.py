@@ -20,6 +20,7 @@ import argparse
 import csv
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import matplotlib
 matplotlib.use("Agg")
@@ -149,11 +150,16 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float) 
             paths.append(T.maps.save_both(figs, out / name, tag))
             plt.close(figs)
 
-    figr = T.maps.plot_range(instr, dims, cs, prof, humans, None, vec_label)
+    # Range/zoom render the SAME coherence-gated c-points the map+SPLOM use (coh_cs), so the figures
+    # agree on which steer multipliers are valid. Without this the map drops incoherent/NaN poles while
+    # the range still plots them (GPT-5.5 code review). Base (c=0) is always in coh_cs (pmass==base_pm).
+    assert 0.0 in coh_cs, f"{name}: base c=0 dropped by coherence gate, pmass={pmass}"
+    prof_coh = {c: prof_c[c] for c in coh_cs}
+    figr = T.maps.plot_range(instr, dims, coh_cs, prof_coh, humans, None, vec_label)
     paths.append(T.maps.save_both(figr, out / name, "range"))
     plt.close(figr)
 
-    figz = T.maps.plot_range_zoom(instr, dims, cs, prof, humans, vec_label)
+    figz = T.maps.plot_range_zoom(instr, dims, coh_cs, prof_coh, humans, vec_label)
     paths.append(T.maps.save_both(figz, out / name, "range_zoom"))
     plt.close(figz)
     return paths
@@ -176,55 +182,59 @@ def read_human_mfv() -> tuple[list[str], dict[str, dict[str, float]]]:
     return sorted(by_country), by_country
 
 
-def plot_mfv_map(run_dir: Path, out: Path, vec_label: str, C: float) -> Path:
-    """Bespoke MFV map: per-foundation RELATIVE EMPHASIS (z across foundations) of the model's base /
-    +C / -C reads against the human MFV cultures. MFV is nominal (model emits logit(violation) per
-    foundation, humans rate wrongness 1-5), so absolute scales differ; z-scoring each profile within
-    itself compares the PATTERN -- which foundations a reader weights as more violation-worthy than
-    their own average -- which is exactly what the steer is meant to move. Social Norms is dropped (no
-    human norm). The steer shows as base->+C (red) and base->-C (blue) arrows per foundation."""
+def _mfv_zspace(run_dir: Path):
+    """Shared MFV adapter -> the common coordinate system the map AND range both consume: z-scored
+    relative-emphasis profiles (model base / +C / -C) + the human MFV culture matrix in the same
+    space. MFV is nominal (model emits logit(violation) per foundation, humans rate wrongness 1-5),
+    so absolute scales differ; z-scoring each profile ACROSS foundations compares the PATTERN -- which
+    foundations a reader weights as more violation-worthy than their own average -- which is exactly
+    what the steer moves. Social Norms is dropped (no human MFV norm), asserted so a taxonomy change
+    fails loud. Returns (founds, countries, M_z[countries x founds], base_z, posz, negz)."""
     d = json.loads((run_dir / "mfv.json").read_text())
     base_l = d["base_logit_per_foundation"]
     pos_dl, neg_dl = d["pos"]["dlogit_per_foundation"], d["neg"]["dlogit_per_foundation"]
     countries, human = read_human_mfv()
     hfounds = set(next(iter(human.values())))
-    founds = [f for f in d["foundation_order"] if f.lower() in hfounds]   # 6 shared, model order
+    founds = [f for f in d["foundation_order"] if f.lower() in hfounds]   # shared, model order
+    dropped = [f for f in d["foundation_order"] if f.lower() not in hfounds]
+    assert dropped == ["Social Norms"], f"unexpected MFV foundations without a human norm: {dropped}"
     fl = [f.lower() for f in founds]
-
     base = _zscore(np.array([base_l[f]["mean"] for f in founds]))
     posz = _zscore(np.array([base_l[f]["mean"] + pos_dl[f]["mean"] for f in founds]))
     negz = _zscore(np.array([base_l[f]["mean"] + neg_dl[f]["mean"] for f in founds]))
-    Hz = {c: _zscore(np.array([human[c][f] for f in fl])) for c in countries}
+    M = np.array([_zscore(np.array([human[c][f] for f in fl])) for c in countries])
+    return founds, countries, M, base, posz, negz
 
-    rng = np.random.default_rng(0)
-    fig, ax = plt.subplots(figsize=(7.2, 4.6))
-    ax.axhline(0, color="0.85", lw=0.8, zorder=0)
-    POS, NEG, GREY = T.maps.POS_COL, T.maps.NEG_COL, T.maps.COUNTRY_GREY
-    for i, f in enumerate(founds):
-        hvals = np.array([Hz[c][i] for c in countries])
-        ax.scatter(i - 0.18 + (rng.random(len(hvals)) - 0.5) * 0.12, hvals, s=26, color=GREY,
-                   alpha=0.9, edgecolor="white", linewidth=0.3, zorder=3)
-        ax.plot([i - 0.30, i - 0.06], [np.median(hvals)] * 2, color=T.maps.MEDIAN_GREY, lw=1.4, zorder=4)
-        xs = i + 0.18
-        ax.plot(xs, base[i], "o", ms=4, color="black", zorder=7)
-        for pole, col in [(posz[i], POS), (negz[i], NEG)]:
-            if abs(pole - base[i]) > 1e-9:
-                ax.plot([xs, xs], [base[i], pole], color=col, lw=2.0, zorder=6, solid_capstyle="round")
-                ax.plot(xs, pole, marker=("^" if pole >= base[i] else "v"), color=col, ms=7,
-                        markeredgecolor="none", zorder=8)
-    ax.scatter([], [], marker="o", color=GREY, label=f"human culture (n={len(countries)})")
-    ax.scatter([], [], marker="o", color="black", label="model base")
-    ax.scatter([], [], marker="^", color=POS, label=f"steer +C={C:+.2f}")
-    ax.scatter([], [], marker="v", color=NEG, label=f"steer -C={-C:+.2f}")
-    ax.legend(fontsize=7.5, loc="lower right", framealpha=0.9, ncol=2)
-    ax.set_xticks(range(len(founds)))
-    ax.set_xticklabels(founds, rotation=20, ha="right", fontsize=8)
-    ax.set_xlim(-0.6, len(founds) - 0.4)
-    ax.set_ylabel("relative emphasis  (z across foundations)")
-    ax.set_title(f"MFV foundation emphasis vs human cultures: {vec_label}", fontsize=10)
-    ax.spines[["top", "right"]].set_visible(False)
-    fig.tight_layout()
-    path = T.maps.save_both(fig, out / "mfv", "map_emphasis")
+
+# MFV has no ordinal Instrument (it goes through evaluate_multibool, not administer), but the shared
+# plotters only read .name/.display off it -- a shim supplies those. The y-values are z-scores, not a
+# 1-M scale, so it carries no scale_max and the range passes its own ylabel.
+_MFV_INSTR = SimpleNamespace(name="mfv", display="MFV vignettes")
+_MFV_YLABEL = "relative emphasis  (z across foundations)"
+
+
+def plot_mfv_map(run_dir: Path, out: Path, vec_label: str, C: float) -> Path:
+    """MFV ipsative culture map via the SAME plot_ipsative_pca the ordinal instruments use, in the
+    z-scored relative-emphasis space (logit-violation and 1-5 wrongness cannot share a raw axis).
+    base->+C (red) / base->-C (blue) arrows show where the steer moves the AI among human cultures."""
+    founds, countries, M, base, posz, negz = _mfv_zspace(run_dir)
+    labels = ("base (c=0)", f"+C={C:+.2f}", f"-C={-C:+.2f}")
+    fig = T.maps.plot_ipsative_pca(_MFV_INSTR, founds, countries, M, base, posz, negz, labels=labels)
+    path = T.maps.save_both(fig, out / "mfv", "map_pca_ipsative")
+    plt.close(fig)
+    return path
+
+
+def plot_mfv_range(run_dir: Path, out: Path, vec_label: str, C: float) -> Path:
+    """MFV range via the SAME plot_range the ordinal instruments use, in z relative-emphasis space.
+    Only base/+C/-C (the MFV eval is a 3-point sweep, not a multi-C grid like the ordinal admin)."""
+    founds, countries, M, base, posz, negz = _mfv_zspace(run_dir)
+    cs = [-1.0, 0.0, 1.0]
+    prof = {-1.0: negz, 0.0: base, 1.0: posz}
+    humans = {f: sorted(((countries[ci], float(M[ci, fi])) for ci in range(len(countries))), key=lambda t: t[1])
+              for fi, f in enumerate(founds)}
+    fig = T.maps.plot_range(_MFV_INSTR, founds, cs, prof, humans, None, vec_label, ylabel=_MFV_YLABEL)
+    path = T.maps.save_both(fig, out / "mfv", "range")
     plt.close(fig)
     return path
 
@@ -238,17 +248,18 @@ def plot_mfv(run_dir: Path, out: Path, vec_label: str, C: float) -> Path:
     y = np.arange(len(order))[::-1]
     fig, ax = plt.subplots(figsize=(6.4, 4.2))
     ax.axvline(0, color="0.6", lw=0.8, zorder=1)
+    POS, NEG = T.maps.POS_COL, T.maps.NEG_COL
     for f, yi in zip(order, y):
         pm, ps = pos[f]["mean"], pos[f]["std"] / max(1, pos[f]["n"]) ** 0.5
         nm, ns = neg[f]["mean"], neg[f]["std"] / max(1, neg[f]["n"]) ** 0.5
         ax.plot([nm, pm], [yi, yi], color="0.8", lw=1.0, zorder=2)
-        ax.errorbar(pm, yi, xerr=1.96 * ps, fmt="o", color="#c0392b", ms=5, capsize=2, zorder=3)
-        ax.errorbar(nm, yi, xerr=1.96 * ns, fmt="o", color="#2c6fbb", ms=5, capsize=2, zorder=3)
+        ax.errorbar(pm, yi, xerr=1.96 * ps, fmt="o", color=POS, ms=5, capsize=2, zorder=3)
+        ax.errorbar(nm, yi, xerr=1.96 * ns, fmt="o", color=NEG, ms=5, capsize=2, zorder=3)
     ax.set_yticks(y); ax.set_yticklabels(order)
     ax.set_xlabel("Delta logit(violation) vs bare  (nats)")
     ax.set_title(f"Steered MFV vignettes: {vec_label}", fontsize=11)
-    ax.scatter([], [], color="#c0392b", label=f"+C={C:+.2f}")
-    ax.scatter([], [], color="#2c6fbb", label=f"-C={-C:+.2f}")
+    ax.scatter([], [], color=POS, label=f"+C={C:+.2f}")
+    ax.scatter([], [], color=NEG, label=f"-C={-C:+.2f}")
     ax.legend(fontsize=8, loc="best")
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
@@ -274,8 +285,9 @@ def main() -> None:
         if (args.run_dir / f"{name}_profiles.csv").exists():
             written += [str(p) for p in plot_ordinal(args.run_dir, args.out, name, vec_label, C)]
     if (args.run_dir / "mfv.json").exists():
-        written.append(str(plot_mfv_map(args.run_dir, args.out, vec_label, C)))
-        written.append(str(plot_mfv(args.run_dir, args.out, vec_label, C)))
+        written.append(str(plot_mfv_map(args.run_dir, args.out, vec_label, C)))    # shared ipsative map (z-space)
+        written.append(str(plot_mfv_range(args.run_dir, args.out, vec_label, C)))  # shared range (z-space)
+        written.append(str(plot_mfv(args.run_dir, args.out, vec_label, C)))        # raw dlogit dumbbell (diagnostic)
     print(f"wrote {len(written)} figures under {args.out}:")
     for w in written:
         print(" ", w)
