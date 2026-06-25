@@ -488,7 +488,7 @@ def draw_range_panel(ax, instr: Instrument, dims: list[str], cs: list[float], pr
             # between the two coloured arms is self-evidently the unsteered model, and on a near-collapsed
             # pole (e.g. humor affiliative, +c ~ base) a 'base' tag overprints the +c tag.
             for c_end, y_end, col in [(cs[-1], yv[-1], POS_COL), (cs[0], yv[0], NEG_COL)]:
-                ax.annotate(f"{int(c_end):+d} {vec}", (xs + 0.30, y_end), fontsize=6.8,
+                ax.annotate(f"c={int(c_end):+d}", (xs + 0.30, y_end), fontsize=6.8,
                             ha="left", va="center", color=col, zorder=9)
 
     pad = 0.10 * (max(ys) - min(ys))

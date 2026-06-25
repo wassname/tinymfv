@@ -1,15 +1,19 @@
 """Showcase tinymfv's plotting on a real steering run (the dogfood before publishing the lib).
 
 Consumes a steering-lite `run_allinstr_showcase.py` output dir (one calibrated
-activation-steering vector administered across every instrument, 3-point
-base/+C/-C) and renders, per instrument, the tinymfv figures:
+activation-steering vector administered across every instrument over a signed
+c-sweep) and renders the SAME two figures for every instrument, uniformly:
 
-  - ordinal (mfq2/big5/16pf/humor_styles): ipsative culture map + range + zoom,
-    via tinymfv.maps, against the bundled human cross-cultural cloud.
-  - nominal MFV: a per-foundation Delta-logit dumbbell (pos vs neg pole).
+  - map  : ipsative culture map (PCA), AI base + steer trajectory vs the human cloud.
+  - range: per-factor range, AI base dot + +c/-c arrows vs the human society strip.
 
-The steer is a 3-point sweep, so cs = [-1, 0, +1] are SYMBOLIC pole indices
-(the real calibrated coefficient C is in the title/caption, not the y-units).
+Ordinal instruments (mfq2/big5/16pf/humor_styles) read <name>_profiles.csv; nominal
+MFV reads mfv.json and is projected into z-scored relative-emphasis space (its
+logit-violation units cannot share a raw axis with 1-5 wrongness), but it goes
+through the same plot_ipsative_pca / plot_range and yields the same two figures.
+
+cs are SIGNED multipliers of the calibrated coefficient C (0 = base); the real C
+is in the title, the legend shows only the multiplier (c=+1, c=-2, ...).
 
   uv run python scripts/plot_steer_showcase.py \
     --run-dir ../steering-lite/outputs/allinstr_qwen35_4b --out docs/img/showcase
@@ -143,28 +147,14 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float) 
     paths = [T.maps.save_both(figm, out / name, "map_pca_ipsative")]
     plt.close(figm)
 
-    # SPLOM only for mfq2: real per-respondent joint (others ship independent-marginal haze, whose
-    # off-diagonals would fabricate the correlation structure). Full + AI-zoom (macro + micro).
-    if name == "mfq2":
-        proffrac = {c: _frac(prof_c[c], instr.scale_max) for c in coh_cs}
-        for zoom, tag in [(False, "splom"), (True, "splom_zoom")]:
-            figs = T.maps.plot_splom(instr, dims, respondents, Mfrac, _frac(base, instr.scale_max),
-                                     proffrac, zoom=zoom, vec_label=vec_label)
-            paths.append(T.maps.save_both(figs, out / name, tag))
-            plt.close(figs)
-
-    # Range/zoom render the SAME coherence-gated c-points the map+SPLOM use (coh_cs), so the figures
-    # agree on which steer multipliers are valid. Without this the map drops incoherent/NaN poles while
-    # the range still plots them (GPT-5.5 code review). Base (c=0) is always in coh_cs (pmass==base_pm).
+    # Range renders the SAME coherence-gated c-points the map uses (coh_cs), so the two figures agree
+    # on which steer multipliers are valid. Without this the map drops incoherent/NaN poles while the
+    # range still plots them (GPT-5.5 code review). Base (c=0) is always in coh_cs (pmass==base_pm).
     assert 0.0 in coh_cs, f"{name}: base c=0 dropped by coherence gate, pmass={pmass}"
     prof_coh = {c: prof_c[c] for c in coh_cs}
     figr = T.maps.plot_range(instr, dims, coh_cs, prof_coh, humans, None, vec_label)
     paths.append(T.maps.save_both(figr, out / name, "range"))
     plt.close(figr)
-
-    figz = T.maps.plot_range_zoom(instr, dims, coh_cs, prof_coh, humans, vec_label)
-    paths.append(T.maps.save_both(figz, out / name, "range_zoom"))
-    plt.close(figz)
     return paths
 
 
@@ -242,36 +232,6 @@ def plot_mfv_range(run_dir: Path, out: Path, vec_label: str, C: float) -> Path:
     return path
 
 
-def plot_mfv(run_dir: Path, out: Path, vec_label: str, C: float) -> Path:
-    """Per-foundation Delta-logit dumbbell: each foundation's +C (red) and -C (blue) shift vs bare."""
-    d = json.loads((run_dir / "mfv.json").read_text())
-    order = d["foundation_order"]
-    pos = d["pos"]["dlogit_per_foundation"]
-    neg = d["neg"]["dlogit_per_foundation"]
-    y = np.arange(len(order))[::-1]
-    fig, ax = plt.subplots(figsize=(6.4, 4.2))
-    ax.axvline(0, color="0.6", lw=0.8, zorder=1)
-    POS, NEG = T.maps.POS_COL, T.maps.NEG_COL
-    for f, yi in zip(order, y):
-        pm, ps = pos[f]["mean"], pos[f]["std"] / max(1, pos[f]["n"]) ** 0.5
-        nm, ns = neg[f]["mean"], neg[f]["std"] / max(1, neg[f]["n"]) ** 0.5
-        ax.plot([nm, pm], [yi, yi], color="0.8", lw=1.0, zorder=2)
-        ax.errorbar(pm, yi, xerr=1.96 * ps, fmt="o", color=POS, ms=5, capsize=2, zorder=3)
-        ax.errorbar(nm, yi, xerr=1.96 * ns, fmt="o", color=NEG, ms=5, capsize=2, zorder=3)
-    ax.set_yticks(y); ax.set_yticklabels(order)
-    ax.set_xlabel("Delta logit(violation) vs bare  (nats)")
-    ax.set_title(f"Steered MFV vignettes: {vec_label}", fontsize=11)
-    ax.scatter([], [], color=POS, label=f"+C={C:+.2f}")
-    ax.scatter([], [], color=NEG, label=f"-C={-C:+.2f}")
-    ax.legend(fontsize=8, loc="best")
-    ax.spines[["top", "right"]].set_visible(False)
-    fig.tight_layout()
-    p = out / "mfv"
-    path = T.maps.save_both(fig, p, "foundation_dlogit")
-    plt.close(fig)
-    return path
-
-
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-dir", type=Path, required=True)
@@ -290,7 +250,6 @@ def main() -> None:
     if (args.run_dir / "mfv.json").exists():
         written.append(str(plot_mfv_map(args.run_dir, args.out, vec_label, C)))    # shared ipsative map (z-space)
         written.append(str(plot_mfv_range(args.run_dir, args.out, vec_label, C)))  # shared range (z-space)
-        written.append(str(plot_mfv(args.run_dir, args.out, vec_label, C)))        # raw dlogit dumbbell (diagnostic)
     print(f"wrote {len(written)} figures under {args.out}:")
     for w in written:
         print(" ", w)
