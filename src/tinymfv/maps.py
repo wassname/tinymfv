@@ -160,7 +160,7 @@ def _minimap(ax_main, cloud_full: np.ndarray, societies: np.ndarray, base_pt, vi
         mm.plot(base_pt[0], base_pt[1], "o", ms=3, color=C_BASE, zorder=3)
     mm.add_patch(Rectangle((xlo, ylo), xhi - xlo, yhi - ylo, fill=False, ec=POS_COL, lw=1.0, zorder=4))
     mm.set_xticks([]); mm.set_yticks([])
-    mm.set_title("full space", fontsize=6.5, color="0.4", pad=2)
+    mm.set_title("all human respondents", fontsize=6.0, color="0.4", pad=2)
     for s in mm.spines.values():
         s.set_color("0.7"); s.set_linewidth(0.5)
 
@@ -275,7 +275,7 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     # bury them in a central blob; it stays a clipped backdrop). Then PAD THE BOTTOM to reserve a clean
     # strip for the legend insets -- deterministic placement, identical on every plot, no overlap with
     # data or labels regardless of where the trajectory heads.
-    PAD_B = 0.52                                          # bottom legend strip = PAD_B of the data y-range
+    PAD_B = 0.62                                          # bottom legend strip = PAD_B of the data y-range
     if cloud is not None:
         anc_extra = [traj_pts] if traj_pts is not None else []
         anc = np.vstack([P] + [p for p in (pb, ph, pf) if p is not None] + anc_extra)
@@ -292,8 +292,8 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     # legend strip along the padded bottom: minimap bottom-right (it reads like a small map), compass
     # bottom-left. Both insets are opaque (set in compass()/_minimap) so the faint haze stays behind them.
     if cloud is not None:
-        _minimap(ax, Pi, P, pb, dview, box=(0.70, 0.015, 0.29, 0.29))
-    compass(ax, Vt[:2].T, dims, title=f"{instr.display} compass", box=(0.0, 0.015, 0.40, 0.29))
+        _minimap(ax, Pi, P, pb, dview, box=(0.71, 0.01, 0.27, 0.27))
+    compass(ax, Vt[:2].T, dims, title=f"{instr.display} compass", box=(0.0, 0.01, 0.40, 0.26))
     ax.set_xlabel(f"PC1 ({var[0]*100:.0f}% var) · {_axis_gloss(Vt[0], dims)}")
     ax.set_ylabel(f"PC2 ({var[1]*100:.0f}% var) · {_axis_gloss(Vt[1], dims)}")
     ax.set_title(f"{instr.name}: ipsative culture map ({len(countries)} societies)", fontsize=10)
