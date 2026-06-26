@@ -145,16 +145,23 @@ def _rollout_natural_or_forced(
     if think_end_id in (None, getattr(tok, "unk_token_id", None)):
         think_end_id = tok.eos_token_id
 
+    # Suppress end-of-answer tokens for the whole budget so every sample ends in the
+    # same mid-think state, read at the same forced slot. Else base self-closes into
+    # the junk-cache case (c -> NaN) while steered keeps thinking (case b), making
+    # pmass measure "did you self-close" (a steering confound) not coherence. eos is
+    # the universal end signal; think_end_id adds </think> on reasoning models and
+    # falls back to eos elsewhere, so this stays model-agnostic.
+    suppress_end = [t for t in {tok.eos_token_id, think_end_id} if t is not None]
+
     enc = tok(chats, return_tensors="pt", padding=True).to(device)
     prompt_len = enc.input_ids.shape[1]
     do_sample = temperature > 0.0
     gen_kwargs = dict(
         max_new_tokens=max_think_tokens,
         # Force full budget so all samples have identical cache length →
-        # batched suffix forward without per-sample rewinding. Garbage tokens
-        # emitted past natural EOS pollute the cache only for case-(c) samples,
-        # which we NaN downstream anyway.
+        # batched suffix forward without per-sample rewinding.
         min_new_tokens=max_think_tokens,
+        suppress_tokens=suppress_end,
         pad_token_id=pad_id,
         return_dict_in_generate=True,
         output_scores=True,
