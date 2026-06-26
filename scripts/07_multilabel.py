@@ -156,7 +156,7 @@ async def judge_one(model: str, prompt: str, sem: asyncio.Semaphore) -> dict:
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.0,
-            "max_tokens": 300,
+            "max_tokens": 3000,
         }
         data = await openrouter_request(payload)
         text = data["choices"][0]["message"]["content"]
