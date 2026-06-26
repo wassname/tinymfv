@@ -86,6 +86,7 @@ class EvalInfo(TypedDict):
     median_nll_T: float | None
     informedness: float | None
     mean_pmass_allowed: float | None
+    frac_unscorable: float | None
     mean_nll_prefill: float | None
 
 
@@ -99,6 +100,7 @@ class EvalResult(TypedDict):
     top1_acc: float | None
     informedness: float | None
     mean_pmass_allowed: float | None
+    frac_unscorable: float | None
     mean_nll_prefill: float | None
     info: EvalInfo
     demos: dict[str, Any] | None
@@ -410,14 +412,17 @@ def evaluate(
         T = None
         profile = None
 
-    mean_pmass_allowed = (
-        float(np.mean([r["pmass_allowed"] for r in per_row]))
-        if per_row else None
-    )
-    mean_nll_prefill = (
-        float(np.mean([r["nll_prefill"] for r in per_row]))
-        if per_row else None
-    )
+    # Unscorable rows (self-close with no answer slot, or a non-finite forward) carry NaN:
+    # the read is undefined, not "zero coherence", so they drop from the means (nanmean,
+    # matching the dlogit path) and surface as frac_unscorable. That rate IS the coherence-
+    # loss signal: pmass under forced reads is pinned high (the scaffold primes a valid token),
+    # so a low mean_pmass no longer flags breakage -- a high frac_unscorable / high
+    # mean_nll_prefill does.
+    pmass_arr = np.array([r["pmass_allowed"] for r in per_row], dtype=float)
+    nll_arr = np.array([r["nll_prefill"] for r in per_row], dtype=float)
+    mean_pmass_allowed = float(np.nanmean(pmass_arr)) if per_row and np.isfinite(pmass_arr).any() else None
+    mean_nll_prefill = float(np.nanmean(nll_arr)) if per_row and np.isfinite(nll_arr).any() else None
+    frac_unscorable = float(np.mean(~np.isfinite(pmass_arr))) if per_row else None
 
     # --- verbose readout: level 1 (default) = one-line aux stats + a 64-char free-form
     # generation, bracketed by blank lines; level 2 = the full first-row trace, profile
@@ -430,6 +435,7 @@ def evaluate(
         aux = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in {
             "top1_acc": top1_acc, "mean_nll_T": mean_nll_T,
             "T": T, "informedness": informedness, "mean_pmass_allowed": mean_pmass_allowed,
+            "frac_unscorable": frac_unscorable, "mean_nll_prefill": mean_nll_prefill,
         }.items() if v is not None}
         logger.debug("aux stats: " + json.dumps(aux))
         if verbose >= 2:
@@ -492,15 +498,19 @@ def evaluate(
         # argmax, in [-1, 1]. Discrete answer-flip metric; 0 = chance,
         # chance-corrected unlike top1_acc. See _informedness.
         "informedness": informedness,
-        # Mean pmass_format: average prob mass on the K foundation answer
-        # tokens at the JSON answer slot, across rows × framings. In [0, 1].
-        # Direct coherence check for forced-choice: drops when the model
-        # emits non-foundation tokens (gibberish, refusal, format collapse),
-        # independent of which foundation is picked. Higher = more
-        # "in-format"; a sharp drop after steering signals coherence loss.
+        # Mean pmass_format over SCORABLE rows (nanmean): prob mass on the K
+        # foundation answer tokens at the forced JSON slot, in [0, 1]. NB the slot
+        # is force-prefilled, which primes a valid token, so this is pinned high
+        # and is NOT a sensitive coherence gate -- use frac_unscorable and
+        # mean_nll_prefill for that. Kept as a format sanity floor.
         "mean_pmass_allowed": mean_pmass_allowed,
-        # Mean NLL in nats/token over the assistant prefill content. Perplexity
-        # is exp(mean_nll_prefill).
+        # Fraction of rows with no scorable answer slot (self-close / blown-up
+        # forward). THIS is the coherence-loss signal that survives forcing:
+        # rises when steering breaks the model. ~0 once tokens are suppressed.
+        "frac_unscorable": frac_unscorable,
+        # Mean NLL in nats/token over the forced assistant prefill (scaffold fit):
+        # rises when steering makes the </think>+JSON scaffold surprising. The
+        # sensitive coherence readout under forcing. Perplexity = exp(this).
         "mean_nll_prefill": mean_nll_prefill,
     }
 
@@ -514,6 +524,7 @@ def evaluate(
         "top1_acc": top1_acc,
         "informedness": informedness,  # macro Youden's J, model vs human argmax, in [-1, 1]
         "mean_pmass_allowed": mean_pmass_allowed,
+        "frac_unscorable": frac_unscorable,
         "mean_nll_prefill": mean_nll_prefill,
         "info": info,
         "demos": demos,   # DEMO A (forced think + top1) + DEMO B (free reasoning); None if not verbose

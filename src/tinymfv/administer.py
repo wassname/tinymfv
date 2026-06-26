@@ -83,7 +83,9 @@ def administer(model, tok, instr: Instrument, *, batch_size: int = 36,
 
     M = instr.scale_max
     profile_E = reduce_ordinal(items, instr)                     # per-factor keyed E (human comparison)
-    mean_pmass = float(np.mean([it["pmass"] for it in items.values()]))
+    # nanmean: an unscorable item (blown-up forced read -> NaN pmass) drops out rather
+    # than poisoning the mean, matching the forced-choice eval path.
+    mean_pmass = float(np.nanmean([it["pmass"] for it in items.values()]))
 
     # per-item frame-averaged readouts. E and entropy come from the averaged probability vector (so the
     # NaN-at-collapse signal survives); C and log-odds come from the averaged logprobs (the sensitive

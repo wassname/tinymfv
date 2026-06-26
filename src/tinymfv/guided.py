@@ -282,13 +282,14 @@ def _rollout_natural_or_forced(
                 )
                 # A non-finite answer-slot logit means the (often steered/quantized) forward
                 # pass blew up here. Do NOT clamp it to a plausible value -- that fabricates a
-                # confident answer from garbage. Mark the row incoherent (pmass=0, lp=NaN), the
-                # same "do not compare" signal as case (c), which the rest of the pipeline
-                # already handles. (Was torch.nan_to_num clamp to +-1e4: silent corruption.)
+                # confident answer from garbage. Mark the row UNSCORABLE (pmass=NaN, lp=NaN),
+                # the same "do not compare" signal as case (c): the read is undefined, not zero
+                # coherence, so it drops from the nanmean and counts toward frac_unscorable.
+                # (Was torch.nan_to_num clamp to +-1e4: silent corruption.)
                 raw = step_scores[answer_pos][i].float()
                 if not torch.isfinite(raw).all():
                     slots[i].append({
-                        "pmass_allowed": 0.0,
+                        "pmass_allowed": float("nan"),
                         "nll_prefill": float("nan"),
                         "top5_str": "",
                         "lp_gather": [float("nan")] * len(gather_token_ids),
@@ -307,14 +308,14 @@ def _rollout_natural_or_forced(
                 nll_val = float(forced_nll_prefill[i].item())
             else:
                 # Case (c) emitted </think> but no natural answer slot found.
-                # Model "finished thinking" without producing JSON — coherence
-                # collapse at the answer slot. pmass=0.0 is the honest measurement
-                # (no probability mass on allowed tokens at a non-existent slot)
-                # and lets c_scan see the failure as a real signal rather than
-                # crashing on NaN. nll_prefill stays NaN (genuinely undefined:
-                # no prefill tokens were emitted to score).
+                # Model "finished thinking" without producing JSON — there is no
+                # answer slot to score, so the read is UNSCORABLE (pmass=NaN), not
+                # "zero coherence". NaN drops it from the nanmean (matching lp) and
+                # surfaces it via frac_unscorable, the real coherence-loss signal.
+                # Token suppression (see gen_kwargs) prevents this in the normal
+                # path; only a multi-token </think> marker can still reach here.
                 slots[i].append({
-                    "pmass_allowed": 0.0,
+                    "pmass_allowed": float("nan"),
                     "nll_prefill": float("nan"),
                     "top5_str": "",
                     "lp_gather": [float("nan")] * len(gather_token_ids),
