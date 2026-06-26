@@ -27,9 +27,27 @@ Care, not Fairness, so it is a care-leaning moral-salience direction that reads 
 questionnaire rather than a clean single-foundation isolator. Coherence holds across the sweep
 (`frac_unscorable` 0, `mean_margin` ~10-12 nats), so the readouts below are not steering artifacts.
 
+The same vector is read on all five bundled instruments. Range plots show the per-factor steer path
+(red `+c` up, blue `-c` down) against human society ranges; maps are PCA culture maps with the c-sweep
+trajectory. The 16PF map is omitted (16 axes do not lay out as a readable 2-D map; its range is kept).
+
 ![MFQ-2 culture map: base and fairness-steered points against human societies](docs/img/showcase/mfq2/map_pca_ipsative.png)
 
 ![MFQ-2 range plot: human society ranges beside the fairness steer path; equality rises at +c](docs/img/showcase/mfq2/range.png)
+
+![Big Five culture map with the c-sweep trajectory](docs/img/showcase/big5/map_pca_ipsative.png)
+
+![Big Five range: fairness steer path per trait against human society ranges](docs/img/showcase/big5/range.png)
+
+![Humor Styles culture map with the c-sweep trajectory](docs/img/showcase/humor_styles/map_pca_ipsative.png)
+
+![Humor Styles range: fairness steer path per style against human ranges](docs/img/showcase/humor_styles/range.png)
+
+![16PF range: fairness steer path across all 16 factors](docs/img/showcase/16pf/range.png)
+
+![MFV culture map with the c-sweep trajectory](docs/img/showcase/mfv/map_pca_ipsative.png)
+
+![MFV range: per-foundation emphasis; Care moves most under the fairness vector, Fairness barely](docs/img/showcase/mfv/range.png)
 
 ## Install
 
@@ -174,28 +192,9 @@ Full return schemas live in the `TypedDict`s in `src/tinymfv/eval.py` and
 
 ## Steering plots
 
-The same fairness vector read on every other bundled instrument. Range plots show the per-factor
-steer path (red `+c` up, blue `-c` down) against human society ranges; maps are PCA culture maps with
-the c-sweep trajectory. The 16PF map is omitted (16 axes do not lay out as a readable 2-D map; its
-range strip is kept).
-
-![Big Five range: fairness steer path per trait against human society ranges](docs/img/showcase/big5/range.png)
-
-![Big Five culture map with the c-sweep trajectory](docs/img/showcase/big5/map_pca_ipsative.png)
-
-![16PF range: fairness steer path across all 16 factors](docs/img/showcase/16pf/range.png)
-
-![Humor Styles range: fairness steer path per style against human ranges](docs/img/showcase/humor_styles/range.png)
-
-![Humor Styles culture map with the c-sweep trajectory](docs/img/showcase/humor_styles/map_pca_ipsative.png)
-
-![MFV range: per-foundation emphasis; Care moves most under the fairness vector, Fairness barely](docs/img/showcase/mfv/range.png)
-
-![MFV culture map with the c-sweep trajectory](docs/img/showcase/mfv/map_pca_ipsative.png)
-
-`si_per_foundation` lives in steering-lite. It is a stricter, thresholded flip metric: did the steer
-move rows toward the intended foundation at `+C` and away at `-C`, while penalizing rows that were
-already right and got broken?
+The per-instrument range and map figures are at the top of this README. A stricter, thresholded flip
+metric, `si_per_foundation`, lives in steering-lite: did the steer move rows toward the intended
+foundation at `+C` and away at `-C`, while penalizing rows that were already right and got broken?
 
 $$\mathrm{SI} = \mathrm{mean}(\mathrm{SI_{fwd}}, \mathrm{SI_{rev}}) \times \text{pmass\_scale}$$
 
