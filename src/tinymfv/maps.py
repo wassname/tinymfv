@@ -70,8 +70,9 @@ MEDIAN_GREY = "0.15"
 POS_COL, NEG_COL = "#c0392b", "#2c6fbb"   # +c side (red) / -c side (blue) of the sweep
 DX_HUMAN, DX_STEER = -0.17, 0.18
 GROUP_PITCH = 1.55       # x-distance between factors; > pair width so each (societies, steer) reads as one unit
-# ipsative-map palette
-C_BASE, C_HON, C_DIS, C_HUM = "#33688f", "#c2702f", "#8a5a9c", "#888888"
+# ipsative-map palette. Keep steer colors identical to the range plots:
+# base is neutral, +c is red, -c is blue, human societies are grey.
+C_BASE, C_HON, C_DIS, C_HUM = "#111111", POS_COL, NEG_COL, "#888888"
 
 
 def save_both(fig, fig_dir: Path, stem: str, dpi: int = 200) -> Path:
@@ -237,14 +238,14 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
             ax.errorbar(pt[0], pt[1], xerr=e1, yerr=e2, fmt="none", ecolor=col,
                         elinewidth=0.7, alpha=0.55, capsize=2.5, capthick=0.8, zorder=4)
     base_lab, pos_lab, neg_lab = labels
-    for pt, col, mk, lab, dxy, ha in [(ph, C_HON, "s", pos_lab, (9, 9), "left"),
-                                      (pf, C_DIS, "^", neg_lab, (-9, -1), "right"),
-                                      (pb, C_BASE, "o", base_lab, (9, -13), "left")]:
+    for pt, col, lab, dxy, ha in [(ph, C_HON, pos_lab, (9, 9), "left"),
+                                  (pf, C_DIS, neg_lab, (-9, -1), "right"),
+                                  (pb, C_BASE, base_lab, (9, -13), "left")]:
         if pt is None:
             continue
         if pt is not pb:
             ax.annotate("", xy=pt, xytext=pb, arrowprops=dict(arrowstyle="-|>", color=col, lw=2.0), zorder=5)
-        ax.scatter(*pt, s=120, c=col, marker=mk, edgecolors="white", linewidths=1.2, zorder=7)
+        ax.scatter(*pt, s=120, c=col, marker="o", edgecolors="white", linewidths=1.2, zorder=7)
         ax.annotate(lab, pt, xytext=dxy, textcoords="offset points", fontsize=9, color=col,
                     fontweight="bold", ha=ha, va="center", zorder=8)
     traj_pts = None
@@ -482,7 +483,7 @@ def draw_range_panel(ax, instr: Instrument, dims: list[str], cs: list[float], pr
         yv = np.array([prof[c][i] for c in cs])
         ys += yv.tolist()
         base_y = float(yv[list(cs).index(0.0)])
-        draw_steer(ax, xs, cs, yv, base_y, dots=True)              # joint dots at c=+-1,+-2 (poles = head only)
+        draw_steer(ax, xs, cs, yv, base_y, dots=False)
         if i == label_i:
             # Only the two pole labels, to the RIGHT of the steer column. No 'base' tag: the black dot
             # between the two coloured arms is self-evidently the unsteered model, and on a near-collapsed
