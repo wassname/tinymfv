@@ -110,7 +110,7 @@ def read_profiles(run_dir: Path, name: str, dims: list[str], value_col: str = "m
     return {c: np.array([d[f] for f in dims]) for c, d in by_c.items()}, pmass
 
 
-def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float) -> list[Path]:
+def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float, *, show_sweep: bool = False) -> list[Path]:
     instr = get_instrument(name)
     dims = instr.dimensions
     prof_c, pmass = read_profiles(run_dir, name, dims)
@@ -133,12 +133,14 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float) 
         respondents, haze = T.maps.respondent_profiles(dims, instr.scale_max), None
     else:
         respondents, haze = None, human_haze(instr)
-    # trajectory overlay only when the run swept more than the 3-point base/+-C (else the arrows suffice).
+    # Public showcase maps default to the clean base/+-C anchors. The full -N..+N sweep is useful
+    # for diagnosis, but it clutters the README and is often mistaken for incoherent random dots.
+    # Pass --show-sweep when debugging how stronger coefficients leave the human map.
     # Coherence gate is RELATIVE: keep a c only if its pmass stays within 95% of the base (c=0) pmass;
     # below that the readout has degraded enough that the profile is not comparable, so drop it entirely.
     base_pm = pmass[0.0]
     coh_cs = [c for c in cs if pmass[c] >= 0.95 * base_pm]
-    traj = {c: _frac(prof_c[c], instr.scale_max) for c in coh_cs} if len(coh_cs) > 3 else None
+    traj = {c: _frac(prof_c[c], instr.scale_max) for c in coh_cs} if show_sweep and len(coh_cs) > 3 else None
     traj_inco = None  # excluded (not drawn hollow) per the 95%-of-base coherence gate
     figm = T.maps.plot_ipsative_pca(instr, dims, countries, Mfrac,
                                     _frac(base, instr.scale_max), _frac(pos, instr.scale_max),
@@ -236,6 +238,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-dir", type=Path, required=True)
     ap.add_argument("--out", type=Path, default=Path("docs/img/showcase"))
+    ap.add_argument("--show-sweep", action="store_true",
+                    help="draw the full coherence-gated c sweep on ordinal maps")
     args = ap.parse_args()
     summary = json.loads((args.run_dir / "summary.json").read_text())
     C = float(summary["calibrated_C"])
@@ -246,7 +250,8 @@ def main() -> None:
     written: list[str] = []
     for name in ORDINAL:
         if (args.run_dir / f"{name}_profiles.csv").exists():
-            written += [str(p) for p in plot_ordinal(args.run_dir, args.out, name, vec_label, C)]
+            written += [str(p) for p in plot_ordinal(args.run_dir, args.out, name, vec_label, C,
+                                                       show_sweep=args.show_sweep)]
     if (args.run_dir / "mfv.json").exists():
         written.append(str(plot_mfv_map(args.run_dir, args.out, vec_label, C)))    # shared ipsative map (z-space)
         written.append(str(plot_mfv_range(args.run_dir, args.out, vec_label, C)))  # shared range (z-space)
