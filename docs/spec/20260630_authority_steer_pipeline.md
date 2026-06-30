@@ -97,6 +97,13 @@ Out:
   - likely_fail: lowering C makes direction vanish instead of fixing the path.
   - sneaky_fail: selecting scenarios by MFV/MFQ-2 directly overfits the eval; keep persona-library validation separate from tinymfv eval.
   - UAT: verifier table plus per-foundation path table show the steer is both signed and selective enough to plot.
+- [/] T7 (R4, R5, R6): Compare one full showcase run per runner-supported steering method.
+  - steps: queue `mean_diff`, `pca`, `sspace`, `directional_ablation`, and `linear_act` with the same Authority-only score60 persona-library selection, the same `mfv mfq2 humor_styles big5` instrument subset, sampled survey reads `N=8`, and signed c-grid `0.5,1,2,3,4`.
+  - verify: each output dir has `summary.json`, `mfv_profiles.csv`, `mfq2_profiles.csv`, `humor_styles_profiles.csv`, `big5_profiles.csv`; then run the Authority verifier and regenerate plots only from passing runs.
+  - success: at least one method moves Authority in the intended direction locally and through coherent `c=1`, does not make MFV Social Norms the largest effect, and yields coherent README-relevant plots.
+  - likely_fail: all methods reproduce the same off-axis Social Norms/tradition entanglement.
+  - sneaky_fail: a method looks good because high-c rows were dropped asymmetrically; catch by printing retained c values and per-instrument quality gates beside the plots.
+  - UAT: a method comparison table links each output dir, verifier table, and regenerated plot folder.
 
 ## Context
 - Current wrong path: `dignity_over_authority` strict22. It was selected as the best dignity conflict axis, not the desired Authority-only axis.
@@ -141,3 +148,10 @@ Out:
 - 2026-06-30: Pushed steering-lite `899d932` to set `PYTHONUNBUFFERED=1` in the authority runner. Queued pueue task 402 with output `outputs/20260630_authority_only_qwen3_14b_score60_sspace_mfv_mfq2_n8_fixedC39758_unbuf`; log confirms `fixed C=+39.7580 (iso-KL skipped)`.
 - 2026-06-30: Killed pueue task 402 after MFQ-2 gave a mixed result: small `c` had the right local sign (`authority` C base `30.80`, `+0.5` `33.17`, `-0.5` `29.72`) but `+1` doubled back to `27.23` while pmass stayed `1.000`. Queued pueue task 403 as focused MFV-only check at `c=0.5,1`: `outputs/20260630_authority_only_qwen3_14b_score60_sspace_mfv_c05_c1_fixedC39758`.
 - 2026-06-30: Pueue task 403 completed. MFV small-c direction passed (`Authority` dlogit `+0.176` at `+0.5`, `-0.392` at `-0.5`; pmass `1.000`, unscorable `0`). MFV `+1/-1` also moved Authority in the expected direction (`+1.454`, `-0.580`). But the vector is not selective enough for README: MFV Social Norms moved more than Authority (`-0.621` at `+0.5`, `+1.121` at `-0.5`; `-1.511/+2.281` at `+1/-1`), and MFQ-2 doubled back at `+1`. Current verdict: local-direction pass, path/selectivity fail.
+- 2026-06-30: Regenerated current MFV-only inspection plots from the completed `sspace` run under `docs/img/showcase_authority_score60_sspace_current/`. This is for inspection only, not README replacement.
+- 2026-06-30: Queued one comparable showcase run per runner-supported steering method using the Authority-only score60 selection and unique timestamped output dirs:
+  - pueue 404: `mean_diff` -> `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T104202_authority_tradition_obedience_score60_mean_diff_mfv_mfq2_humor_big5_n8`
+  - pueue 405: `pca` -> `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T104202_authority_tradition_obedience_score60_pca_mfv_mfq2_humor_big5_n8`
+  - pueue 406: `sspace` -> `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T104202_authority_tradition_obedience_score60_sspace_mfv_mfq2_humor_big5_n8`
+  - pueue 407: `directional_ablation` -> `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T104202_authority_tradition_obedience_score60_directional_ablation_mfv_mfq2_humor_big5_n8`
+  - pueue 408: `linear_act` -> `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T104202_authority_tradition_obedience_score60_linear_act_mfv_mfq2_humor_big5_n8`
