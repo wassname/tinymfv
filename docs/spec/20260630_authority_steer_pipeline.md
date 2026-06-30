@@ -154,6 +154,13 @@ Out:
   - likely_fail: the plotter uses MFQ-2 or arbitrary small-c thresholds to choose the method.
   - sneaky_fail: candidate images silently replace README figures before the steer is accepted; catch by writing to a separate candidate directory.
   - UAT: candidate artifacts are in `/media/wassname/SGIronWolf/projects5/2026/lite/tinymfv/docs/img/showcase_authority_pca_mundane15/`. Result: `pca` is the best current candidate by MFV-only evidence; it has signed Authority movement at `c=0.5` and `c=1.0`, `pmass=1.000`, `frac_unscorable=0.000`, and minimum MFV `margin/base=0.805`.
+- [x] T13 (R5): Render steering-method comparison plots.
+  - steps: render MFV and MFQ-2 maps/ranges for `mean_diff`, `pca`, `sspace`, `directional_ablation`, and `linear_act` from pueue runs 417-421.
+  - verify: `find docs/img/showcase_authority_method_compare_mundane15 -type f`.
+  - success: one method-named directory per steering method, each with MFV and MFQ-2 map/range PNG/SVG pairs.
+  - likely_fail: method plots overwrite README figures or the candidate PCA directory.
+  - sneaky_fail: plots use different c retention rules across methods; catch by plotter output showing coherent c values for each method.
+  - UAT: artifacts are in `/media/wassname/SGIronWolf/projects5/2026/lite/tinymfv/docs/img/showcase_authority_method_compare_mundane15/`.
 
 ## Context
 - Current wrong path: `dignity_over_authority` strict22. It was selected as the best dignity conflict axis, not the desired Authority-only axis.
@@ -225,3 +232,4 @@ Out:
 - 2026-07-01: Copied the selected data into steering-lite and added verbatim persona-library prompt support so the steer uses the same prompts that validation tested. Queued pueue 417-421 for `mean_diff`, `pca`, `sspace`, `directional_ablation`, and `linear_act` on MFV/MFQ-2 with `c=0.5,1`, `N=8`.
 - 2026-07-01: User correctly objected that the `c=0.5`, MFQ-2, Social-Norms-selectivity, and hard coherence thresholds were arbitrary. Replaced the active verifier with an MFV-only evidence report: Authority direction over all paired c values, plus MFV `pmass`, `mean_margin`, `margin/base`, `frac_unscorable`, and `mean_nll_prefill`. Under this corrected view, `pca` and `linear_act` have signed MFV Authority direction across the evaluated path; `sspace` is only locally signed; `mean_diff` and `directional_ablation` are direction failures.
 - 2026-07-01: Rendered candidate maps/ranges from the current best MFV-only method, `pca`, into `/media/wassname/SGIronWolf/projects5/2026/lite/tinymfv/docs/img/showcase_authority_pca_mundane15/`. These are candidate artifacts, not README replacements.
+- 2026-07-01: Rendered method-comparison maps/ranges into `/media/wassname/SGIronWolf/projects5/2026/lite/tinymfv/docs/img/showcase_authority_method_compare_mundane15/`.
