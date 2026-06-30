@@ -56,7 +56,9 @@ def build_user_content(instr: Instrument, item: InstrItem) -> str:
 
 @torch.no_grad()
 def read_items(model, tok, instr: Instrument, items: list[InstrItem], answer_ids: list[int],
-               *, max_think_tokens: int, batch_size: int = 36, verbose_first: bool = False) -> list[dict]:
+               *, max_think_tokens: int, batch_size: int = 36, n_samples: int = 1,
+               temperature: float = 0.0, top_p: float = 1.0,
+               verbose_first: bool = False) -> list[dict]:
     """Score a list of InstrItems (one frame's worth, or any subset). Returns per-item rows with
     the keys `per_item_categorical` consumes: id, frame, p, pmass_allowed, dimension, sign, human_label.
 
@@ -83,31 +85,35 @@ def read_items(model, tok, instr: Instrument, items: list[InstrItem], answer_ids
         # ordinal frames are already separate InstrItems, so single-pass (no reversed-enum two-pass;
         # frame debias is downstream in canonicalize_to_forward). force_only: the "(" prefill is too
         # short for natural-emission detection (matches by chance in the think trace), so always read
-        # the forced answer slot. n_samples=1, temperature=0 -> deterministic.
+        # the forced answer slot. n_samples>1 samples independent think traces, then averages the
+        # answer-token probabilities below.
         thinks, slots = _rollout_natural_or_forced(
             model, tok, user_prompts,
             schema_hint="", max_think_tokens=max_think_tokens,
             scoring_slots=[("Just answer", instr.prefill)],
             gather_token_ids=answer_ids,
-            n_samples=1, temperature=0.0, force_only=True,
+            n_samples=n_samples, temperature=temperature, top_p=top_p, force_only=True,
             verbose=verbose_first and i == 0,
         )
         for j, it in enumerate(chunk):
-            slot = slots[j][0]
+            sample_idx = [j * n_samples + n for n in range(n_samples)]
+            sample_slots = [slots[k][0] for k in sample_idx]
             # lp = lp_gather: the full-vocab log_softmax logprob of each answer token at the answer
             # slot. This is the RAW PRIMITIVE -- every readout (E, the logit contrast C, log-odds,
             # entropy) is a pure function of it, and a steer effect is just a difference of lp. Keep
             # it; do not throw it away by collapsing to a single number here.
-            lp = np.asarray(slot["lp_gather"], dtype=float)            # [A] raw logprobs (full-vocab norm)
+            sample_lp = np.asarray([s["lp_gather"] for s in sample_slots], dtype=float)  # [N,A]
+            lp = np.log(np.nanmean(np.exp(sample_lp), axis=0))         # [A] BMA over sampled thoughts
             p_a = np.exp(lp)                                           # [A] prob on each answer token
-            pmass = float(slot["pmass_allowed"])                       # mass on allowed tokens (coherence)
+            pmass = float(np.nansum(p_a))                              # mass on allowed tokens (coherence)
             # Renormalize within allowed. INTENTIONALLY NOT NaN-guarded: at full coherence collapse
             # pmass -> 0 so p_norm -> NaN and poisons that item's factor. That is the honest signal, a
             # distribution renormalized from ~zero mass is NOT comparable to one from real mass (the mean
             # of 10 != the mean of 130), so it must not be silently turned into a comparable-looking
             # number. NaN marks "do not compare". Do not "fix" this with a softmax/eps fallback.
             p_norm = p_a / p_a.sum()                                   # [A] within allowed (NaN at collapse, by design)
-            think_text, n_think, emitted_close = thinks[j]
+            sample_thinks = [thinks[k] for k in sample_idx]
+            think_text, n_think, emitted_close = sample_thinks[0]
             out.append({
                 "id": it.id, "frame": it.frame,
                 "lp": lp,                                              # raw logprobs at the M scale tokens
@@ -115,7 +121,8 @@ def read_items(model, tok, instr: Instrument, items: list[InstrItem], answer_ids
                 "pmass_allowed": pmass,
                 "dimension": it.dimension, "sign": it.sign,
                 "human_label": it.human_label,
-                "think": think_text, "n_think": n_think, "emitted_close": emitted_close,
+                "think": think_text, "n_think": n_think,
+                "emitted_close": any(t[2] for t in sample_thinks),
             })
         if verbose_first and i == 0:
             slot0 = slots[0][0]

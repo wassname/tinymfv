@@ -190,9 +190,9 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     for the crop -- separate from the fit so instruments with only society-level mean+sd (big5/16pf/
     humor: a marginal resample) get a backdrop without that resample dictating the axes. mfq2 passes
     real `respondents` (also used as the haze when `haze` is None). With neither, fit on M, pad-crop,
-    no backdrop. `traj` (signed c-multiplier -> length-K fraction vector) draws the full steer SWEEP
-    as a connected path through PC space, so a multi-C run shows where the steer leaves the human
-    cloud and curves into incoherence (the base/pos/neg arrows stay as the headline +-C anchors).
+    no backdrop. `traj` (signed c-multiplier -> length-K fraction vector) draws the coherent steer
+    path through PC space. Public README plots pass only the coherent prefix; incoherent c values
+    are omitted.
     `traj_incoherent` is the subset of those c whose admin pmass fell below the coherence floor --
     drawn hollow. `boots` optionally maps 'base'/'honest'/'dis' -> (n x K) bootstrap matrices. Returns
     the Figure."""
@@ -238,33 +238,44 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
             ax.errorbar(pt[0], pt[1], xerr=e1, yerr=e2, fmt="none", ecolor=col,
                         elinewidth=0.7, alpha=0.55, capsize=2.5, capthick=0.8, zorder=4)
     base_lab, pos_lab, neg_lab = labels
-    for pt, col, lab, dxy, ha in [(ph, C_HON, pos_lab, (9, 9), "left"),
-                                  (pf, C_DIS, neg_lab, (-9, -1), "right"),
-                                  (pb, C_BASE, base_lab, (9, -13), "left")]:
-        if pt is None:
-            continue
-        ax.scatter(*pt, s=120, c=col, marker="o", edgecolors="white", linewidths=1.2, zorder=7)
-        ax.annotate(lab, pt, xytext=dxy, textcoords="offset points", fontsize=9, color=col,
-                    fontweight="bold", ha=ha, va="center", zorder=8)
+    if pb is not None:
+        ax.scatter(*pb, s=72, c=C_BASE, marker="o", edgecolors="white", linewidths=1.0, zorder=7)
+        ax.annotate(base_lab, pb, xytext=(9, -13), textcoords="offset points", fontsize=9,
+                    color=C_BASE, fontweight="bold", ha="left", va="center", zorder=8)
     traj_pts = None
     if traj:
         inco = traj_incoherent or set()
         cs_sorted = sorted(traj)
         traj_pts = np.array([proj(traj[c]) for c in cs_sorted])
-        # two arms fanning from base (c=0): +c red, -c blue. Marker grows with |c|; a point whose
-        # admin pmass fell below the coherence floor is hollow (the steer is no longer measuring).
+        # Two arms from base (c=0): +c red, -c blue. Marker size is constant so path length, not ink
+        # area, carries the coefficient change.
         for lo, hi in [(0.0, max(cs_sorted)), (min(cs_sorted), 0.0)]:
             arm = [(c, proj(traj[c])) for c in cs_sorted if lo <= c <= hi]
             if len(arm) < 2:
                 continue
             xy = np.array([p for _, p in arm])
-            ax.plot(xy[:, 0], xy[:, 1], "-", color="0.55", lw=0.9, zorder=4, alpha=0.8)
+            col = POS_COL if hi > 0 else NEG_COL
+            ax.plot(xy[:, 0], xy[:, 1], "-", color=col, lw=1.1, zorder=4, alpha=0.75)
+            c_end = max((c for c, _p in arm), key=abs)
             for c, p in arm:
                 if c == 0:
                     continue
-                col = POS_COL if c > 0 else NEG_COL
-                ax.scatter(p[0], p[1], s=34, c="none" if c in inco else col,
-                           edgecolors=col, linewidths=1.0, zorder=6)
+                fill = col if c == c_end and c not in inco else "none"
+                ax.scatter(p[0], p[1], s=42, c=fill, edgecolors=col,
+                           linewidths=1.25, zorder=6)
+                if c == c_end:
+                    lab = pos_lab if c > 0 else neg_lab
+                    dxy, ha = ((9, 9), "left") if c > 0 else ((-9, -1), "right")
+                    ax.annotate(lab, p, xytext=dxy, textcoords="offset points", fontsize=9,
+                                color=col, fontweight="bold", ha=ha, va="center", zorder=8)
+    else:
+        for pt, col, lab, dxy, ha in [(ph, C_HON, pos_lab, (9, 9), "left"),
+                                      (pf, C_DIS, neg_lab, (-9, -1), "right")]:
+            if pt is None:
+                continue
+            ax.scatter(*pt, s=42, c=col, marker="o", edgecolors="white", linewidths=1.0, zorder=7)
+            ax.annotate(lab, pt, xytext=dxy, textcoords="offset points", fontsize=9, color=col,
+                        fontweight="bold", ha=ha, va="center", zorder=8)
     # Crop to the SOCIETIES + steer anchors for EVERY instrument (the human cloud is far wider and would
     # bury them in a central blob; it stays a clipped backdrop). Then PAD THE BOTTOM to reserve a clean
     # strip for the legend insets -- deterministic placement, identical on every plot, no overlap with
@@ -414,12 +425,11 @@ def plot_splom(instr: Instrument, dims: list[str], cloud: np.ndarray, M: np.ndar
 
 # --- per-vector steer range ---------------------------------------------------------------------
 
-def draw_steer(ax, xs: float, cs: list[float], yv: np.ndarray, base_y: float,
-               lw: float = 2.0, dx: float = 0.12, tick: float = 0.038) -> None:
-    """Draw one coherent AI c-path."""
+def draw_steer(ax, xs: float, cs: list[float], yv: np.ndarray, lw: float = 2.0,
+               lane_dx: float = 0.14) -> None:
+    """Draw one coherent AI c-path. X is only the sign lane: negative, base, positive."""
     assert list(cs) == sorted(cs) and 0.0 in cs, f"draw_steer needs sorted cs with c=0 (yv[-1]=+pole, yv[0]=-pole), got {cs}"
-    cmax = max(abs(c) for c in cs) or 1.0
-    xs_by_c = {c: xs if c == 0.0 else xs + dx * np.sign(c) * np.sqrt(abs(c) / cmax) for c in cs}
+    xs_by_c = {c: xs + lane_dx * np.sign(c) for c in cs}
     for side_cs, col in [([c for c in cs if c <= 0.0], NEG_COL), ([c for c in cs if c >= 0.0], POS_COL)]:
         if len(side_cs) < 2:
             continue
@@ -428,11 +438,11 @@ def draw_steer(ax, xs: float, cs: list[float], yv: np.ndarray, base_y: float,
         ax.plot(x_path, y_path, color=col, lw=lw, alpha=0.9, zorder=6, solid_capstyle="round")
     for c, y in zip(cs, yv):
         if c == 0.0:
-            col, t = "black", tick * 1.25
+            col = "black"
         else:
-            col, t = (POS_COL if c > 0 else NEG_COL), tick
+            col = POS_COL if c > 0 else NEG_COL
         x = xs_by_c[c]
-        ax.plot([x - t, x + t], [float(y), float(y)], color=col, lw=lw, zorder=8)
+        ax.scatter(x, float(y), s=18, color=col, edgecolors="white", linewidths=0.45, zorder=8)
 
 
 def draw_range_panel(ax, instr: Instrument, dims: list[str], cs: list[float], prof: dict,
@@ -464,8 +474,7 @@ def draw_range_panel(ax, instr: Instrument, dims: list[str], cs: list[float], pr
         xs = gx + DX_STEER
         yv = np.array([prof[c][i] for c in cs])
         ys += yv.tolist()
-        base_y = float(yv[list(cs).index(0.0)])
-        draw_steer(ax, xs, cs, yv, base_y)
+        draw_steer(ax, xs, cs, yv)
         if i == label_i:
             # Only the two pole labels, to the RIGHT of the steer column. No 'base' tag: the black dot
             # between the two coloured arms is self-evidently the unsteered model, and on a near-collapsed
@@ -534,8 +543,7 @@ def plot_range_zoom(instr: Instrument, dims: list[str], cs: list[float], prof: d
         soc_vals = np.array([m for _, m in soc])
         q1, q3 = np.percentile(soc_vals, [25, 75])
         # nanmin/nanmax: a collapsed pole reads NaN (read.py NaN-at-collapse, "do not compare"). The
-        # base (c=0) is always finite, so the axis still frames the un-collapsed cells; draw_steer
-        # skips the NaN arm on its own (the abs(NaN-base) test is False).
+        # base (c=0) is always finite, so the axis still frames the un-collapsed cells.
         lo, hi = min(np.nanmin(yv), q1), max(np.nanmax(yv), q3)
         m = max(0.10, 0.30 * (hi - lo))
         ylo, yhi = lo - m, hi + m
@@ -550,7 +558,7 @@ def plot_range_zoom(instr: Instrument, dims: list[str], cs: list[float], prof: d
 
         xs = 0.30
         base_y = float(yv[list(cs).index(0.0)])
-        draw_steer(ax, xs, cs, yv, base_y, lw=2.4, dx=0.10, tick=0.055)
+        draw_steer(ax, xs, cs, yv, lw=2.4)
         named = {}
         if near:
             name_xy = {nm: (float(x), v) for (nm, v), x in zip(near, soc_x)}
@@ -558,7 +566,7 @@ def plot_range_zoom(instr: Instrument, dims: list[str], cs: list[float], prof: d
                 named[min(near, key=lambda t: abs(t[1] - ref))[0]] = ref
         tx = [xs] * len(cs) + [name_xy[nm][0] for nm in named] if near else [xs] * len(cs)
         ty = list(map(float, yv)) + [name_xy[nm][1] for nm in named] if near else list(map(float, yv))
-        txt = [("c=0" if c == 0 else f"c={int(c):+d}") for c in cs] + list(named)
+        txt = [("c=0" if c == 0 else f"c={c:+g}") for c in cs] + list(named)
         dot_x = [xs] * len(cs) + (list(soc_x) if near else [])
         dot_y = list(map(float, yv)) + ([v for _, v in near] if near else [])
         placed = False

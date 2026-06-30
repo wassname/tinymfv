@@ -67,7 +67,8 @@ class AdministerResult(TypedDict):
 
 
 def administer(model, tok, instr: Instrument, *, batch_size: int = 36,
-               max_think_tokens: int = 64) -> AdministerResult:
+               max_think_tokens: int = 64, n_samples: int = 1,
+               temperature: float = 0.0, top_p: float = 1.0) -> AdministerResult:
     assert instr.kind == "ordinal", "administer() is the ordinal survey readout; use evaluate() for nominal MFV"
     # Every ordinal item must carry its frame-specific response-scale legend in meta['task']; without
     # it build_user_content would silently emit a bare statement (no legend) and the profile would be
@@ -78,7 +79,9 @@ def administer(model, tok, instr: Instrument, *, batch_size: int = 36,
     # slot, so an activation steer accrues over the trace before being read. Floor is 1 (the shared
     # rollout core's HF generate() rejects max_new_tokens=0).
     per_row = read_items(model, tok, instr, instr.items, answer_ids,
-                         max_think_tokens=max_think_tokens, batch_size=batch_size, verbose_first=True)
+                         max_think_tokens=max_think_tokens, batch_size=batch_size,
+                         n_samples=n_samples, temperature=temperature, top_p=top_p,
+                         verbose_first=True)
     items = per_item_categorical(per_row, instr.kind)            # {id: {p, pmass, dimension, sign, ...}}
 
     M = instr.scale_max

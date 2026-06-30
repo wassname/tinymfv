@@ -4,7 +4,7 @@ Consumes a steering-lite `run_allinstr_showcase.py` output dir (one calibrated
 activation-steering vector administered across every instrument over a signed
 c-sweep) and renders the SAME two figures for every instrument, uniformly:
 
-  - map  : ipsative culture map (PCA), AI base + strongest coherent +/-c vs the human cloud.
+  - map  : ipsative culture map (PCA), AI coherent +/-c path vs the human cloud.
   - range: per-factor range, AI base + coherent +/-c path vs the human society strip.
 
 Ordinal instruments (mfq2/big5/16pf/humor_styles) read <name>_profiles.csv; nominal
@@ -13,9 +13,8 @@ logit-violation units cannot share a raw axis with 1-5 wrongness), but it goes
 through the same plot_ipsative_pca / plot_range and yields the same two figures.
 
 cs are SIGNED multipliers of the calibrated coefficient C (0 = base). The public
-README range plots show the coherent path: c=0 plus each +/-c row whose pmass stays
-above the requested fraction of base. Maps show only the strongest coherent endpoints.
-Incoherent rows are dropped, not drawn hollow.
+README plots show the coherent path: c=0 plus each +/-c row whose tinymfv answer mass
+stays above the requested fraction of base. Incoherent rows are dropped, not drawn hollow.
 
   uv run python scripts/plot_steer_showcase.py \
     --run-dir ../steering-lite/outputs/allinstr_qwen35_4b --out docs/img/showcase
@@ -23,6 +22,7 @@ Incoherent rows are dropped, not drawn hollow.
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import json
 from pathlib import Path
@@ -112,28 +112,36 @@ def read_profiles(run_dir: Path, name: str, dims: list[str], value_col: str = "m
     return {c: np.array([d[f] for f in dims]) for c, d in by_c.items()}, pmass
 
 
-def coherent_prefix_cs(cs: list[float], pmass: dict[float, float], coherence_frac: float) -> list[float]:
+def coherent_prefix_cs(cs: list[float], pmass_ratio: dict[float, float], coherence_frac: float) -> list[float]:
     """c=0 plus each signed arm until answer mass first falls below the base-relative floor."""
-    base_pm = pmass[0.0]
     kept = [0.0]
     for side in (1.0, -1.0):
         for c in sorted([c for c in cs if np.sign(c) == side], key=abs):
-            if pmass[c] <= coherence_frac * base_pm:
+            if pmass_ratio[c] <= coherence_frac:
                 break
             kept.append(c)
     return sorted(kept)
 
 
+def shared_pmass_ratio(run_dir: Path, names: list[str]) -> dict[float, float]:
+    """Worst base-relative answer mass across the survey evals, keyed by signed calibrated multiplier."""
+    pmasses: list[dict[float, float]] = []
+    for name in names:
+        instr = get_instrument(name)
+        _, pmass = read_profiles(run_dir, name, instr.dimensions)
+        pmasses.append(pmass)
+    cs = sorted(set.intersection(*(set(p) for p in pmasses)))
+    return {c: min(p[c] / p[0.0] for p in pmasses) for c in cs}
+
+
 def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float,
-                 coherence_frac: float) -> list[Path]:
-    instr = get_instrument(name)
+                 coh_cs: list[float]) -> list[Path]:
+    instr = copy.copy(get_instrument(name))
+    if name == "mfq2":
+        instr.display = "MFQ-2 survey"
     dims = instr.dimensions
-    prof_c, pmass = read_profiles(run_dir, name, dims)
-    cs = sorted(prof_c)
+    prof_c, _pmass = read_profiles(run_dir, name, dims)
     base = prof_c[0.0]
-    # Coherence gate is RELATIVE and monotone per signed arm: walk outward from c=0 and stop at the
-    # first coefficient whose allowed-answer mass falls below the requested fraction of base.
-    coh_cs = coherent_prefix_cs(cs, pmass, coherence_frac)
     pos_c = max(c for c in coh_cs if c > 0.0)
     neg_c = min(c for c in coh_cs if c < 0.0)
     pos = prof_c[pos_c]
@@ -151,10 +159,11 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float,
         respondents, haze = T.maps.respondent_profiles(dims, instr.scale_max), None
     else:
         respondents, haze = None, human_haze(instr)
+    traj = {c: _frac(prof_c[c], instr.scale_max) for c in coh_cs}
     figm = T.maps.plot_ipsative_pca(instr, dims, countries, Mfrac,
                                     _frac(base, instr.scale_max), _frac(pos, instr.scale_max),
                                     _frac(neg, instr.scale_max), respondents=respondents, haze=haze,
-                                    labels=labels)
+                                    traj=traj, labels=labels)
     figm.axes[0].set_title(f"{instr.display}: humans vs LLMs steered for {vec_label}", fontsize=10)
     paths = [T.maps.save_both(figm, out / name, "map_pca_ipsative")]
     plt.close(figm)
@@ -182,29 +191,34 @@ def read_human_mfv() -> tuple[list[str], dict[str, dict[str, float]]]:
             by_country.setdefault(r["country"], {})[r["foundation"]] = float(r["mean"])
     return sorted(by_country), by_country
 
-
-def _mfv_zspace(run_dir: Path):
-    """Shared MFV adapter -> the common coordinate system the map AND range both consume: z-scored
-    relative-emphasis profiles (model base / +C / -C) + the human MFV culture matrix in the same
-    space. MFV is nominal (model emits logit(violation) per foundation, humans rate wrongness 1-5),
-    so absolute scales differ; z-scoring each profile ACROSS foundations compares the PATTERN -- which
-    foundations a reader weights as more violation-worthy than their own average -- which is exactly
-    what the steer moves. Social Norms is dropped (no human MFV norm), asserted so a taxonomy change
-    fails loud. Returns (founds, countries, M_z[countries x founds], base_z, posz, negz)."""
-    d = json.loads((run_dir / "mfv.json").read_text())
-    base_l = d["base_logit_per_foundation"]
-    pos_dl, neg_dl = d["pos"]["dlogit_per_foundation"], d["neg"]["dlogit_per_foundation"]
+def read_mfv_profiles(run_dir: Path) -> tuple[list[str], dict[float, np.ndarray], dict[float, float]]:
+    rows = list(csv.DictReader((run_dir / "mfv_profiles.csv").open()))
+    foundation_order = []
+    for r in rows:
+        if r["foundation"] not in foundation_order:
+            foundation_order.append(r["foundation"])
     countries, human = read_human_mfv()
     hfounds = set(next(iter(human.values())))
-    founds = [f for f in d["foundation_order"] if f.lower() in hfounds]   # shared, model order
-    dropped = [f for f in d["foundation_order"] if f.lower() not in hfounds]
+    founds = [f for f in foundation_order if f.lower() in hfounds]
+    dropped = [f for f in foundation_order if f.lower() not in hfounds]
     assert dropped == ["Social Norms"], f"unexpected MFV foundations without a human norm: {dropped}"
+    by_c: dict[float, dict[str, float]] = {}
+    pmass: dict[float, float] = {}
+    for r in rows:
+        c = float(r["c"])
+        by_c.setdefault(c, {})[r["foundation"]] = float(r["mean"])
+        pmass[c] = float(r["pmass"])
+    prof = {c: _zscore(np.array([vals[f] for f in founds])) for c, vals in by_c.items()}
+    return founds, prof, pmass
+
+
+def _mfv_zspace(run_dir: Path):
+    """Shared MFV adapter -> z-scored relative-emphasis profiles + human MFV culture matrix."""
+    founds, prof, pmass = read_mfv_profiles(run_dir)
+    countries, human = read_human_mfv()
     fl = [f.lower() for f in founds]
-    base = _zscore(np.array([base_l[f]["mean"] for f in founds]))
-    posz = _zscore(np.array([base_l[f]["mean"] + pos_dl[f]["mean"] for f in founds]))
-    negz = _zscore(np.array([base_l[f]["mean"] + neg_dl[f]["mean"] for f in founds]))
     M = np.array([_zscore(np.array([human[c][f] for f in fl])) for c in countries])
-    return founds, countries, M, base, posz, negz
+    return founds, countries, M, prof, pmass
 
 
 # MFV has no ordinal Instrument (it goes through evaluate_multibool, not administer), but the shared
@@ -214,28 +228,30 @@ _MFV_INSTR = SimpleNamespace(name="mfv", display="MFV vignettes")
 _MFV_YLABEL = "relative emphasis  (z across foundations)"
 
 
-def plot_mfv_map(run_dir: Path, out: Path, vec_label: str, C: float) -> Path:
+def plot_mfv_map(run_dir: Path, out: Path, vec_label: str, C: float, coh_cs: list[float]) -> Path:
     """MFV ipsative culture map via the SAME plot_ipsative_pca the ordinal instruments use, in the
     z-scored relative-emphasis space (logit-violation and 1-5 wrongness cannot share a raw axis).
     Red/blue endpoint points show where the steer moves the AI among human cultures."""
-    founds, countries, M, base, posz, negz = _mfv_zspace(run_dir)
-    labels = ("base (c=0)", "c=+1", "c=-1")
-    fig = T.maps.plot_ipsative_pca(_MFV_INSTR, founds, countries, M, base, posz, negz, labels=labels)
+    founds, countries, M, prof, _pmass = _mfv_zspace(run_dir)
+    pos_c = max(c for c in coh_cs if c > 0.0)
+    neg_c = min(c for c in coh_cs if c < 0.0)
+    labels = ("base (c=0)", f"c={pos_c:+g}", f"c={neg_c:+g}")
+    traj = {c: prof[c] for c in coh_cs}
+    fig = T.maps.plot_ipsative_pca(_MFV_INSTR, founds, countries, M, prof[0.0], prof[pos_c], prof[neg_c],
+                                   traj=traj, labels=labels)
     fig.axes[0].set_title(f"MFV vignettes: humans vs LLMs steered for {vec_label}", fontsize=10)
     path = T.maps.save_both(fig, out / "mfv", "map_pca_ipsative")
     plt.close(fig)
     return path
 
 
-def plot_mfv_range(run_dir: Path, out: Path, vec_label: str, C: float) -> Path:
-    """MFV range via the SAME plot_range the ordinal instruments use, in z relative-emphasis space.
-    Only base/+C/-C (the MFV eval is a 3-point sweep, not a multi-C grid like the ordinal admin)."""
-    founds, countries, M, base, posz, negz = _mfv_zspace(run_dir)
-    cs = [-1.0, 0.0, 1.0]
-    prof = {-1.0: negz, 0.0: base, 1.0: posz}
+def plot_mfv_range(run_dir: Path, out: Path, vec_label: str, C: float, coh_cs: list[float]) -> Path:
+    """MFV range via the SAME plot_range the ordinal instruments use, in z relative-emphasis space."""
+    founds, countries, M, prof, _pmass = _mfv_zspace(run_dir)
     humans = {f: sorted(((countries[ci], float(M[ci, fi])) for ci in range(len(countries))), key=lambda t: t[1])
               for fi, f in enumerate(founds)}
-    fig = T.maps.plot_range(_MFV_INSTR, founds, cs, prof, humans, None, vec_label, ylabel=_MFV_YLABEL)
+    fig = T.maps.plot_range(_MFV_INSTR, founds, coh_cs, {c: prof[c] for c in coh_cs},
+                            humans, None, vec_label, ylabel=_MFV_YLABEL)
     path = T.maps.save_both(fig, out / "mfv", "range")
     plt.close(fig)
     return path
@@ -257,13 +273,19 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
 
     written: list[str] = []
-    for name in ORDINAL:
-        if (args.run_dir / f"{name}_profiles.csv").exists():
-            written += [str(p) for p in plot_ordinal(args.run_dir, args.out, name, vec_label, C,
-                                                       args.coherence_frac)]
-    if (args.run_dir / "mfv.json").exists():
-        written.append(str(plot_mfv_map(args.run_dir, args.out, vec_label, C)))    # shared ipsative map (z-space)
-        written.append(str(plot_mfv_range(args.run_dir, args.out, vec_label, C)))  # shared range (z-space)
+    ordinal_names = [name for name in ORDINAL if (args.run_dir / f"{name}_profiles.csv").exists()]
+    pmass_ratio = shared_pmass_ratio(args.run_dir, ordinal_names)
+    if (args.run_dir / "mfv_profiles.csv").exists():
+        _founds, _prof, mfv_pmass = read_mfv_profiles(args.run_dir)
+        for c, pm in mfv_pmass.items():
+            pmass_ratio[c] = min(pmass_ratio[c], pm / mfv_pmass[0.0])
+    coh_cs = coherent_prefix_cs(sorted(pmass_ratio), pmass_ratio, args.coherence_frac)
+    print(f"shared coherent c values at {args.coherence_frac:.2%} base answer mass: {coh_cs}")
+    for name in ordinal_names:
+        written += [str(p) for p in plot_ordinal(args.run_dir, args.out, name, vec_label, C, coh_cs)]
+    if (args.run_dir / "mfv_profiles.csv").exists():
+        written.append(str(plot_mfv_map(args.run_dir, args.out, vec_label, C, coh_cs)))    # shared ipsative map (z-space)
+        written.append(str(plot_mfv_range(args.run_dir, args.out, vec_label, C, coh_cs)))  # shared range (z-space)
     print(f"wrote {len(written)} figures under {args.out}:")
     for w in written:
         print(" ", w)
