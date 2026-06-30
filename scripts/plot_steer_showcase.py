@@ -17,7 +17,9 @@ README plots show the coherent path: c=0 plus each +/-c row whose tinymfv answer
 stays above the requested fraction of base. Incoherent rows are dropped.
 
   uv run python scripts/plot_steer_showcase.py \
-    --run-dir ../steering-lite/outputs/allinstr_qwen35_4b --out docs/img/showcase
+    --run-dir ../steering-lite/outputs/allinstr_qwen35_4b \
+    --out docs/img/showcase \
+    --vec-label "MFV Authority anchor (+c intended higher Authority)"
 """
 from __future__ import annotations
 
@@ -290,8 +292,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-dir", type=Path, required=True)
     ap.add_argument("--out", type=Path, default=Path("docs/img/showcase"))
-    ap.add_argument("--vec-label", default=None,
-                    help="short human-readable steering direction for plot titles")
+    ap.add_argument("--vec-label", required=True,
+                    help="short run-local steering label for plot titles; declare the anchor explicitly")
     ap.add_argument("--coherence-frac", type=float, default=0.99,
                     help="keep c rows whose pmass is above this fraction of base")
     ap.add_argument("--contrast-frac", type=float, default=0.50,
@@ -302,7 +304,7 @@ def main() -> None:
     summary = json.loads((args.run_dir / "summary.json").read_text())
     C = float(summary["calibrated_C"])
     method = summary["method"]
-    vec_label = args.vec_label or summary.get("vec_label", "-Authority")
+    vec_label = args.vec_label
     args.out.mkdir(parents=True, exist_ok=True)
 
     written: list[str] = []

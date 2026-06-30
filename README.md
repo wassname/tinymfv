@@ -4,7 +4,7 @@ tinymfv is a small set of fast value evals for local LLM steering work. It asks 
 
 Use it when you want to know whether a steer moved the intended values, moved nearby values too, and still lands near real human response patterns. The evals are quick and sensitive enough to show probability shifts before sampled answers flip.
 
-The plots compare that profile to human data. Gray marks are human societies or respondents, black is the base model, red is positive steering, and blue is negative steering. In these steering plots, red is positive `c`, blue is negative `c`, and `c` is the signed multiplier on the calibrated steering vector.
+The plots compare that profile to human data. Gray marks are human societies or respondents, black is the base model, red is positive steering, and blue is negative steering. In this README run, `+c` is oriented by a declared MFV Authority anchor. In other runs, `c` is just the signed vector coefficient unless the run declares its own anchor.
 
 MFV comes first because it is the direct moral-vignette readout. MFV is nominal: the answer is a moral foundation category. The survey plots are ordinal: the answer is a 1-5 scale point.
 
@@ -112,7 +112,7 @@ Generate the bundled range plots and culture maps from a steering-lite all-instr
 uv run python scripts/plot_steer_showcase.py \
   --run-dir ../steering-lite/outputs/20260630_dignity_authority_strict22_local_sspace_mfvgrid_n8 \
   --out docs/img/showcase \
-  --vec-label="dignity/authority axis (+c = Authority)" \
+  --vec-label="MFV Authority anchor (+c intended higher Authority)" \
   --coherence-frac 0.99 \
   --contrast-frac 0.50 \
   --margin-frac 0.50
