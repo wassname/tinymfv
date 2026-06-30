@@ -106,13 +106,13 @@ Out:
   - likely_fail: MFQ-2 noisy or opposite sign.
   - sneaky_fail: profile shift comes from loss of answer structure; catch with answer mass, survey contrast, and MFV margin.
   - UAT: one table lets the user decide whether the steer is good enough to show.
-- [ ] T12 (R6): Estimate the minimum MFQ-2 `N` needed for stable steering plots.
+- [x] T12 (R6): Estimate the minimum MFQ-2 `N` needed for stable steering plots.
   - steps: measure bootstrapped MFQ-2 Authority path variability at subset sizes `N=1,2,4,8` from per-sample readouts, or add a per-sample export if the current aggregate output is insufficient.
   - verify: table reports mean and bootstrap std/CI for Authority `C` deltas at each subset size and c row.
   - success: choose the smallest `N` whose bootstrapped direction and effect size are stable enough for README plots.
   - likely_fail: current `mfq2_profiles.csv` only has aggregate `C_sd`/`C_sem`, not the sample-level trajectories needed for subset bootstrapping.
   - sneaky_fail: bootstrapping across items instead of think trajectories answers the wrong question; catch by inspecting the exported unit of resampling.
-  - UAT: committed table or CSV shows MFQ-2 subset stability, with enough detail to choose default `N`.
+  - UAT: committed table or CSV shows MFQ-2 subset stability, with enough detail to choose default `N`. Result: `/media/wassname/SGIronWolf/projects5/2026/lite/tinymfv/docs/reviews/mfq2_authority_pca_n_bootstrap_20260701.csv` shows correct Authority direction for every bootstrap draw at `N=1,2,4,8` and `c in {-1,-0.5,+0.5,+1}`. `N=1` is enough for sign stability in this run; `N=4` or `N=8` gives tighter deltas for publication/readme plots.
 - [x] T8 (R1-R5): Repair the pure-Authority data selection.
   - steps: inspect rendered strict25 examples; remove scenarios whose Authority affordance is actually Social Norms, legality, institutional controversy, or welfare/autonomy; rerun scenario validation with stricter source balance and example audit.
   - verify: selected examples file has direct respect/disregard for authority without Social Norms or dignity/care wording, and source counts are not dominated by ValueBench.
@@ -161,6 +161,15 @@ Out:
   - likely_fail: method plots overwrite README figures or the candidate PCA directory.
   - sneaky_fail: plots use different c retention rules across methods; catch by plotter output showing coherent c values for each method.
   - UAT: artifacts are in `/media/wassname/SGIronWolf/projects5/2026/lite/tinymfv/docs/img/showcase_authority_method_compare_mundane15/`.
+- [x] T14 (R5-R7): Regenerate live README plot images from the successful PCA full run.
+  - steps: run the full PCA showcase on MFV, MFQ-2, Humor Styles, and Big Five; verify MFV Authority direction and coherence; regenerate `docs/img/showcase`.
+  - verify:
+    - `uv run --extra benchmark python scripts/verify_authority_showcase.py outputs/20260630T222000Z_pure_authority_mundane15_pca_readme_mfv_mfq2_humor_big5_n8`
+    - `uv run python scripts/plot_steer_showcase.py --run-dir /media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T222000Z_pure_authority_mundane15_pca_readme_mfv_mfq2_humor_big5_n8 --out docs/img/showcase --vec-label "pure Authority, PCA (+c = more Authority)" --coherence-frac 0.99 --margin-frac 0.50 --contrast-frac 0.000001`
+  - success: all four live showcase plot sets use the same coherent path `[-1, -0.5, 0, +0.5, +1]` and no 16PF plot is regenerated.
+  - likely_fail: MFV Authority sign regresses in the full run.
+  - sneaky_fail: plotter silently drops different `c` rows per instrument; catch by the shared coherent c-values printout.
+  - UAT: live plot files are in `/media/wassname/SGIronWolf/projects5/2026/lite/tinymfv/docs/img/showcase/{mfv,mfq2,humor_styles,big5}/`. MFV verifier result: Authority dlogit `+0.306/-0.327` at `c=0.5` and `+0.906/-0.910` at `c=1.0`; `pmass=1.000`, `frac_unscorable=0.000`, and minimum `margin/base=0.800`. Plotter result: shared coherent c values `[-1.0, -0.5, 0.0, 0.5, 1.0]`.
 
 ## Context
 - Current wrong path: `dignity_over_authority` strict22. It was selected as the best dignity conflict axis, not the desired Authority-only axis.
@@ -233,3 +242,5 @@ Out:
 - 2026-07-01: User correctly objected that the `c=0.5`, MFQ-2, Social-Norms-selectivity, and hard coherence thresholds were arbitrary. Replaced the active verifier with an MFV-only evidence report: Authority direction over all paired c values, plus MFV `pmass`, `mean_margin`, `margin/base`, `frac_unscorable`, and `mean_nll_prefill`. Under this corrected view, `pca` and `linear_act` have signed MFV Authority direction across the evaluated path; `sspace` is only locally signed; `mean_diff` and `directional_ablation` are direction failures.
 - 2026-07-01: Rendered candidate maps/ranges from the current best MFV-only method, `pca`, into `/media/wassname/SGIronWolf/projects5/2026/lite/tinymfv/docs/img/showcase_authority_pca_mundane15/`. These are candidate artifacts, not README replacements.
 - 2026-07-01: Rendered method-comparison maps/ranges into `/media/wassname/SGIronWolf/projects5/2026/lite/tinymfv/docs/img/showcase_authority_method_compare_mundane15/`.
+- 2026-07-01: Pueue 423 completed the full PCA run over MFV, MFQ-2, Humor Styles, and Big Five at `N=8`: `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T222000Z_pure_authority_mundane15_pca_readme_mfv_mfq2_humor_big5_n8`. MFV Authority direction is signed at both evaluated magnitudes (`+0.306/-0.327` at `c=0.5`; `+0.906/-0.910` at `c=1.0`) and coherence is clean (`pmass=1.000`, unscorable `0`, min margin/base `0.800`). The README plot images were regenerated from this run with the shared coherent c path `[-1,-0.5,0,+0.5,+1]`.
+- 2026-07-01: MFQ-2 per-sample bootstrap from the pueue 423 run shows sign stability even at `N=1`: every bootstrap draw has the intended Authority direction for `c in {-1,-0.5,+0.5,+1}`. `N=4` or `N=8` tightens uncertainty, but the minimum sign-stable `N` in this run is `1`.
