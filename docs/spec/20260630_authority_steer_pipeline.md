@@ -118,13 +118,21 @@ Out:
     - steering-lite selection commit: `f6ea42b` (`Add mundane pure-authority selection`).
     - selected data: `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/data/persona_library_selections/pure_authority_qwen3_14b_mundane15.jsonl`.
     - selected examples: `/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/pure_authority_verbatim_mundane5_20260630/selection_score70/selected_examples.md`.
-- [/] T10 (R5): Run mundane15 pure-Authority steer/eval UAT across methods.
+- [x] T10 (R5): Run mundane15 pure-Authority steer/eval UAT across methods.
   - steps: queue `mean_diff`, `pca`, `sspace`, `directional_ablation`, and `linear_act` on MFV/MFQ-2 with `c-grid=0.5,1`, `admin-n-samples=8`, and the verifier.
   - verify: each pueue output dir passes or fails `scripts/verify_authority_showcase.py --small-c 0.5`.
   - success: at least one method passes signed Authority direction on MFV and MFQ-2, MFV Social Norms does not dominate Authority, and coherence is clean.
   - likely_fail: smaller cleaner data is underpowered and gives weak/unstable direction.
   - sneaky_fail: method appears to work only because it changes retained c rows or answer structure; catch with verifier coherence and matching c grid.
-  - UAT: verifier tables for pueue tasks 417-421.
+  - UAT: verifier tables for pueue tasks 417-421. Result: no method passed. `pca` and `linear_act` pass signed direction on MFV and MFQ-2 at `c=0.5`, but fail selectivity because MFV Social Norms moves more than Authority. Coherence is clean across all methods.
+
+| method | output dir | MFV direction | MFQ-2 direction | MFV selectivity | coherence | verdict |
+|---|---|---:|---:|---:|---:|---|
+| mean_diff | `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T163010Z_pure_authority_mundane15_mean_diff_mfv_mfq2_n8` | fail | fail | fail | pass | fail |
+| pca | `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T163010Z_pure_authority_mundane15_pca_mfv_mfq2_n8` | pass | pass | fail | pass | fail |
+| sspace | `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T163010Z_pure_authority_mundane15_sspace_mfv_mfq2_n8` | pass | fail | fail | pass | fail |
+| directional_ablation | `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T163010Z_pure_authority_mundane15_directional_ablation_mfv_mfq2_n8` | fail | fail | fail | pass | fail |
+| linear_act | `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T163010Z_pure_authority_mundane15_linear_act_mfv_mfq2_n8` | pass | pass | fail | pass | fail |
 - [ ] T9 (R7): Update README only from the final successful run.
   - steps: regenerate all README plots from one final artifact; add concise table and captions.
   - verify: README image links resolve; no 16PF plot; no WIP methodology journal in reader prose.
@@ -201,4 +209,4 @@ Out:
 - 2026-06-30: All pure-Authority strict25 method runs failed the same verifier family. Pattern: coherence is clean, but either MFV Authority direction is wrong/weak, MFQ-2 Authority direction is wrong/weak, or MFV Social Norms dominates. This points more to selection/template/scenario contamination than to plotting or answer-token collapse.
 - 2026-07-01: Repaired the pure-Authority selection pipeline around the fixed pair and verbatim persona instructions. Removed direct ValueBench, Airisk/Machiavelli, law/police, safety/harm, and lexical false positives from bare `order/orders`, `master`, and `senior`. Final validator artifact: `/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/pure_authority_verbatim_mundane5_20260630/stage_b_live_qwen3_14b_deepinfra.json`; 125 successes, 0 errors, 33 strict rows, 15 score>=70 selected rows across 4 sources, 0 persona echo/refusal.
 - 2026-07-01: Copied the selected data into steering-lite and added verbatim persona-library prompt support so the steer uses the same prompts that validation tested. Queued pueue 417-421 for `mean_diff`, `pca`, `sspace`, `directional_ablation`, and `linear_act` on MFV/MFQ-2 with `c=0.5,1`, `N=8`; pass criterion remains direction/selectivity/coherence.
-- 2026-07-01: Pueue 417-421 are queued at priority 1000 but blocked by already-running default-group GPU task 416. Do not kill 416 without user approval; resume by checking `pueue status --json` and then verifying 417-421 once they finish.
+- 2026-07-01: Pueue 417-421 completed. Verifier result: no method passed. `pca` and `linear_act` are the closest because they pass signed Authority direction on MFV and MFQ-2 at `c=0.5`, but both fail MFV selectivity. The repeated failure is still not answer collapse: MFV `pmass=1.000`, `frac_unscorable=0.000`, and MFQ-2 `pmass=1.000` at small c for all methods. Current diagnosis: the vector still entangles Authority with MFV Social Norms, despite the cleaner scenario selection.
