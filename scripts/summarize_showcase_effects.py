@@ -39,14 +39,12 @@ def _cs_label(cs: list[float]) -> str:
     return ", ".join(f"{c:+g}" if c else "0" for c in sorted(cs))
 
 
-def _coherent_cs(run_dir: Path, instruments: list[str], coherence_frac: float) -> list[float]:
+def _coherent_cs(run_dir: Path, instruments: list[str], coherence_frac: float,
+                 contrast_frac: float, margin_frac: float) -> list[float]:
     ordinal = [name for name in instruments if name != "mfv"]
-    pmass_ratio = P.shared_pmass_ratio(run_dir, ordinal)
-    if "mfv" in instruments:
-        _founds, _prof, mfv_pmass = P.read_mfv_profiles(run_dir)
-        for c, pm in mfv_pmass.items():
-            pmass_ratio[c] = min(pmass_ratio[c], pm / mfv_pmass[0.0])
-    return P.coherent_prefix_cs(sorted(pmass_ratio), pmass_ratio, coherence_frac)
+    quality = P.shared_quality_score(run_dir, ordinal, pmass_frac=coherence_frac,
+                                     contrast_frac=contrast_frac, margin_frac=margin_frac)
+    return P.coherent_prefix_cs(sorted(quality), quality, 1.0)
 
 
 def _survey_rows(run_dir: Path, name: str, cs: list[float]) -> list[dict[str, str]]:
@@ -118,10 +116,13 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-dir", type=Path, required=True)
     ap.add_argument("--coherence-frac", type=float, default=0.99)
+    ap.add_argument("--contrast-frac", type=float, default=0.50)
+    ap.add_argument("--margin-frac", type=float, default=0.50)
     ap.add_argument("--instruments", nargs="+", default=["mfv", "humor_styles", "big5", "mfq2"])
     args = ap.parse_args()
 
-    cs = _coherent_cs(args.run_dir, args.instruments, args.coherence_frac)
+    cs = _coherent_cs(args.run_dir, args.instruments, args.coherence_frac,
+                     args.contrast_frac, args.margin_frac)
     assert any(c > 0 for c in cs) and any(c < 0 for c in cs), f"need both signed arms, got {cs}"
 
     rows: list[dict[str, str]] = []

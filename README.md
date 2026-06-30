@@ -4,31 +4,35 @@ tinymfv is a small set of fast value evals for local LLM steering work. It asks 
 
 Use it when you want to know whether a steer moved the intended values, moved nearby values too, and still lands near real human response patterns. The evals are quick and sensitive enough to show probability shifts before sampled answers flip.
 
-The plots compare that profile to human data. Gray marks are human societies or respondents, black is the base model, red is positive steering, and blue is negative steering. Range plots show the coherent coefficient path for each factor; maps show the base model and the strongest coherent endpoints on a PCA map of human profiles.
+The plots compare that profile to human data. Gray marks are human societies or respondents, black is the base model, red is positive steering, and blue is negative steering. In these steering plots, red is positive `c`, blue is negative `c`, and `c` is the signed multiplier on the calibrated steering vector.
 
-![MFQ-2 range plot: human society ranges beside base, +C, and -C authority steering](docs/img/showcase/mfq2/range.png)
+MFV comes first because it is the direct moral-vignette readout. MFV is nominal: the answer is a moral foundation category. The survey plots are ordinal: the answer is a 1-5 scale point.
 
-![MFQ-2 culture map: base, +C, and -C authority steering against human societies](docs/img/showcase/mfq2/map_pca_ipsative.png)
+![MFV culture map: dignity/authority steering against human countries](docs/img/showcase/mfv/map_pca_ipsative.png)
 
-![Big Five range plot: human society ranges beside base, +C, and -C authority steering](docs/img/showcase/big5/range.png)
+![MFV range plot: foundation emphasis beside dignity/authority steering](docs/img/showcase/mfv/range.png)
 
-![Big Five culture map: base, +C, and -C authority steering against human societies](docs/img/showcase/big5/map_pca_ipsative.png)
+MFV uses the same map and range plotters as the surveys, after converting nominal foundation logits into relative foundation emphasis. Each profile is z-scored across foundations before mapping, so the plot compares which foundations are high or low within that profile.
 
-Read the Big Five map left to right: gray is the human reference, black is the base LLM, and the red/blue points are steered endpoints. Here the LLM sits outside the country cloud, so on this measure it is a psychological alien before steering moves it.
+![Humor Styles range plot: human society ranges beside dignity/authority steering](docs/img/showcase/humor_styles/range.png)
 
-![16PF range plot: human society ranges beside base, +C, and -C authority steering](docs/img/showcase/16pf/range.png)
-
-![Humor Styles range plot: human society ranges beside base, +C, and -C authority steering](docs/img/showcase/humor_styles/range.png)
-
-![Humor Styles culture map: base, +C, and -C authority steering against human societies](docs/img/showcase/humor_styles/map_pca_ipsative.png)
+![Humor Styles culture map: dignity/authority steering against human societies](docs/img/showcase/humor_styles/map_pca_ipsative.png)
 
 The Humor Styles map shows the same failure mode more sharply: the model profile can live away from the human societies. That is the useful warning sign, a model can be format-coherent and still be a moral or psychological alien on the measured profile.
 
-![MFV culture map: base, +C, and -C authority steering against human countries](docs/img/showcase/mfv/map_pca_ipsative.png)
+![Big Five range plot: human society ranges beside dignity/authority steering](docs/img/showcase/big5/range.png)
 
-![MFV range plot: foundation emphasis beside base, +C, and -C authority steering](docs/img/showcase/mfv/range.png)
+![Big Five culture map: dignity/authority steering against human societies](docs/img/showcase/big5/map_pca_ipsative.png)
 
-Here `c` is the signed multiplier on the calibrated steering vector. The plotted path shows only coherent coefficients: `c=0`, then each positive and negative side while its answer mass stays above 99% of the base run. Once a side becomes incoherent, later points on that side are dropped.
+Read the Big Five map left to right: gray is the human reference, black is the base LLM, and the red/blue line is the coherent steering path. Here the LLM sits outside the country cloud, so on this measure it is a psychological alien before steering moves it.
+
+MFQ-2 means Moral Foundations Questionnaire 2, the short survey instrument. It is separate from MFV, the moral-vignette foundation reader. MFQ-2 has fewer items per axis than the longer personality surveys, so the showcase uses sampled think traces before treating small path wiggles as signal.
+
+![MFQ-2 range plot: human society ranges beside dignity/authority steering](docs/img/showcase/mfq2/range.png)
+
+![MFQ-2 culture map: dignity/authority steering against human societies](docs/img/showcase/mfq2/map_pca_ipsative.png)
+
+The path shows only usable coefficients: `c=0`, then each positive and negative side until the reader starts to collapse. For surveys, collapse can mean the answer distribution loses its factor structure even when answer mass stays high.
 
 ## Install
 
@@ -106,9 +110,12 @@ Generate the bundled range plots and culture maps from a steering-lite all-instr
 
 ```bash
 uv run python scripts/plot_steer_showcase.py \
-  --run-dir ../steering-lite/outputs/20260630_dignity_authority_strict22_local_sspace_allinstr \
+  --run-dir ../steering-lite/outputs/20260630_dignity_authority_strict22_local_sspace_mfvgrid_n8 \
   --out docs/img/showcase \
-  --vec-label=-Authority
+  --vec-label="dignity/authority axis (+c = Authority)" \
+  --coherence-frac 0.99 \
+  --contrast-frac 0.50 \
+  --margin-frac 0.50
 ```
 
 ## Measurement
@@ -131,7 +138,7 @@ For paired steering runs, compare the base profile to the steered profile path. 
 
 $$m(c) = \mathbb{E}_i \sum_{a \in A_i} P_c(a \mid i)$$
 
-where $A_i$ is the valid answer-token set for item $i$. The showcase drops a side at the first coefficient where answer mass is at or below 99% of the base run.
+where $A_i$ is the valid answer-token set for item $i$. The showcase also checks survey contrast and MFV forced-choice margin, because a steered reader can keep answer mass while losing useful structure.
 
 ## Scope
 

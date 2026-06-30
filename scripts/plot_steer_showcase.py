@@ -112,26 +112,55 @@ def read_profiles(run_dir: Path, name: str, dims: list[str], value_col: str = "m
     return {c: np.array([d[f] for f in dims]) for c, d in by_c.items()}, pmass
 
 
-def coherent_prefix_cs(cs: list[float], pmass_ratio: dict[float, float], coherence_frac: float) -> list[float]:
-    """c=0 plus each signed arm until answer mass first falls below the base-relative floor."""
+def coherent_prefix_cs(cs: list[float], quality: dict[float, float], floor: float) -> list[float]:
+    """c=0 plus each signed arm until the shared quality score first falls below `floor`."""
     kept = [0.0]
     for side in (1.0, -1.0):
         for c in sorted([c for c in cs if np.sign(c) == side], key=abs):
-            if pmass_ratio[c] <= coherence_frac:
+            if quality[c] < floor:
                 break
             kept.append(c)
     return sorted(kept)
 
 
-def shared_pmass_ratio(run_dir: Path, names: list[str]) -> dict[float, float]:
-    """Worst base-relative answer mass across the survey evals, keyed by signed calibrated multiplier."""
+def shared_quality_score(run_dir: Path, names: list[str], *, pmass_frac: float,
+                         contrast_frac: float, margin_frac: float) -> dict[float, float]:
+    """Worst base-relative quality across instruments, keyed by signed calibrated multiplier.
+
+    For ordinal surveys, answer mass can stay ~1 while the within-answer distribution becomes
+    generic. The rank-logit contrast retention catches that failure mode. For MFV, answer mass is
+    structurally pinned by the forced-choice scaffold, so mean top1-vs-top2 margin is the live OOD
+    signal when present.
+    """
+    scores: list[dict[float, float]] = []
     pmasses: list[dict[float, float]] = []
     for name in names:
         instr = get_instrument(name)
         _, pmass = read_profiles(run_dir, name, instr.dimensions)
+        c_prof, _ = read_profiles(run_dir, name, instr.dimensions, value_col="C")
         pmasses.append(pmass)
-    cs = sorted(set.intersection(*(set(p) for p in pmasses)))
-    return {c: min(p[c] / p[0.0] for p in pmasses) for c in cs}
+        base_contrast = float(np.mean(np.abs(c_prof[0.0])))
+        scores.append({
+            c: min(pmass[c] / pmass[0.0] / pmass_frac,
+                   float(np.mean(np.abs(c_prof[c]))) / base_contrast / contrast_frac)
+            for c in pmass
+        })
+    if (run_dir / "mfv_profiles.csv").exists():
+        mfv_pmass: dict[float, float] = {}
+        mfv_margin: dict[float, float] = {}
+        with open(run_dir / "mfv_profiles.csv", newline="") as fh:
+            for r in csv.DictReader(fh):
+                c = float(r["c"])
+                mfv_pmass[c] = float(r["pmass"])
+                mfv_margin[c] = float(r["mean_margin"])
+        scores.append({
+            c: min(mfv_pmass[c] / mfv_pmass[0.0] / pmass_frac,
+                   mfv_margin[c] / mfv_margin[0.0] / margin_frac)
+            for c in mfv_pmass
+        })
+    assert scores, "no profile CSVs found"
+    cs = sorted(set.intersection(*(set(s) for s in scores)))
+    return {c: min(s[c] for s in scores) for c in cs}
 
 
 def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float,
@@ -265,6 +294,10 @@ def main() -> None:
                     help="short human-readable steering direction for plot titles")
     ap.add_argument("--coherence-frac", type=float, default=0.99,
                     help="keep c rows whose pmass is above this fraction of base")
+    ap.add_argument("--contrast-frac", type=float, default=0.50,
+                    help="for ordinal surveys, also keep only rows whose mean |C| stays above this fraction of base")
+    ap.add_argument("--margin-frac", type=float, default=0.50,
+                    help="for MFV, also keep only rows whose mean forced-choice margin stays above this fraction of base")
     args = ap.parse_args()
     summary = json.loads((args.run_dir / "summary.json").read_text())
     C = float(summary["calibrated_C"])
@@ -274,13 +307,11 @@ def main() -> None:
 
     written: list[str] = []
     ordinal_names = [name for name in ORDINAL if (args.run_dir / f"{name}_profiles.csv").exists()]
-    pmass_ratio = shared_pmass_ratio(args.run_dir, ordinal_names)
-    if (args.run_dir / "mfv_profiles.csv").exists():
-        _founds, _prof, mfv_pmass = read_mfv_profiles(args.run_dir)
-        for c, pm in mfv_pmass.items():
-            pmass_ratio[c] = min(pmass_ratio[c], pm / mfv_pmass[0.0])
-    coh_cs = coherent_prefix_cs(sorted(pmass_ratio), pmass_ratio, args.coherence_frac)
-    print(f"shared coherent c values at {args.coherence_frac:.2%} base answer mass: {coh_cs}")
+    quality = shared_quality_score(args.run_dir, ordinal_names, pmass_frac=args.coherence_frac,
+                                   contrast_frac=args.contrast_frac, margin_frac=args.margin_frac)
+    coh_cs = coherent_prefix_cs(sorted(quality), quality, 1.0)
+    print(f"shared coherent c values at pmass>={args.coherence_frac:.2%}, "
+          f"survey |C|>={args.contrast_frac:.0%}, MFV margin>={args.margin_frac:.0%}: {coh_cs}")
     for name in ordinal_names:
         written += [str(p) for p in plot_ordinal(args.run_dir, args.out, name, vec_label, C, coh_cs)]
     if (args.run_dir / "mfv_profiles.csv").exists():

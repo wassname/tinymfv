@@ -16,6 +16,34 @@ Out: changing eval semantics, changing dataset schemas, adding new metrics.
 - R6: README range plots show the coherent coefficient path in sign lanes. Done means: all negative c values share a blue lane, base is black in the middle, and all positive c values share a red lane. Reversals/wraps are visible on the y-axis without marker-size encoding. VERIFY: inspect regenerated range PNGs and check `draw_steer` maps x by sign only.
 
 ## Tasks
+- [ ] User ask checklist
+  - [ ] Regenerate README plots from one unified artifact, not mixed old runs.
+  - [ ] Fix MFV plots, including the MFV normalization/range issue.
+  - [ ] Do not show 16PF in the README.
+  - [ ] README plot order: MFV first, Humor second, Big Five third, MFQ-2 last.
+  - [ ] Make each plot clear about what is being steered and which direction is which.
+  - [ ] Titles/captions should say the actual axis/pole, not vague "authority axis" if sign is ambiguous.
+  - [ ] Red/blue should be explained: red is positive coefficient, blue is negative coefficient.
+  - [ ] Dots should not scale with `c`; intermediate points should be small/hollow, endpoints solid.
+  - [ ] Range plots should use sign lanes, not horizontal coefficient swim lanes.
+  - [ ] Coherence/path gate should show `0, +/-0.5, +/-1, +/-2...` only up to real coherence, not pmass-only fake coherence.
+  - [ ] Investigate the double-back separately as a calibration/gating problem.
+  - [ ] Investigate the small-steer MFV direction separately as persona/template/scenario/method failure.
+  - [ ] Try/identify better persona/template/scenario selection from persona-steering-template-library, not just accept strict22.
+  - [ ] Keep selections committed in steering-lite, not persona library.
+  - [ ] Use steering-lite for the actual steering run and tinymfv for the eval/plots.
+  - [ ] Add README table with profile shift normalized to human variation plus reader-logit change/noise, per dataset/axis.
+  - [ ] Make "Moral Foundations" unambiguous: MFV vignettes versus MFQ-2 survey.
+  - [ ] Link dataset table entries to committed JSON/CSV files.
+  - [ ] Keep README simple: what it is, why useful, datasets, metric/API, plots.
+  - [ ] Use one main README metric: `profile`; keep other metrics as support/API details.
+  - [ ] Define metrics cleanly with LaTeX that renders in GitHub markdown.
+  - [ ] Avoid AI-ish prose and long "design notes"; say less.
+  - [ ] Run external-review-v2 on plots/code.
+  - [ ] Run external-review-v2 comprehension panel on README once final plots/table are in.
+  - [ ] Show final file paths for plots and README.
+  - [ ] Commit small, push when done.
+
 - [x] T1 (R1, R2): Simplify README around `profile` and update plot captions.
   - verify: `rg -n '^###|profile_C|informedness|nll_prefill|pmass_allowed|dlogit_per_foundation|trajectory' README.md`
   - success: one `### The profile` subsection; no stale plot "trajectory" language.
