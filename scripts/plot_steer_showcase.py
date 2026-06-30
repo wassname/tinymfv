@@ -1,4 +1,4 @@
-"""Showcase tinymfv's plotting on a real steering run (the dogfood before publishing the lib).
+"""Showcase tinymfv's plotting on a real steering run.
 
 Consumes a steering-lite `run_allinstr_showcase.py` output dir (one calibrated
 activation-steering vector administered across every instrument over a signed
@@ -7,14 +7,14 @@ c-sweep) and renders the SAME two figures for every instrument, uniformly:
   - map  : ipsative culture map (PCA), AI coherent +/-c path vs the human cloud.
   - range: per-factor range, AI base + coherent +/-c path vs the human society strip.
 
-Ordinal instruments (mfq2/big5/16pf/humor_styles) read <name>_profiles.csv; nominal
-MFV reads mfv.json and is projected into z-scored relative-emphasis space (its
-logit-violation units cannot share a raw axis with 1-5 wrongness), but it goes
-through the same plot_ipsative_pca / plot_range and yields the same two figures.
+Ordinal instruments read <name>_profiles.csv. MFV reads mfv_profiles.csv and is
+projected into z-scored relative-emphasis space, because its nominal foundation
+probabilities cannot share a raw axis with 1-5 survey scores. It still goes
+through the same plot_ipsative_pca / plot_range functions.
 
 cs are SIGNED multipliers of the calibrated coefficient C (0 = base). The public
 README plots show the coherent path: c=0 plus each +/-c row whose tinymfv answer mass
-stays above the requested fraction of base. Incoherent rows are dropped, not drawn hollow.
+stays above the requested fraction of base. Incoherent rows are dropped.
 
   uv run python scripts/plot_steer_showcase.py \
     --run-dir ../steering-lite/outputs/allinstr_qwen35_4b --out docs/img/showcase
