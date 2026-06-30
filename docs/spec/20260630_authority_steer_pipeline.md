@@ -96,6 +96,7 @@ Out:
   - `/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/authority_affordant_20260630/stage_a_live.json`
   - `/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/authority_affordant_20260630/alibaba_smoke_dryrun.json`
   - `/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/authority_affordant_20260630/alibaba_smoke_live.json`
+  - `/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/authority_affordant_20260630/deepinfra_qwen3_14b_nothink_smoke_live.json`
 
 ## Log
 - 2026-06-30: User corrected the axis. `dignity_over_authority` is not the goal; it confounds Authority with dignity/care/wellbeing. Use Authority-only.
@@ -109,3 +110,5 @@ Out:
 - 2026-06-30: Replaced seed-random scenario selection with source-stratified Authority-affordance ranking. New stage-A rows include explicit boss/rules/commanding-officer/king/captain/protocol cases; weak sources remain visible so stage A can reject them.
 - 2026-06-30: Replaced global provider preference with generator-only provider pinning. Generator calls now use `provider.only=["Alibaba"]` and `allow_fallbacks=false`; judge calls remain unpinned. Dry-run artifact `out/authority_affordant_20260630/alibaba_smoke_dryrun.json` records `generator_provider_only=["Alibaba"]`.
 - 2026-06-30: Live Alibaba smoke confirmed the routing but hit upstream 429s from Alibaba: artifact `out/authority_affordant_20260630/alibaba_smoke_live.json` has `generator_provider_only=["Alibaba"]`, `n_results=1`, and the row error cites `provider_name="Alibaba"`. Next step is BYOK/wait/retry, or choose another close Qwen endpoint deliberately.
+- 2026-06-30: OpenRouter endpoint scan found `qwen/qwen3-14b` has DeepInfra; `qwen/qwen3-8b` does not. Direct mini-test showed DeepInfra Qwen3 returns `content=null` unless prompted with `/no_think`. Patched the validator to add `/no_think` for Qwen-family generator models.
+- 2026-06-30: Smoke artifact `out/authority_affordant_20260630/deepinfra_qwen3_14b_nothink_smoke_live.json` completed 3/3 rows with `generator_provider_only=["DeepInfra"]`. Early signal: `authority_tradition_obedience` strict-pass 1/1 and mean axis delta 6.3; generic `authority_only` still mostly collapses toward welfare.
