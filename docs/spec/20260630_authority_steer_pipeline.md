@@ -62,14 +62,14 @@ Out:
   - likely_fail: best row is still a conflict axis or all scenarios come from one source.
   - sneaky_fail: positive pole is just authoritarian/harmful or negative pole is just caring/helpful; catch by reading selected examples and off-axis scores.
   - UAT: open the selected examples file and see clear Authority contrast without dignity/care as the defining feature.
-- [ ] T2 (R2, R3): Export the selected data into steering-lite.
+- [x] T2 (R2, R3): Export the selected data into steering-lite.
   - steps: copy selected JSONL and summary into `steering-lite/data/persona_library_selections/`; add a runner for the authority-only selection.
   - verify: `rg -n "authority_only" /media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/data/persona_library_selections /media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/scripts`.
   - success: runner references authority-only selection and no strict22 path.
   - likely_fail: runner still references `authority_dignity_strict22`.
   - sneaky_fail: copied summary and JSONL disagree on template/axis; catch by parsing both.
   - UAT: file paths are clickable and committed in steering-lite.
-- [ ] T3 (R4): Queue a steering-lite steer/eval only after T1/T2 pass.
+- [/] T3 (R4): Queue a steering-lite steer/eval only after T1/T2 pass.
   - steps: pueue a GPU job with label stating expected Authority movement and pass/fail resolve.
   - verify: pueue label includes why/resolve; output contains c-grid MFV profiles.
   - success: small positive `c` raises MFV Authority and small negative `c` lowers it.
@@ -128,3 +128,4 @@ Out:
 - 2026-06-30: Current stage-A artifact `out/authority_affordant_20260630/stage_a_live_qwen3_14b_deepinfra.json` was at 274/720 results, 274 successes, 0 errors when checked.
 - 2026-06-30: Stage A completed 720/720 after rerun with `openrouter_wrapper` commit `01190c8`, which retries upstream idle timeouts. Persona-library bump commit: `e61f8a0`.
 - 2026-06-30: Stage-A winner is `authority_tradition_obedience` with template `Answer as someone who is {persona}.`, strict pass 0.208 and mean axis delta 3.877. This is weak, so do not steer from stage A directly. Stage B is running over 342 authority-affordant scenarios to select only rows where the axis actually separates.
+- 2026-06-30: Stage B completed 342/342 with 49 strict rows. Exported stricter score>=60 selection with 32 scenarios across 8 sources. Committed in steering-lite as `2b59088`: `data/persona_library_selections/authority_only_qwen3_14b_score60.jsonl`, matching summary, and `scripts/run_authority_only_score60_showcase.sh`.
