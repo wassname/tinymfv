@@ -69,7 +69,7 @@ Out:
   - likely_fail: runner still references `authority_dignity_strict22`.
   - sneaky_fail: copied summary and JSONL disagree on template/axis; catch by parsing both.
   - UAT: file paths are clickable and committed in steering-lite.
-- [/] T3 (R4): Queue a steering-lite steer/eval only after T1/T2 pass.
+- [x] T3 (R4): Queue a steering-lite steer/eval only after T1/T2 pass.
   - steps: pueue a GPU job with label stating expected Authority movement and pass/fail resolve.
   - verify: pueue label includes why/resolve; output contains c-grid MFV profiles.
   - success: small positive `c` raises MFV Authority and small negative `c` lowers it.
@@ -90,6 +90,13 @@ Out:
   - likely_fail: README narrates failed strict22/debug history.
   - sneaky_fail: captions imply a general sign convention; catch by reading README without this spec.
   - UAT: external-review-v2 comprehension panel can explain what/where/why/measurement/dataset in its own words.
+- [ ] T6 (R4, R5): Fix the current Authority steer before README.
+  - steps: run a cheaper verifier first (`mfv` at `c=0.5,1`, `mfq2` at `c=0.5,1`) while iterating axis/C/selection.
+  - verify: effect table shows Authority local direction, monotone path through `c=1`, and off-axis max smaller than Authority shift on MFV/MFQ-2.
+  - success: no MFQ-2 double-back at `+1`; MFV Social Norms is not the largest movement.
+  - likely_fail: lowering C makes direction vanish instead of fixing the path.
+  - sneaky_fail: selecting scenarios by MFV/MFQ-2 directly overfits the eval; keep persona-library validation separate from tinymfv eval.
+  - UAT: verifier table plus per-foundation path table show the steer is both signed and selective enough to plot.
 
 ## Context
 - Current wrong path: `dignity_over_authority` strict22. It was selected as the best dignity conflict axis, not the desired Authority-only axis.
@@ -133,3 +140,4 @@ Out:
 - 2026-06-30: Pushed steering-lite `eafae69` so `scripts/run_authority_only_score60_showcase.sh` forwards `"$@"`. Queued pueue task 401 with `--fixed-C 39.758 --out outputs/20260630_authority_only_qwen3_14b_score60_sspace_mfv_mfq2_n8_fixedC39758`, then killed it because the pre-unbuffered runner gave no live stdout/files after five minutes.
 - 2026-06-30: Pushed steering-lite `899d932` to set `PYTHONUNBUFFERED=1` in the authority runner. Queued pueue task 402 with output `outputs/20260630_authority_only_qwen3_14b_score60_sspace_mfv_mfq2_n8_fixedC39758_unbuf`; log confirms `fixed C=+39.7580 (iso-KL skipped)`.
 - 2026-06-30: Killed pueue task 402 after MFQ-2 gave a mixed result: small `c` had the right local sign (`authority` C base `30.80`, `+0.5` `33.17`, `-0.5` `29.72`) but `+1` doubled back to `27.23` while pmass stayed `1.000`. Queued pueue task 403 as focused MFV-only check at `c=0.5,1`: `outputs/20260630_authority_only_qwen3_14b_score60_sspace_mfv_c05_c1_fixedC39758`.
+- 2026-06-30: Pueue task 403 completed. MFV small-c direction passed (`Authority` dlogit `+0.176` at `+0.5`, `-0.392` at `-0.5`; pmass `1.000`, unscorable `0`). MFV `+1/-1` also moved Authority in the expected direction (`+1.454`, `-0.580`). But the vector is not selective enough for README: MFV Social Norms moved more than Authority (`-0.621` at `+0.5`, `+1.121` at `-0.5`; `-1.511/+2.281` at `+1/-1`), and MFQ-2 doubled back at `+1`. Current verdict: local-direction pass, path/selectivity fail.
