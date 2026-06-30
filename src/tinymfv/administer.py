@@ -42,7 +42,11 @@ class ItemFrameRow(TypedDict):
     id: str
     framing: str                    # forward | inverted | negated
     foundation: str
+    sign: int
     lp: list[float]                 # raw logprobs at the M scale tokens (presented orientation)
+    sample_lp: list[list[float]]     # [N, scale_max] raw logprobs before BMA
+    sample_pmass_allowed: list[float]
+    sample_nll_prefill: list[float]
     E: float                        # forward-canonicalized E toward the original statement
     C: float                        # forward-canonicalized logit contrast
     keyed_E: float
@@ -120,7 +124,11 @@ def administer(model, tok, instr: Instrument, *, batch_size: int = 36,
         by_dim_frame.setdefault((r["dimension"], r["frame"]), []).append((M + 1 - E) if sign < 0 else E)
         per_item_frame.append({
             "id": r["id"], "framing": r["frame"], "foundation": r["dimension"],
+            "sign": sign,
             "lp": list(map(float, r["lp"])),
+            "sample_lp": r["sample_lp"],
+            "sample_pmass_allowed": r["sample_pmass_allowed"],
+            "sample_nll_prefill": r["sample_nll_prefill"],
             "E": E, "C": Cval,
             "keyed_E": (M + 1 - E) if sign < 0 else E,
             "keyed_C": -Cval if sign < 0 else Cval,

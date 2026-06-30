@@ -106,6 +106,13 @@ Out:
   - likely_fail: MFQ-2 noisy or opposite sign.
   - sneaky_fail: profile shift comes from loss of answer structure; catch with answer mass, survey contrast, and MFV margin.
   - UAT: one table lets the user decide whether the steer is good enough to show.
+- [ ] T12 (R6): Estimate the minimum MFQ-2 `N` needed for stable steering plots.
+  - steps: measure bootstrapped MFQ-2 Authority path variability at subset sizes `N=1,2,4,8` from per-sample readouts, or add a per-sample export if the current aggregate output is insufficient.
+  - verify: table reports mean and bootstrap std/CI for Authority `C` deltas at each subset size and c row.
+  - success: choose the smallest `N` whose bootstrapped direction and effect size are stable enough for README plots.
+  - likely_fail: current `mfq2_profiles.csv` only has aggregate `C_sd`/`C_sem`, not the sample-level trajectories needed for subset bootstrapping.
+  - sneaky_fail: bootstrapping across items instead of think trajectories answers the wrong question; catch by inspecting the exported unit of resampling.
+  - UAT: committed table or CSV shows MFQ-2 subset stability, with enough detail to choose default `N`.
 - [x] T8 (R1-R5): Repair the pure-Authority data selection.
   - steps: inspect rendered strict25 examples; remove scenarios whose Authority affordance is actually Social Norms, legality, institutional controversy, or welfare/autonomy; rerun scenario validation with stricter source balance and example audit.
   - verify: selected examples file has direct respect/disregard for authority without Social Norms or dignity/care wording, and source counts are not dominated by ValueBench.

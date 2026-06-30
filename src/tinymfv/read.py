@@ -117,6 +117,9 @@ def read_items(model, tok, instr: Instrument, items: list[InstrItem], answer_ids
             out.append({
                 "id": it.id, "frame": it.frame,
                 "lp": lp,                                              # raw logprobs at the M scale tokens
+                "sample_lp": sample_lp.tolist(),                        # [N,A] raw logprobs before BMA
+                "sample_pmass_allowed": [float(s["pmass_allowed"]) for s in sample_slots],
+                "sample_nll_prefill": [float(s["nll_prefill"]) for s in sample_slots],
                 "p": p_norm,
                 "pmass_allowed": pmass,
                 "dimension": it.dimension, "sign": it.sign,
