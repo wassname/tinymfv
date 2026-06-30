@@ -51,17 +51,17 @@ Out:
 - R7: README only shows successful artifacts. Done means: README plot captions name the pure Authority steer and use regenerated images from the final run. VERIFY: README image links and run-dir command point to the final output.
 
 ## Tasks
-- [ ] T1 (R1): Write the fixed pure Authority pair.
+- [x] T1 (R1): Write the fixed pure Authority pair.
   - steps: add the exact pair `authority-respecting` vs `authority-disregarding` to persona-library/steering-lite selection inputs; remove axis-variant selection from the active path.
   - done:
-    - [ ] pair artifact contains exactly one pair id.
-    - [ ] rendered example shows only `authority-respecting` and `authority-disregarding`.
+    - [x] pair artifact contains exactly one pair id.
+    - [x] rendered example shows only `authority-respecting` and `authority-disregarding`.
   - verify: `rg -n "authority-respecting|authority-disregarding|authority_tradition_obedience|dignity_over_authority" <selection files>`.
   - success: only the pure pair appears in active selection files.
   - likely_fail: old `authority_tradition_obedience` runner or JSON is still referenced.
   - sneaky_fail: pair wording smuggles in tradition, dignity, care, or social norms; catch by reading rendered prompts.
   - UAT: file paths show the exact pure pair and no proxy pair.
-- [ ] T2 (R2): Validate templates with the fixed pair.
+- [/] T2 (R2): Validate templates with the fixed pair.
   - steps: run a stage-A screen over fixed pair x candidate templates x source-stratified Authority-affordant scenarios.
   - verify: summary table has one pair id, multiple template ids, and off-axis/style audit columns.
   - success: choose a template because it cleanly elicits the fixed Authority contrast.
@@ -88,7 +88,10 @@ Out:
   - success: small positive `c` raises MFV/MFQ-2 Authority and small negative `c` lowers it, without Social Norms dominating MFV.
   - likely_fail: sign is reversed or flat.
   - sneaky_fail: Authority moves only because high-c rows are incoherent; catch with pmass, MFV margin, and small-c verifier.
-  - UAT: verifier table shows local direction, path through `c=1`, and off-axis max.
+  - UAT: verifier table shows signed direction, selectivity, and coherence:
+    - direction: MFV Authority `dlogit(+0.5) > 0` and `dlogit(-0.5) < 0`; MFQ-2 Authority `C(+0.5) > base` and `C(-0.5) < base`.
+    - selectivity: MFV Social Norms is not larger than Authority at the same small-c rows.
+    - coherence: MFV `frac_unscorable` stays near zero and margin does not collapse; ordinal `pmass` stays near base.
 - [ ] T6 (R5, R6): If the cheap UAT passes, compare runner-supported methods.
   - steps: queue `mean_diff`, `pca`, `sspace`, `directional_ablation`, and `linear_act` with unique timestamped output dirs.
   - verify: each output dir has `summary.json`, `mfv_profiles.csv`, `mfq2_profiles.csv`, and method-specific verifier output.
@@ -163,3 +166,5 @@ Out:
   - pueue 408: `linear_act` -> `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T104202_authority_tradition_obedience_score60_linear_act_mfv_mfq2_humor_big5_n8`
 - 2026-06-30: User caught a spec error: validation was supposed to hold the pure Authority persona pair fixed and choose only templates/scenarios. The previous stage-A screen incorrectly let validation choose among axis/persona variants, and selected `authority_tradition_obedience`, a proxy contaminated by tradition/Social Norms. Killed pueue 404 and removed 405-408; old score60 artifacts are invalid evidence for the pure-Authority goal.
 - 2026-06-30: Replanned the active path around the fixed premise `authority-respecting` vs `authority-disregarding`. Validation now only selects templates and scenarios; method comparison only happens after a cheap pure-Authority steer/eval UAT passes.
+- 2026-06-30: User clarified the verification target from the previous good readout: direction, selectivity, and coherence. Direction means the intended signed Authority movement is present. Selectivity means the movement is not dominated by MFV Social Norms or another off-axis foundation. Coherence means answer mass/margin/unscorable gates do not explain the effect.
+- 2026-06-30: Persona-library commit `f355b47` adds `pure_authority` (`authority-respecting` vs `authority-disregarding`) and changes `prepare_authority_steering_selection.py` so the active path has one fixed pair and no axis/persona selection. Dry-run artifact: `/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/pure_authority_20260630/stage_a_dryrun_qwen3_14b_deepinfra.json`, 240 planned cells, one pair id.
