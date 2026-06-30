@@ -1,10 +1,26 @@
+You are reading the document below for the FIRST time (a cold reader).
+Answer ONLY from what it says; where something is unstated or ambiguous, say so.
+Pay special attention to whether you can explain: what tinymfv is, what the maps measure, what MFV and MFQ-2 are, which steer is shown, what reader-logit shift means, what the c path/gates are, and why a researcher would use this package.
+Output ONE JSON object, no prose, no fences:
+{
+ "summary": "<2-3 sentences: restate what the repo does and why a researcher would use it, in your OWN words>",
+ "mechanism": "<reconstruct how the eval turns LLM answer probabilities into the plotted profile and steering comparison; say 'unclear' if the doc does not let you rebuild it>",
+ "scores": {"clarity": "<1-5>", "conciseness": "<1-5>", "technical_accuracy": "<1-5>"},
+ "reason": "<one sentence on the scores>",
+ "unclear": ["<what was confusing, ambiguous, or you had to guess>"],
+ "misunderstandings": ["<places the text contradicts itself or invites a misread>"],
+ "missing_to_implement": ["<what a reader still needs to reproduce or act on this>"],
+ "suggestions": ["<concrete edit that would help>"]
+}
+
+DOCUMENT:
 # tinymfv
 
 tinymfv is a small set of fast value evals for local LLM steering work. It asks moral vignettes and survey questions, reads answer-token probabilities, and turns them into one model profile.
 
 Use it when you want to know whether a steer moved the intended values, moved nearby values too, and still lands near real human response patterns. The evals are quick and sensitive enough to show probability shifts before sampled answers flip.
 
-The plots compare that profile to human data. Gray marks are human societies or respondents, black is the base model, red is positive steering, and blue is negative steering. This showcase uses a pure Authority steering vector built from `authority-respecting` versus `authority-disregarding` personas. Here `c` is the steering-lite multiplier on that vector. Red is `+c`, more Authority; blue is `-c`, less Authority.
+The plots compare that profile to human data. Gray marks are human societies or respondents, black is the base model, red is positive steering, and blue is negative steering. This showcase uses a pure Authority steering vector built from `authority-respecting` versus `authority-disregarding` personas. Red is `+c`, more Authority; blue is `-c`, less Authority.
 
 MFV comes first because it is the direct moral-vignette readout. MFV is nominal: the answer is a moral foundation category. MFQ-2 is the Moral Foundations Questionnaire 2 survey, where the answer is a 1-5 scale point.
 
@@ -32,11 +48,11 @@ MFQ-2 means Moral Foundations Questionnaire 2, the short survey instrument. It i
 
 ![MFQ-2 culture map: pure Authority steering against human societies](docs/img/showcase/mfq2/map_pca_ipsative.png)
 
-The path shows only usable coefficients: `c=0`, then each positive and negative side until one of the plot gates fails. This run kept the full path `c=-1,-0.5,0,+0.5,+1`. For surveys, collapse can mean the answer distribution loses its factor structure even when answer mass stays high.
+The path shows only usable coefficients: `c=0`, then each positive and negative side until the reader starts to collapse. This run kept the full path `c=-1,-0.5,0,+0.5,+1`. For surveys, collapse can mean the answer distribution loses its factor structure even when answer mass stays high.
 
 This is the same run as the plots. The steer is pure in the contrast used to build it; the table shows the side effects it actually caused.
 
-`profile shift / human SD` is the distance from `c=-1` to `c=+1`, divided by the standard deviation of country means in the bundled human reference for that axis. `100%` means one human SD. `profile shift` is in plot units: MFV relative-emphasis z-score, or survey expected 1-5 score. `reader-logit shift` is the direct answer-logit readout for the same endpoints: MFV uses foundation `dlogit`, surveys use the rank-logit contrast `C`. The `+/-` term is the propagated item uncertainty.
+`profile shift / human SD` is the distance from `c=-1` to `c=+1`, measured in human between-country standard deviations. `100%` means one human SD. `profile shift` is in plot units: MFV relative-emphasis z-score, or survey expected 1-5 score. `reader-logit shift` is the direct answer-logit readout for the same endpoints: MFV uses foundation `dlogit`, surveys use the rank-logit contrast `C`. The `+/-` term is the propagated item uncertainty.
 
 | dataset | axis | profile shift / human SD | profile shift | reader-logit shift |
 | --- | --- | --- | --- | --- |

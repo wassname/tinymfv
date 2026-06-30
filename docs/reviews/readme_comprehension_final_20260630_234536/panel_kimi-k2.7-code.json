@@ -1,0 +1,36 @@
+ {
+  "summary": "tinymfv is a lightweight, fast evaluation toolkit that prompts local LLMs with moral vignettes and psychological survey items, reads the probabilities on valid answer tokens, and aggregates those probabilities into a single model profile. Researchers would use it to quickly test whether a steering intervention moves the target value, shifts nearby values, and stays close to human response patterns.",
+  "mechanism": "For each installed dataset (MFV vignettes or a survey instrument), tinymfv builds items, asks them in multiple framings (other/self violate for MFV; forward/inverted/negated for surveys), and reads the model's logits over the valid answer tokens. It canonicalizes the reverse-keyed framings and averages them, then computes a profile: for MFV this is the mean softmax probability per foundation, and for surveys it is the mean expected 1-5 scale score per factor. For the showcase, MFV profiles are z-scored across foundations so model and human reference share relative-emphasis units, while survey maps use the raw expected scores. Steering is applied along a coefficient path (c), here pure Authority built from authority-respecting vs authority-disregarding personas (red = +c = more Authority, blue = -c = less Authority). The plotted path keeps only usable coefficients: those whose answer mass is at least `coherence-frac` of base, whose survey contrast is above `contrast-frac`, and whose MFV forced-choice margin is above `margin-frac`. The final table reports the profile shift from c=-1 to c=+1 in both z-score/expected-score units and in human between-country SDs, plus a more sensitive `reader-logit shift` computed from log-space contrasts.",
+  "scores": {
+    "clarity": "4",
+    "conciseness": "4",
+    "technical_accuracy": "5"
+  },
+  "reason": "The document explains the package's purpose, the showcased Authority steer, and the profile/logit metrics with consistent equations and plots, though a few gate/collapse details and map-axis construction are left implicit.",
+  "unclear": [
+    "The exact formulas for the plot-gate metrics 'MFV forced-choice margin' and 'survey contrast' are not defined.",
+    "What precise operational test counts as 'reader collapse' is only described qualitatively.",
+    "How the 'human between-country SD' used for scaled profile shift is computed is not shown.",
+    "Whether the map PCA axes are computed once across datasets or per-plot is not stated.",
+    "How the steering vector is mechanically applied to the model (layers, scale, hook) is missing."
+  ],
+  "misunderstandings": [
+    "The table's 'profile shift' for MFV is in z-scored relative-emphasis units, but a reader might take it as raw probability shift because the API reports `mean probability per foundation`.",
+    "The phrase 'MFV uses the same map and range plotters as the surveys' could imply identical units; the text later clarifies MFV is z-scored, but this is easy to skim past.",
+    "Saying both 'the path shows only usable coefficients' and 'this run kept the full path' is consistent if no collapse occurred, but could be read as saying the path is always fixed."
+  ],
+  "missing_to_implement": [
+    "A steering-lite run directory containing the actual generated model outputs to feed into `scripts/plot_steer_showcase.py`.",
+    "A causal LM, GPU, and the `tiny-mfv[maps]` extra dependency.",
+    "The bundled JSON/CSV data files and the code that converts them into prompts and valid answer-token sets.",
+    "The PCA and human-reference preprocessing pipeline.",
+    "The concrete implementation of the three gate thresholds used to truncate the coefficient path."
+  ],
+  "suggestions": [
+    "Add a short glossary sidebar defining c path, collapse, forced-choice margin, and survey contrast.",
+    "Move the reader-logit shift equations next to the table where the term is first used.",
+    "Restate the table header units explicitly, e.g. 'profile shift (MFV z-score or survey expected 1-5 score)'.",
+    "Include one sentence or a link explaining how the Authority vector is applied to activations.",
+    "Add a map caption that defines the PCA axes and the gray/black/red/blue legend."
+  ]
+}

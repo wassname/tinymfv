@@ -1,0 +1,31 @@
+```json
+{
+ "summary": "tinymfv is a lightweight tool designed for rapidly evaluating the effects of steering on language models' moral and value judgments. It quickly assesses how steering influences a model's responses to moral vignettes and survey questions, providing insights into whether changes are targeted, have unintended side effects, or align with human responses.",
+ "mechanism": "The evaluation process involves feeding moral vignettes or survey questions to the LLM and capturing the probabilities assigned to different answer tokens. tinymfv then converts these probabilities into a profile, which is compared against human data using plots like culture maps and range plots. The details of how precision to linearize affinities and gates remained unclear from the documentation.",
+ "scores": {
+  "clarity": "3",
+  "conciseness": "4",
+  "technical_accuracy": "3"
+ },
+ "reason": "The documentation is reasonably concise and provides a general overview of the tool's purpose, but it lacks detailed technical explanations of the evaluation mechanisms, making a full reconstruction difficult.",
+ "unclear": [
+  "How the probabilities are converted into the plotted profile and steering comparison.",
+  "What the 'c path/gates' are and their role in the measurement.",
+  "The specifics of 'reader-logit shift' calculation",
+  "The exact method for 'z-scoring' the profiles"
+ ],
+ "misunderstandings": [
+  "The document implies a direct one-to-one correspondence between MFV items, LLM answers and human foundations, where in reality these can be more complex.",
+  "There's ambiguity around the precise treatment of responses for different survey frames (inverted/negated)."
+ ],
+ "missing_to_implement": [
+  "Detailed instructions on how to reproduce the plots.",
+  "A more in-depth explanation of the 'profile shift' and 'reader-logit shift' metrics."
+ ],
+ "suggestions": [
+  "Add a detailed walkthrough with example code showing how to generate the plots from the 'report' object.",
+  "Elaborate on the mathematical formulas behind the different measurement metrics (profile shift, reader-logit shift).",
+  "Clarify the treatment of survey frame variations for a more consistent reading"
+ ]
+}
+```

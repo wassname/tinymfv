@@ -1,0 +1,9 @@
+{
+ "summary": "tinymfv is a toolkit for fast evaluation of local LLM steering, using moral vignettes and standardized surveys to measure model value shifts. Researchers use it to verify whether a steering vector effectively moves a model toward human response patterns or inadvertently shifts it into out-of-distribution, 'alien' territory without requiring full moral reasoning evaluations.",
+ "mechanism": "The package processes model outputs into 'profiles' by calculating mean foundation probabilities for MFV vignettes (z-scored for mapping) or expected 1-5 scores for surveys. These profiles are compared against human data across a steering coefficient path. The tool calculates 'reader-logit shift' as a sensitive measure of log-space changes at steering endpoints (`c=+1` vs `c=-1`) and applies 'gates' (coherence, contrast, and margin checks) to discard unstable runs where the model loses its semantic structure.",
+ "scores": {"clarity": 5, "conciseness": 5, "technical_accuracy": 5},
+ "reason": "The documentation is highly specific, providing both the conceptual workflow and the necessary mathematical formulas to understand how the profiles are derived and compared.",
+ "unclear": ["The specific mathematical derivation of the survey 'rank-logit contrast C' is provided, but 'reader-logit shift' calculation details rely on the reader interpreting the formula $\\ell_{i,f}^{(c)}$ and the table columns without a definitions glossary for all abbreviations."],
+ "misunderstandings": ["The term 'MFV' is used ambiguously, acting as both an acronym for the package name (tinymfv), the moral vignette dataset, and the foundation-reader framework."],
+ "missing_to_implement": ["The documentation demonstrates how to run evaluations (evaluate/administer), but implies the steering vector (e.g., 'pure Authority') exists externally, without explaining how to construct that vector from the mentioned personas."]
+}

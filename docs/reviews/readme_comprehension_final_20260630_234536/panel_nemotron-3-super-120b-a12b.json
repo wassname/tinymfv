@@ -1,0 +1,35 @@
+{
+  "summary": "tinymfv is a lightweight package for evaluating how steering changes an LLM's expressed values. It poses moral vignettes and survey questions, reads the model's answer-token probabilities, collapses them into per‑foundation or per‑trait profiles, and visualizes those profiles alongside human baselines to see whether a steer moves the intended values, affects nearby values, and remains within human response patterns.",
+  "mechanism": "For each item, the model’s answer-token probabilities are collected; MFV vignettes yield a profile as the mean probability of each moral foundation across items, while surveys give the mean expected 1‑5 score per factor. MFV profiles are z‑scored across foundations before plotting so the map shows relative emphasis. Steering effects are assessed by comparing profiles (or logits) at positive and negative steering coefficients (+c, –c); the table’s reader‑logit shift reports the average difference in forced‑choice logits (MFV) or rank‑weighted logits (surveys) between +c and –c, and profile shift / human SD expresses that difference in units of between‑country standard deviation.",
+  "scores": {
+    "clarity": "4",
+    "conciseness": "3",
+    "technical_accuracy": "5"
+  },
+  "reason": "The document is reasonably clear and technically precise, though some sections are dense and could be more concise.",
+  "unclear": [
+    "what the steering coefficient 'c' concretely represents and how it is applied to the model",
+    "exact computation of 'profile shift / human SD' (how the human between‑country SD is derived)",
+    "meaning of the plot gate parameters coherence‑frac, contrast‑frac, margin‑frac",
+    "definition of 'forced‑choice margin' used in the gate",
+    "how the 'reader-logit shift' is propagated to item uncertainty (± term)"
+  ],
+  "misunderstandings": [
+    "the text says MFV uses 'nominal foundation logits' after converting to relative foundation emphasis, yet earlier defines the MFV profile as mean probability, creating potential confusion about whether probabilities or logits are plotted",
+    "the description of the path states it shows only usable coefficients until the reader starts to collapse, but the showcase then keeps the full path c=-1,-0.5,0,+0.5,+1, which may suggest collapse did not occur"
+  ],
+  "missing_to_implement": [
+    "instructions for generating or obtaining the steering vectors (e.g., pure Authority vector) and applying coefficients c",
+    "details on how to produce the steering‑lite run directory referenced in the plotting script",
+    "explanation of any additional dependencies beyond transformers (e.g., steering‑lite, plotting utilities)",
+    "guidance on how to compute the z‑scoring of MFV foundations for custom plots",
+    "clarification on how to interpret the 'mean_pmass_allowed' format check"
+  ],
+  "suggestions": [
+    "Add a brief introductory paragraph explaining what the steering coefficient c is (e.g., strength along a pre‑computed steering vector) and how ±c are obtained",
+    "Include a worked example showing the calculation of reader‑logit shift for one MFV foundation and one survey factor",
+    "Provide a tooltip or legend in the documentation defining coherence‑frac, contrast‑frac, and margin‑frac in the plot gate",
+    "Clarify whether the MFV profile plotted is based on probabilities or logits, and show the conversion step explicitly",
+    "Add a minimal end‑to‑end tutorial that starts from a raw model, applies steering, runs tinymfv evaluate/administer, and generates the showcase plots"
+  ]
+}

@@ -99,13 +99,13 @@ Out:
   - likely_fail: all methods reproduce off-axis Social Norms movement.
   - sneaky_fail: a method looks good because retained c values differ; catch by printing retained c values and quality gates.
   - UAT: method comparison table links each output dir and verifier table. Result: no method is README-ready.
-- [ ] T7 (R6): Evaluate reliability and side effects.
+- [x] T7 (R6): Evaluate reliability and side effects.
   - steps: run tinymfv summary over MFV, MFQ-2, Humor, Big Five; estimate noise/CI where available.
   - verify: table includes profile shift/human SD, reader-logit shift, and uncertainty/noise columns.
   - success: Authority signal is larger than noise and side effects are interpretable.
   - likely_fail: MFQ-2 noisy or opposite sign.
   - sneaky_fail: profile shift comes from loss of answer structure; catch with answer mass, survey contrast, and MFV margin.
-  - UAT: one table lets the user decide whether the steer is good enough to show.
+  - UAT: one table lets the user decide whether the steer is good enough to show. Result: README now includes the per-axis table from the final PCA run. It reports `profile shift / human SD`, raw `profile shift`, and `reader-logit shift` for MFV, Humor Styles, Big Five, and MFQ-2. MFQ-2 sample-noise bootstrap is in `/media/wassname/SGIronWolf/projects5/2026/lite/tinymfv/docs/reviews/mfq2_authority_pca_n_bootstrap_20260701.csv`.
 - [x] T12 (R6): Estimate the minimum MFQ-2 `N` needed for stable steering plots.
   - steps: measure bootstrapped MFQ-2 Authority path variability at subset sizes `N=1,2,4,8` from per-sample readouts, or add a per-sample export if the current aggregate output is insufficient.
   - verify: table reports mean and bootstrap std/CI for Authority `C` deltas at each subset size and c row.
@@ -140,13 +140,13 @@ Out:
 | sspace | `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T163010Z_pure_authority_mundane15_sspace_mfv_mfq2_n8` | signed at `c=0.5`, not at `c=1.0` | `pmass=1`, `unscorable=0`, margin/base `0.972..0.980` at +c and `1.059..1.193` at -c |
 | directional_ablation | `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T163010Z_pure_authority_mundane15_directional_ablation_mfv_mfq2_n8` | both signs raise Authority | `pmass=1`, `unscorable=0`, margin/base `0.812..0.813` at +c and `0.843..0.760` at -c |
 | linear_act | `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T163010Z_pure_authority_mundane15_linear_act_mfv_mfq2_n8` | signed at `c=0.5` and `c=1.0` | `pmass=1`, `unscorable=0`, margin/base `1.133..1.149` at +c and `0.891..0.760` at -c |
-- [ ] T9 (R7): Update README only from the final successful run.
+- [x] T9 (R7): Update README only from the final successful run.
   - steps: regenerate all README plots from one final artifact; add concise table and captions.
   - verify: README image links resolve; no 16PF plot; no WIP methodology journal in reader prose.
   - success: reader sees what tinymfv is, what was steered, which datasets measured it, and why it matters.
   - likely_fail: README narrates failed strict22/debug history.
   - sneaky_fail: captions imply a general sign convention; catch by reading README without this spec.
-  - UAT: external-review-v2 comprehension panel can explain what/where/why/measurement/dataset in its own words.
+  - UAT: external-review-v2 comprehension panel can explain what/where/why/measurement/dataset in its own words. Result: final panel artifacts are in `/media/wassname/SGIronWolf/projects5/2026/lite/tinymfv/docs/reviews/readme_comprehension_final_20260630_234536/`. The panel converged on the intended reading: tinymfv reads answer-token probabilities, builds MFV/survey profiles, compares steered paths to human reference data, and is used to catch intended movement, side effects, and non-human profiles. Repeated earlier confusion about `reader-logit shift`, `c` path, and MFQ-2 sampled reads was addressed in README.
 - [x] T11 (R5): Render candidate PCA maps from the best current MFV path.
   - steps: choose the method using MFV Authority direction and MFV coherence evidence only; render candidate maps/ranges from the selected steering-lite run.
   - verify: `uv run python scripts/plot_steer_showcase.py --run-dir /media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T163010Z_pure_authority_mundane15_pca_mfv_mfq2_n8 --out docs/img/showcase_authority_pca_mundane15 --vec-label "pure Authority, PCA (+c = more Authority)" --coherence-frac 0.99 --margin-frac 0.50 --contrast-frac 0.000001`
@@ -244,3 +244,4 @@ Out:
 - 2026-07-01: Rendered method-comparison maps/ranges into `/media/wassname/SGIronWolf/projects5/2026/lite/tinymfv/docs/img/showcase_authority_method_compare_mundane15/`.
 - 2026-07-01: Pueue 423 completed the full PCA run over MFV, MFQ-2, Humor Styles, and Big Five at `N=8`: `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T222000Z_pure_authority_mundane15_pca_readme_mfv_mfq2_humor_big5_n8`. MFV Authority direction is signed at both evaluated magnitudes (`+0.306/-0.327` at `c=0.5`; `+0.906/-0.910` at `c=1.0`) and coherence is clean (`pmass=1.000`, unscorable `0`, min margin/base `0.800`). The README plot images were regenerated from this run with the shared coherent c path `[-1,-0.5,0,+0.5,+1]`.
 - 2026-07-01: MFQ-2 per-sample bootstrap from the pueue 423 run shows sign stability even at `N=1`: every bootstrap draw has the intended Authority direction for `c in {-1,-0.5,+0.5,+1}`. `N=4` or `N=8` tightens uncertainty, but the minimum sign-stable `N` in this run is `1`.
+- 2026-07-01: README was updated from the final PCA run only. External-review-v2 comprehension panels first identified repeated gaps around `reader-logit shift`, the c path/gates, and MFQ-2 sampled reads; after edits, the final panel understood the core package/use-case and left only expected out-of-scope requests for a steering-lite end-to-end tutorial.

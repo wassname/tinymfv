@@ -1,0 +1,37 @@
+{
+  "summary": "tinymfv is a lightweight Python library that evaluates the moral, personality, and humor value profiles of locally run LLMs by presenting vignette and survey items, reading answer-token probabilities, and summarizing them into a single model profile. It visualizes how positive or negative steering moves these profiles relative to human reference data using PCA maps and range plots. Researchers use it to quickly detect subtle steering effects and side‑effects before they appear in sampled model outputs.",
+  "mechanism": "For each vignette (MFV) or survey item the model is queried and the probability mass on each valid answer token is extracted. MFV computes a foundation profile as the average probability for each moral foundation (profile_f = E_i P(f|i)). Survey instruments compute an expected rating per factor (profile_d = E_i ∑_k k·P(k|i)) after reverse‑keying. MFV profiles are z‑scored across foundations and projected onto a PCA derived from human country data to produce 2‑D ipsative maps; range plots show the raw or z‑scored values against human means and standard deviations. Steering is evaluated by running the model at several steering coefficients c (e.g., -1, -0.5, 0, +0.5, +1), calculating profile shift (difference in profile values) and reader‑logit shift (Δ_f = E_i (ℓ_{i,f}^{(+1)} – ℓ_{i,f}^{(-1)}) for MFV and analogous C_d(c) for surveys). Coefficients are kept only if the answer‑mass coherence (m(c) ≥ coherence‑frac), survey contrast (≥ contrast‑frac), and MFV forced‑choice margin (≥ margin‑frac) pass threshold, implementing the “c path/gates”. The resulting shifts are plotted against human‑SD units.",
+  "scores": {
+    "clarity": 4,
+    "conciseness": 3,
+    "technical_accuracy": 4
+  },
+  "reason": "The documentation provides clear definitions and formulas for profiles and shifts, but some gating details, the steering coefficient implementation, and PCA construction are not fully explained, reducing overall precision and brevity.",
+  "unclear": [
+    "Exact definition and calculation of the MFV \"forced‑choice margin\" used for gating.",
+    "How the steering coefficient c is applied to the model (e.g., prompt modification, logit bias, LoRA).",
+    "Details of the PCA computation and how human reference data are pre‑processed for the maps.",
+    "How answer‑token sets A_i are constructed for each vignette and survey item (mapping tokens to categories or scale points).",
+    "Precise interpretation and units of \"reader‑logit shift\" across MFV and surveys."
+  ],
+  "misunderstandings": [
+    "\"Reader‑logit shift\" may be misread as a uniform metric across MFV and surveys, though its underlying logit definitions differ (foundation dlogit vs rank‑logit contrast C).",
+    "The difference between \"profile shift / human SD\" and \"profile shift\" units could cause confusion about scaling."
+  ],
+  "missing_to_implement": [
+    "A description or code for generating the PCA axes from human data and projecting model profiles onto them.",
+    "Mapping from token probabilities to moral foundation categories for MFV items.",
+    "Implementation details for applying the steering coefficient c to the model and producing outputs at multiple c values.",
+    "Formula and explanation for the MFV forced‑choice margin metric used in the gate.",
+    "Procedure for building the answer‑token sets A_i for each vignette and survey item.",
+    "Exact calculation of the survey contrast metric used for gating."
+  ],
+  "suggestions": [
+    "Add a clear explanation of how the steering coefficient c is realized (e.g., via prompt templates, logit bias, or adapter weights) and how to generate multiple c values.",
+    "Provide the definition and computation steps for the MFV forced‑choice margin and its threshold (margin‑frac).",
+    "Include a brief outline of the PCA pipeline: data sources, standardization, number of components, and how human IPSATIVE maps are derived.",
+    "Supply a mapping table or utility function that translates model token IDs to answer options for each MFV and survey item.",
+    "Clarify the interpretation of \"reader‑logit shift\" for both MFV and surveys, perhaps with a small numeric example.",
+    "Show example code demonstrating the gating checks (coherence‑frac, contrast‑frac, margin‑frac) and how they prune the c path."
+  ]
+}
