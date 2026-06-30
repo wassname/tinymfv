@@ -82,23 +82,23 @@ Out:
   - likely_fail: runner still references `authority_tradition_obedience`.
   - sneaky_fail: copied summary and JSONL disagree on pair/template; catch by parsing both.
   - UAT: committed steering-lite files point to the pure Authority selection.
-- [/] T5 (R5): Queue pure-Authority steer/eval UAT.
+- [x] T5 (R5): Queue pure-Authority steer/eval UAT.
   - steps: queue `sspace` first on `mfv mfq2` at `c=0.5,1`, `admin-n-samples=8`; only broaden after it passes.
   - verify: pueue label includes why/resolve; output contains MFV and MFQ-2 profiles over the signed c-grid.
   - success: small positive `c` raises MFV/MFQ-2 Authority and small negative `c` lowers it, without Social Norms dominating MFV.
   - likely_fail: sign is reversed or flat.
   - sneaky_fail: Authority moves only because high-c rows are incoherent; catch with pmass, MFV margin, and small-c verifier.
-  - UAT: verifier table shows signed direction, selectivity, and coherence:
+  - UAT: verifier table shows signed direction, selectivity, and coherence. Result: failed for all tested methods, with coherence clean.
     - direction: MFV Authority `dlogit(+0.5) > 0` and `dlogit(-0.5) < 0`; MFQ-2 Authority `C(+0.5) > base` and `C(-0.5) < base`.
     - selectivity: MFV Social Norms is not larger than Authority at the same small-c rows.
     - coherence: MFV `frac_unscorable` stays near zero and margin does not collapse; ordinal `pmass` stays near base.
-- [/] T6 (R5, R6): Compare runner-supported methods.
+- [x] T6 (R5, R6): Compare runner-supported methods.
   - steps: queue `mean_diff`, `pca`, `sspace`, `directional_ablation`, and `linear_act` with unique timestamped output dirs.
   - verify: each output dir has `summary.json`, `mfv_profiles.csv`, `mfq2_profiles.csv`, and method-specific verifier output.
   - success: choose a method that preserves pure Authority direction and selectivity.
   - likely_fail: all methods reproduce off-axis Social Norms movement.
   - sneaky_fail: a method looks good because retained c values differ; catch by printing retained c values and quality gates.
-  - UAT: method comparison table links each output dir and verifier table.
+  - UAT: method comparison table links each output dir and verifier table. Result: no method is README-ready.
 - [ ] T7 (R6): Evaluate reliability and side effects.
   - steps: run tinymfv summary over MFV, MFQ-2, Humor, Big Five; estimate noise/CI where available.
   - verify: table includes profile shift/human SD, reader-logit shift, and uncertainty/noise columns.
@@ -106,7 +106,14 @@ Out:
   - likely_fail: MFQ-2 noisy or opposite sign.
   - sneaky_fail: profile shift comes from loss of answer structure; catch with answer mass, survey contrast, and MFV margin.
   - UAT: one table lets the user decide whether the steer is good enough to show.
-- [ ] T8 (R7): Update README only from the final successful run.
+- [ ] T8 (R1-R5): Repair the pure-Authority data selection.
+  - steps: inspect rendered strict25 examples; remove scenarios whose Authority affordance is actually Social Norms, legality, institutional controversy, or welfare/autonomy; rerun scenario validation with stricter source balance and example audit.
+  - verify: selected examples file has direct respect/disregard for authority without Social Norms or dignity/care wording, and source counts are not dominated by ValueBench.
+  - success: strict selected rows still separate the fixed persona pair, and the rendered examples read like Authority rather than social-order controversy.
+  - likely_fail: too few strict rows survive after deconfounding.
+  - sneaky_fail: judge score is high because the responses echo `authority-respecting`/`authority-disregarding`; catch by reading examples and echo/style columns.
+  - UAT: committed steering-lite selection file plus example table show the corrected data before another GPU run.
+- [ ] T9 (R7): Update README only from the final successful run.
   - steps: regenerate all README plots from one final artifact; add concise table and captions.
   - verify: README image links resolve; no 16PF plot; no WIP methodology journal in reader prose.
   - success: reader sees what tinymfv is, what was steered, which datasets measured it, and why it matters.
@@ -177,3 +184,5 @@ Out:
 - 2026-06-30: Pueue 407 `pca` completed at `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T123208Z_pure_authority_strict25_pca_mfv_mfq2_n8`. Verifier verdict: fail. MFV small-c direction barely passed (`Authority` dlogit `+0.024` at `+0.5`, `-0.069` at `-0.5`) but selectivity failed because Social Norms moved more (`-0.005`, `+0.427`). MFQ-2 direction failed: `authority` C base `30.836`, `+0.5` delta `-1.018`, `-0.5` delta `-4.221`; high-c rows also lowered Authority. Coherence was clean for both instruments.
 - 2026-06-30: Pueue 408 `sspace` completed at `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T123208Z_pure_authority_strict25_sspace_mfv_mfq2_n8`. Verifier verdict: fail. MFV small-c direction passed (`Authority` dlogit `+0.187` at `+0.5`, `-0.276` at `-0.5`), but selectivity failed because Social Norms moved more (`-0.497`, `+0.596`). MFQ-2 direction failed: `authority` C base `32.349`, `+0.5` delta `-1.265`, `-0.5` delta `-6.489`. Coherence was clean for both instruments (`pmass=1.000`; MFV `frac_unscorable=0.000`), so this is direction/selectivity failure, not readout collapse.
 - 2026-06-30: Pueue 409 `directional_ablation` completed at `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T123208Z_pure_authority_strict25_directional_ablation_mfv_mfq2_n8`. Verifier verdict: fail. Iso-KL calibration never reached target: bracket floor `C=0.0061` still had `kl_p95=0.971` against target `0.5`. MFV direction failed because both signs raised Authority (`+0.296` at `+0.5`, `+0.219` at `-0.5`), and selectivity failed because Social Norms moved more (`+0.407`, `+0.206`). MFQ-2 direction failed hard: `authority` C base `31.388`, `+0.5` delta `-6.284`, `-0.5` delta `-7.094`. Coherence was clean for both instruments.
+- 2026-06-30: Pueue 411 `linear_act` completed at `/media/wassname/SGIronWolf/projects5/2026/lite/steering-lite/outputs/20260630T123208Z_pure_authority_strict25_linear_act_mfv_mfq2_n8`. Verifier verdict: fail. MFQ-2 small-c direction passed weakly (`authority` C base `30.660`, `+0.5` delta `+0.351`, `-0.5` delta `-3.905`), but MFV direction failed (`Authority` dlogit `-0.202` at `+0.5`, `+0.102` at `-0.5`) and selectivity failed because Social Norms moved more (`+0.294`, `+0.111`). Coherence was clean (`pmass=1.000`; MFV `frac_unscorable=0.000`), so this is not answer collapse.
+- 2026-06-30: All pure-Authority strict25 method runs failed the same verifier family. Pattern: coherence is clean, but either MFV Authority direction is wrong/weak, MFQ-2 Authority direction is wrong/weak, or MFV Social Norms dominates. This points more to selection/template/scenario contamination than to plotting or answer-token collapse.
