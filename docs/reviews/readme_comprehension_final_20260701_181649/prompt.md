@@ -1,3 +1,20 @@
+You are reading the document below for the FIRST time (a cold reader).
+Answer ONLY from what it says; where something is unstated or ambiguous, say so.
+Output ONE JSON object, no prose, no fences:
+{
+ "summary": "<2-3 sentences: restate the thesis/method in your OWN words>",
+ "mechanism": "<the doc's single hardest/central mechanism, reconstructed in your OWN words as if to a colleague; say 'unclear' if the doc does not let you rebuild it>",
+ "scores": {"clarity": "<1-5>", "conciseness": "<1-5>", "technical_accuracy": "<1-5>"},
+ "reason": "<one sentence on the scores>",
+ "unclear": ["<what was confusing, ambiguous, or you had to guess>"],
+ "misunderstandings": ["<places the text contradicts itself or invites a misread>"],
+ "missing_to_implement": ["<what a reader still needs to reproduce or act on this>"],
+ "questions": ["<a question the doc left you with, then your best-guess answer>"],
+ "suggestions": ["<concrete edit that would help>"],
+ "rewrites": [{"section": "<quote a sentence/section that reads as AI-written>", "rewrite": "<rewrite it to strip the AI voice and read like a plain, direct human draft -- SAME meaning and facts, do not add claims>", "why": "<which AI tell it removes>"}]
+}
+
+DOCUMENT:
 # tinymfv
 
 tinymfv is a small set of fast value evals for local LLM steering work. It asks moral vignettes and survey questions, reads answer-token probabilities, and turns them into one model profile.
@@ -6,13 +23,13 @@ Use it when you want to know whether a steer moved the intended values, moved ne
 
 The plots compare that profile to human data. Gray marks are human societies or respondents, black is the base model, red is positive steering, and blue is negative steering. This showcase uses an Authority contrast vector built from `authority-respecting` versus `authority-disregarding` personas. steering-lite built and applied the vector; tinymfv measures the resulting model profiles. Here `c` is the steering-lite multiplier on that vector. Red is `+c`, more Authority; blue is `-c`, less Authority.
 
-MFV comes first because it is the direct moral-vignette readout. MFV uses categorical answers: the answer is a moral foundation. MFQ-2 is the Moral Foundations Questionnaire 2 survey, where the answer is a 1-5 scale point.
+MFV comes first because it is the direct moral-vignette readout. MFV is nominal: the answer is a moral foundation category. MFQ-2 is the Moral Foundations Questionnaire 2 survey, where the answer is a 1-5 scale point.
 
 ![MFV culture map: Authority steering against human countries](docs/img/showcase/mfv/map_pca_ipsative.png)
 
 ![MFV range plot: foundation emphasis beside Authority steering](docs/img/showcase/mfv/range.png)
 
-MFV uses the same map and range plotters as the surveys, after converting foundation probabilities into relative foundation emphasis. Each profile is z-scored across foundations before mapping, so the plot compares which foundations are high or low within that profile.
+MFV uses the same map and range plotters as the surveys, after converting nominal foundation probabilities into relative foundation emphasis. Each profile is z-scored across foundations before mapping, so the plot compares which foundations are high or low within that profile.
 
 ![Humor Styles range plot: human society ranges beside Authority steering](docs/img/showcase/humor_styles/range.png)
 
@@ -95,7 +112,7 @@ just smoke
 | 16PF | [162 items](src/tinymfv/data/surveys/16pf/questionnaire.json), plus inverted and negated frames | [country means](src/tinymfv/data/human/16pf_country_factors.csv) | expected 1-5 score per factor |
 | Humor Styles | [32 items](src/tinymfv/data/surveys/humor_styles/questionnaire.json), plus inverted and negated frames | [country means](src/tinymfv/data/human/humor_styles_country_factors.csv), originally 1-7 | expected 1-5 score per style |
 
-MFV uses categorical answers: the answer is the foundation. The survey instruments use ordinal answers: the answer is a scale point.
+MFV is nominal: the answer is the category. The survey instruments are ordinal: the answer is a scale point.
 
 Each MFV item is asked in two perspectives, `other_violate` and `self_violate`. Each survey item is asked three ways, forward, scale-inverted, and content-negated. tinymfv canonicalizes these frames before averaging, so the profile is less tied to one wording.
 
@@ -146,7 +163,7 @@ uv run python scripts/plot_steer_showcase.py \
   --margin-frac 0.50
 ```
 
-The plot gate keeps only coefficients that all plotted instruments can still read. A row passes when answer mass, survey rank-logit contrast, and MFV top-foundation margin stay above the requested fraction of their base values: `pmass(c)/pmass(0) >= coherence-frac`, `mean_abs_C(c)/mean_abs_C(0) >= contrast-frac`, and `mean_margin(c)/mean_margin(0) >= margin-frac`.
+The plot gate keeps only coefficients that all plotted instruments can still read. `coherence-frac` checks answer mass against base. `contrast-frac` checks that survey answers still have rank-logit structure rather than flattening. `margin-frac` checks that MFV still has a top foundation separated from the runner-up.
 
 ## Measurement
 

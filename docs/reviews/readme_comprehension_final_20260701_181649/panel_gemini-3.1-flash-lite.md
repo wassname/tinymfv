@@ -1,0 +1,12 @@
+{
+ "summary": "tinymfv is a tool for evaluating the effects of LLM steering on moral and psychological profiles by comparing model responses against human-derived benchmarks. It provides methods to measure how probability shifts in moral vignettes and standardized surveys align with human-like distributions.",
+ "mechanism": "The framework calculates a 'profile' by computing the mean foundation probability (for vignettes) or expected 1-5 scale scores (for surveys) across items; it then compares these results against human z-scored distributions, visualizing the model's steering path relative to human-norm clusters.",
+ "scores": {"clarity": "4", "conciseness": "5", "technical_accuracy": "5"},
+ "reason": "The documentation is highly efficient and technically rigorous, though it relies on implied knowledge of the 'steering-lite' pipeline.",
+ "unclear": ["The explicit criteria for 'plot gates' (e.g., exactly how coherence and contrast thresholds cause a path render to fail).", "The precise integration step between steering-lite output artifacts and tinymfv ingestion."],
+ "misunderstandings": ["The introduction introduces visual plot conventions (colors for steering) before defining the data structures that those plots represent."],
+ "missing_to_implement": ["An integrated workflow example demonstrating how the steering-lite output explicitly becomes the input for the tinymfv plotting scripts."],
+ "questions": ["What happens when a 'plot gate' fails? Best-guess: The plotter detects statistically non-significant or degenerate model output and truncates the visualization path to avoid showing misleading data."],
+ "suggestions": ["Define 'plot gates' explicitly in the Measurement section, clarifying that these are automatic statistical filters used to prune paths where the model has lost coherent structure."],
+ "rewrites": [{"section": "That is the useful warning sign, a model can answer in the requested format and still be a moral or psychological alien on the measured profile.", "rewrite": "This serves as a diagnostic warning: a model may adhere to the requested output format while remaining psychologically distinct from human norms on the measured profile.", "why": "Removes the dramatic 'moral or psychological alien' phrasing which sounds unscientific."}]
+}
