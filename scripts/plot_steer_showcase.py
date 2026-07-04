@@ -39,7 +39,9 @@ import tinymfv as T
 from tinymfv import get_instrument
 from tinymfv.zones import zones_for
 
-ORDINAL = ["mfq2", "big5", "16pf", "humor_styles"]
+# 16pf turned off: even at 6 macro zones its ipsative map is an unreadable pile-up (that instrument
+# doesn't separate cultures; Brazil/Ecuador stretch Latin America across the whole plot). -- Claude
+ORDINAL = ["mfq2", "big5", "humor_styles"]
 
 
 def _frac(x, scale_max: int) -> np.ndarray:
@@ -193,15 +195,16 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float,
     # scatters its real Atari respondents behind; the others scatter a per-country resample.
     zones, emph = zones_for(countries)
     if name == "mfq2":
-        _, respondents = T.maps.respondent_profiles(dims, instr.scale_max)
+        cloud_countries, respondents = T.maps.respondent_profiles(dims, instr.scale_max)
         haze = None
     else:
-        respondents, (haze, _) = None, human_haze(instr)
+        respondents, (haze, cloud_countries) = None, human_haze(instr)
     traj = {c: _frac(prof_c[c], instr.scale_max) for c in coh_cs}
     figm = T.maps.plot_ipsative_pca(instr, dims, countries, Mfrac,
                                     _frac(base, instr.scale_max), _frac(pos, instr.scale_max),
                                     _frac(neg, instr.scale_max), respondents=respondents, haze=haze,
-                                    traj=traj, emphasize=emph, zones=zones, labels=labels)
+                                    traj=traj, emphasize=emph, zones=zones,
+                                    cloud_countries=cloud_countries, labels=labels)
     figm.axes[0].set_title(f"{instr.display}: humans vs LLMs steered for {vec_label}", fontsize=10)
     paths = [T.maps.save_both(figm, out / name, "map_pca_ipsative")]
     plt.close(figm)

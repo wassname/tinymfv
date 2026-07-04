@@ -98,29 +98,58 @@ ZONE_COLORS = {
 }
 
 
-def draw_zone_ellipses(ax, P: np.ndarray, countries: list[str], zones: dict[str, list[str]]) -> None:
-    """Per-zone blob: a ~1.6-sigma covariance ellipse over that zone's member COUNTRY points (P is
-    countries x 2). Between-country spread keeps zones separate; an eigenvalue floor (a fraction of
-    the overall P spread) gives a 1-country zone a small circle and a 2-country zone real width
-    instead of a line. Shared by the instrument maps and the WVS map."""
+def _country_region(cen: np.ndarray, pts: np.ndarray | None, sigma: float, r_fixed: float):
+    """One country's territory as a shapely polygon: its real p75-ish covariance ellipse from its
+    projected respondent/haze cloud `pts` (natural shape + size, scaled by `sigma`), or a fixed disc
+    of radius `r_fixed` when there is no within-country cloud (MFV / WVS have only country means)."""
+    from shapely.geometry import Point, Polygon as ShapelyPolygon
+    if pts is not None and len(pts) >= 10:
+        evals, evecs = np.linalg.eigh(np.cov(pts.T))
+        evals = np.maximum(evals, (0.35 * r_fixed) ** 2)   # floor so a low-spread country stays visible
+        th = np.linspace(0, 2 * np.pi, 48)
+        xy = (evecs @ (sigma * np.sqrt(evals)[:, None] * np.stack([np.cos(th), np.sin(th)]))).T + cen
+        return ShapelyPolygon(xy)
+    return Point(*cen).buffer(r_fixed, quad_segs=24)
+
+
+def draw_zone_regions(ax, P: np.ndarray, countries: list[str], zones: dict[str, list[str]],
+                      cloud_P: np.ndarray | None = None, cloud_countries: list[str] | None = None,
+                      sigma: float = 1.0) -> None:
+    """Each zone is the UNION (one merged shape, uniform alpha -- not stacked translucent discs) of a
+    per-country region: that country's real spread ellipse when a cloud is given, else a fixed disc.
+    Every country therefore sits inside its own zone territory, a 2-country zone still has an area,
+    and clustered members merge into one blob. P is countries x 2; `cloud_P`/`cloud_countries` are the
+    projected respondent/haze cloud and its per-row country. Shared by the instrument + WVS maps."""
+    from shapely.ops import unary_union
+    from matplotlib.patches import Polygon as MplPolygon
     cidx = {c: i for i, c in enumerate(countries)}
-    floor = (0.07 * float(np.hypot(*(P.max(0) - P.min(0))))) ** 2
+    r_fixed = 0.06 * float(np.hypot(*(P.max(0) - P.min(0))))
+    by_country: dict[str, np.ndarray] = {}
+    if cloud_P is not None and cloud_countries is not None:
+        cc = np.asarray(cloud_countries)
+        for c in set(cloud_countries):
+            by_country[c] = cloud_P[cc == c]
+    # Real per-country individual spread is far larger than the between-country dot spacing (within >>
+    # between variance), so raw ellipses fill the plot. Rescale so the MEDIAN country ellipse ~ r_fixed
+    # -- keeps each country's natural shape/orientation and relative size, at a legible overall scale.
+    radii = [np.sqrt(max(np.linalg.eigvalsh(np.cov(pts.T)).mean(), 1e-12))
+             for pts in by_country.values() if len(pts) >= 10]
+    sigma *= (r_fixed / float(np.median(radii))) if radii else 1.0
     for zname, members in zones.items():
-        zp = P[[cidx[c] for c in members if c in cidx]]
-        if len(zp) == 0:
+        idxs = [cidx[c] for c in members if c in cidx]
+        if not idxs:
             continue
-        cen = zp.mean(0)
-        cov = np.cov(zp.T) if len(zp) > 1 else np.zeros((2, 2))
-        evals, evecs = np.linalg.eigh(cov)
-        ang = np.degrees(np.arctan2(evecs[1, -1], evecs[0, -1]))
-        w, h = 2 * 1.6 * np.sqrt(np.maximum(evals[::-1], floor))
+        regions = [_country_region(P[cidx[c]], by_country.get(c), sigma, r_fixed)
+                   for c in members if c in cidx]
+        union = unary_union(regions)
+        geoms = list(union.geoms) if union.geom_type == "MultiPolygon" else [union]
         zcol = ZONE_COLORS.get(zname, "#888888")
-        ax.add_patch(Ellipse(cen, w, h, angle=ang, facecolor=zcol, edgecolor=zcol,
-                     alpha=0.12, lw=1.0, zorder=1.5))
-        ax.add_patch(Ellipse(cen, w, h, angle=ang, facecolor="none", edgecolor=zcol,
-                     alpha=0.7, lw=1.2, zorder=1.7))
-        ax.text(cen[0], cen[1], zname, fontsize=8.5, color=zcol, ha="center",
-                va="center", style="italic", fontweight="bold", zorder=2, alpha=0.9)
+        for g in geoms:
+            ax.add_patch(MplPolygon(np.asarray(g.exterior.coords), closed=True, facecolor=zcol,
+                         edgecolor=zcol, alpha=0.15, lw=1.1, zorder=1.5))
+        cen = P[idxs].mean(0)
+        ax.text(cen[0], cen[1], zname, fontsize=8.5, color=zcol, ha="center", va="center",
+                style="italic", fontweight="bold", zorder=2, alpha=0.9)
 
 
 
@@ -231,7 +260,7 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
                       traj: dict[float, np.ndarray] | None = None, traj_incoherent: set | None = None,
                       boots: dict | None = None,
                       emphasize: set[str] | None = None,
-                      zones: dict[str, list[str]] | None = None,
+                      zones: dict[str, list[str]] | None = None, cloud_countries: list[str] | None = None,
                       labels: tuple[str, str, str] = ("baseline (c=0)", "honest (c=+2)", "dishonest (c=-2)")):
     """Ipsative culture map. M is societies x K (0-1 fraction); base / pos / neg are the length-K
     fraction vectors for the base model and its two steer poles (or None). `labels` is the legend
@@ -272,12 +301,13 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     fig, ax = plt.subplots(figsize=(8.5, 7.5))
     ax.set_facecolor("#faf8f2")
     ax.grid(True, color="#eceadf", lw=0.3, zorder=0)
+    Pi = None
     if cloud is not None:                              # grey haze/respondents (rasterized; SVG-safe)
         Pi = (cloud @ Pc - mu) @ Vt[:2].T
         ax.scatter(Pi[:, 0], Pi[:, 1], s=4, c="#8f8a7e", alpha=0.14, edgecolors="none",
                    zorder=1, rasterized=True)
     if zones:
-        draw_zone_ellipses(ax, P, countries, zones)
+        draw_zone_regions(ax, P, countries, zones, cloud_P=Pi, cloud_countries=cloud_countries)
     ax.scatter(P[:, 0], P[:, 1], s=26, c=C_HUM, alpha=0.7, edgecolors="white", linewidths=0.5, zorder=3)
     # Society labels: each name/ISO code is pinned RIGHT NEXT to its dot (small fixed offset, no
     # leader line). A label is dropped if its box would collide with an already-placed one -- better an
