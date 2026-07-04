@@ -20,6 +20,12 @@ maps = [
     "matplotlib>=3.8",
     "textalloc>=1.2.3",   # non-overlapping label placement on the maps
 ]
+# tinymfv.read_api (sampling readout for logprob-less API models) only. Install with
+# `pip install tiny-mfv[api]`. The local logprob reader (read.py) needs none of this.
+api = [
+    "openai>=1.0",
+    "python-dotenv",
+]
 
 [dependency-groups]
 dev = [
