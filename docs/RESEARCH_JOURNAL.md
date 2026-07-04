@@ -749,3 +749,16 @@ over people; a person-level contour honestly shows the overlap the country-mean
 view hides. Secondary caveat: several mfq2 zones are single-country in the Atari
 19 (Confucian=Japan, Orthodox=Russia, Protestant=Switzerland), so those ellipses
 are one country's spread wearing a zone label.
+
+Follow-up (same day, after eyeballing): the individual-respondent contour was the
+wrong call for the map -- it fills the frame and every zone overlaps, exactly
+because within >> between variance. Switched the zone blob to a ~1.6-sigma
+covariance ellipse over each zone's COUNTRY-MEAN dots (between-country spread) with
+an eigenvalue floor so a 1- or 2-country zone still gets a circle/ellipse instead
+of a dot/line. Also fit the ipsative PCA on the country means M (not the respondent
+cloud) so the axes are between-country. Result: mfq2/big5/mfv separate cleanly and
+Economist-like, every country is grouped (big5 SG/PK no longer orphaned). humor
+STILL overlaps heavily even on country means -- humor-style country profiles do not
+cluster the IW way on the top 2 ipsative PCs, a real negative result, not a plot
+bug. (Whether any linear axis separates humor zones is the LDA question, tested
+separately.)

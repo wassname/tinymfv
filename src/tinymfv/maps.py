@@ -93,24 +93,6 @@ ZONE_COLORS = {
 }
 
 
-def convex_hull(pts: np.ndarray) -> np.ndarray:
-    """2D convex-hull vertices (CCW) via Andrew's monotone chain. Inline instead of scipy so the
-    `maps` install extra stays matplotlib-only (scipy is dev-only). pts (n,2) -> polygon (m,2)."""
-    P = sorted(map(tuple, pts.tolist()))
-    if len(P) <= 2:
-        return np.array(P, dtype=float)
-    cross = lambda o, a, b: (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
-    lower: list = []
-    for p in P:
-        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
-            lower.pop()
-        lower.append(p)
-    upper: list = []
-    for p in reversed(P):
-        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
-            upper.pop()
-        upper.append(p)
-    return np.array(lower[:-1] + upper[:-1], dtype=float)
 
 
 def save_both(fig, fig_dir: Path, stem: str, dpi: int = 200) -> Path:
@@ -218,8 +200,8 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
                       *, respondents: np.ndarray | None = None, haze: np.ndarray | None = None,
                       traj: dict[float, np.ndarray] | None = None, traj_incoherent: set | None = None,
                       boots: dict | None = None,
-                      zones: dict[str, list[str]] | None = None, emphasize: set[str] | None = None,
-                      respondent_zones: list[str] | None = None,
+                      emphasize: set[str] | None = None,
+                      zones: dict[str, list[str]] | None = None,
                       labels: tuple[str, str, str] = ("baseline (c=0)", "honest (c=+2)", "dishonest (c=-2)")):
     """Ipsative culture map. M is societies x K (0-1 fraction); base / pos / neg are the length-K
     fraction vectors for the base model and its two steer poles (or None). `labels` is the legend
@@ -237,18 +219,19 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     drawn hollow. `boots` optionally maps 'base'/'honest'/'dis' -> (n x K) bootstrap matrices.
     `zones` maps an Inglehart-Welzel zone name to the subset of `countries` (verbatim strings) in it;
     each zone with >=3 members gets a shaded convex hull (echoes the Economist WVS map's zone blobs),
-    testing whether moral-foundation space recovers the WVS clusters. `emphasize` is a subset of
+    `emphasize` is a subset of
     `countries` labelled bold-first so named outliers (China, US, Sweden...) always survive the
-    label-collision drop. `respondent_zones` (length = rows of the projected cloud, i.e.
-    `respondents` when `haze` is None) is each respondent's IW zone; each zone with enough respondents
-    gets a p90 Gaussian ellipse of its cloud (the real-respondent analogue of a zone hull, mfq2 only).
-    Returns the Figure."""
+    label-collision drop. `zones` maps an IW zone name to its member `countries`; each becomes a
+    covariance ellipse over that zone's COUNTRY-MEAN points (between-country spread, so zones stay
+    separate -- contouring individual respondents instead gives huge overlap since within-culture
+    variance dominates). An eigenvalue floor gives a 1- or 2-country zone a visible blob. The PCA is
+    fit on the country means M; `respondents`/`haze` only scatter + set the crop. Returns the
+    Figure."""
     try:
         import textalloc as ta
     except ImportError:
         ta = None
-    fit_on = respondents if respondents is not None else M
-    _, Vt, var, mu, Pc = ipsative_pca(fit_on)          # signs already stabilized inside the helper
+    _, Vt, var, mu, Pc = ipsative_pca(M)               # fit on country means: between-country axes
     P = (M @ Pc - mu) @ Vt[:2].T
     cloud = haze if haze is not None else respondents  # what we scatter + crop to (fit is separate)
 
@@ -259,50 +242,32 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     fig, ax = plt.subplots(figsize=(8.5, 7.5))
     ax.set_facecolor("#faf8f2")
     ax.grid(True, color="#eceadf", lw=0.3, zorder=0)
-    if cloud is not None:                              # grey haze = human respondents (rasterized; SVG-safe)
+    if cloud is not None:                              # grey haze/respondents (rasterized; SVG-safe)
         Pi = (cloud @ Pc - mu) @ Vt[:2].T
         ax.scatter(Pi[:, 0], Pi[:, 1], s=4, c="#8f8a7e", alpha=0.14, edgecolors="none",
                    zorder=1, rasterized=True)
-        # Per-zone p90 respondent ellipse (mfq2 only): the real-respondent analogue of a zone hull.
-        # A 90%-mass contour of the bivariate-Gaussian fit to each zone's projected cloud; the radius
-        # is the chi-square(2 dof) 0.90 quantile, sqrt(4.605)=2.1459 (hardcoded to avoid a scipy dep).
-        if respondent_zones is not None:
-            assert len(respondent_zones) == Pi.shape[0], "respondent_zones must align with the cloud rows"
-            zr = np.asarray(respondent_zones)
-            for zname in dict.fromkeys(respondent_zones):  # stable order, unique
-                zp = Pi[zr == zname]
-                if len(zp) < 30:                          # too few respondents -> unreliable contour
-                    continue
-                cen = zp.mean(0)
-                evals, evecs = np.linalg.eigh(np.cov(zp.T))
-                ang = np.degrees(np.arctan2(evecs[1, -1], evecs[0, -1]))
-                w, h = 2 * 2.1459 * np.sqrt(np.maximum(evals[::-1], 0))
-                zcol = ZONE_COLORS.get(zname, "#888888")
-                ax.add_patch(Ellipse(cen, w, h, angle=ang, facecolor="none",
-                             edgecolor=zcol, alpha=0.75, lw=1.4, ls="--", zorder=1.6))
-                ax.text(cen[0], cen[1], zname, fontsize=8.5, color=zcol, ha="center",
-                        va="center", style="italic", fontweight="bold", zorder=2, alpha=0.9)
-    # Inglehart-Welzel zone hulls: a shaded convex blob per zone with >=3 member societies, drawn
-    # UNDER the society dots (zorder<3). The zone name sits at the hull centroid in grey, echoing the
-    # Economist WVS map. A 2-member zone has no polygon, so it's shown as its connecting segment.
+    # Per-zone blob: a ~1.6-sigma covariance ellipse over that zone's COUNTRY-MEAN points. Between-
+    # country spread keeps the zones separate; an eigenvalue floor (a fraction of the overall P
+    # spread) gives a 1-country zone a small circle and a 2-country zone real width instead of a line.
     if zones:
         cidx = {c: i for i, c in enumerate(countries)}
+        floor = (0.07 * float(np.hypot(*(P.max(0) - P.min(0))))) ** 2
         for zname, members in zones.items():
-            mi = [cidx[c] for c in members if c in cidx]
-            if len(mi) < 2:
+            zp = P[[cidx[c] for c in members if c in cidx]]
+            if len(zp) == 0:
                 continue
-            zpts = P[mi]
+            cen = zp.mean(0)
+            cov = np.cov(zp.T) if len(zp) > 1 else np.zeros((2, 2))
+            evals, evecs = np.linalg.eigh(cov)
+            ang = np.degrees(np.arctan2(evecs[1, -1], evecs[0, -1]))
+            w, h = 2 * 1.6 * np.sqrt(np.maximum(evals[::-1], floor))
             zcol = ZONE_COLORS.get(zname, "#888888")
-            if len(mi) >= 3:
-                hull = convex_hull(zpts)
-                ax.add_patch(plt.Polygon(hull, closed=True, facecolor=zcol, edgecolor=zcol,
-                                         alpha=0.13, lw=1.0, zorder=1.6))
-                ax.plot(*np.vstack([hull, hull[:1]]).T, color=zcol, lw=1.0, alpha=0.45, zorder=1.7)
-            else:
-                ax.plot(zpts[:, 0], zpts[:, 1], color=zcol, lw=1.2, alpha=0.5, zorder=1.7)
-            cx, cy = zpts.mean(0)
-            ax.text(cx, cy, zname, fontsize=8.5, color="#6b6b6b", ha="center", va="center",
-                    style="italic", zorder=2, alpha=0.85)
+            ax.add_patch(Ellipse(cen, w, h, angle=ang, facecolor=zcol, edgecolor=zcol,
+                         alpha=0.12, lw=1.0, zorder=1.5))
+            ax.add_patch(Ellipse(cen, w, h, angle=ang, facecolor="none", edgecolor=zcol,
+                         alpha=0.7, lw=1.2, zorder=1.7))
+            ax.text(cen[0], cen[1], zname, fontsize=8.5, color=zcol, ha="center",
+                    va="center", style="italic", fontweight="bold", zorder=2, alpha=0.9)
     ax.scatter(P[:, 0], P[:, 1], s=26, c=C_HUM, alpha=0.7, edgecolors="white", linewidths=0.5, zorder=3)
     # Society labels: each name/ISO code is pinned RIGHT NEXT to its dot (small fixed offset, no
     # leader line). A label is dropped if its box would collide with an already-placed one -- better an
