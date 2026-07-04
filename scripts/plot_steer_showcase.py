@@ -35,100 +35,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from loguru import logger
-
 import tinymfv as T
 from tinymfv import get_instrument
+from tinymfv.zones import zones_for
 
 ORDINAL = ["mfq2", "big5", "16pf", "humor_styles"]
-
-# --- Inglehart-Welzel cultural zones (for the map's zone hulls) ---------------------------------
-# WVS Wave 7 nine-cluster taxonomy. Membership is VALUE-based not geographic, so a handful are
-# judgment calls: Ireland->English-Speaking, Switzerland->Protestant Europe, Philippines->Latin
-# America, South Africa/Turkey->African-Islamic, India/Pakistan/Thailand->South Asia. Source: WVS
-# Findings + en.wikipedia.org/wiki/Inglehart-Welzel_cultural_map_of_the_world. -- added by Claude
-IW_ZONE = {
-    # English-Speaking
-    "United States": "English-Speaking", "Great Britain": "English-Speaking",
-    "Australia": "English-Speaking", "Canada": "English-Speaking",
-    "New Zealand": "English-Speaking", "Ireland": "English-Speaking",
-    # Protestant Europe
-    "Germany": "Protestant Europe", "Sweden": "Protestant Europe", "Norway": "Protestant Europe",
-    "Denmark": "Protestant Europe", "Netherlands": "Protestant Europe",
-    "Finland": "Protestant Europe", "Switzerland": "Protestant Europe",
-    # Catholic Europe
-    "France": "Catholic Europe", "Belgium": "Catholic Europe", "Italy": "Catholic Europe",
-    "Spain": "Catholic Europe", "Poland": "Catholic Europe", "Portugal": "Catholic Europe",
-    "Croatia": "Catholic Europe",
-    # Orthodox / Ex-Communist
-    "Russia": "Orthodox", "Ukraine": "Orthodox", "Bulgaria": "Orthodox", "Serbia": "Orthodox",
-    "Greece": "Orthodox", "Romania": "Orthodox", "Bosnia & Herzegovina": "Orthodox",
-    "Hungary": "Orthodox",
-    # Baltic
-    "Latvia": "Baltic", "Estonia": "Baltic",
-    # Confucian
-    "Japan": "Confucian", "China": "Confucian", "South Korea": "Confucian",
-    "Hong Kong": "Confucian", "Vietnam": "Confucian", "Singapore": "Confucian",
-    # Latin America
-    "Argentina": "Latin America", "Chile": "Latin America", "Colombia": "Latin America",
-    "Mexico": "Latin America", "Peru": "Latin America", "Brazil": "Latin America",
-    "Ecuador": "Latin America", "Philippines": "Latin America",
-    # African-Islamic
-    "Egypt": "African-Islamic", "Kenya": "African-Islamic", "Morocco": "African-Islamic",
-    "Nigeria": "African-Islamic", "Saudi Arabia": "African-Islamic",
-    "United Arab Emirates": "African-Islamic", "Turkey": "African-Islamic",
-    "Iran": "African-Islamic", "Indonesia": "African-Islamic", "Malaysia": "African-Islamic",
-    "South Africa": "African-Islamic",
-    # South Asia
-    "India": "South Asia", "Pakistan": "South Asia", "Thailand": "South Asia",
-}
-
-# raw country string (as it appears in the human CSVs) -> canonical IW_ZONE key. Our CSVs mix full
-# names (mfv/mfq2/humor, with a "Columbia" typo) and ISO2 codes (big5/16pf). A `None` value marks a
-# row we KNOW is corrupt and deliberately exclude from hulls (surfaced by a loud warning, not a
-# silent drop); an unrecognised country that is NOT here falls through to IW_ZONE and KeyErrors.
-_COUNTRY_CANON = {
-    "AE": "United Arab Emirates", "AU": "Australia", "BR": "Brazil", "CA": "Canada",
-    "CN": "China", "DE": "Germany", "DK": "Denmark", "EC": "Ecuador", "ES": "Spain",
-    "FI": "Finland", "FR": "France", "GB": "Great Britain", "GR": "Greece", "HK": "Hong Kong",
-    "HR": "Croatia", "ID": "Indonesia", "IE": "Ireland", "IN": "India", "IT": "Italy",
-    "MX": "Mexico", "MY": "Malaysia", "NL": "Netherlands", "NO": "Norway", "NZ": "New Zealand",
-    "PH": "Philippines", "PK": "Pakistan", "PL": "Poland", "RO": "Romania", "SE": "Sweden",
-    "SG": "Singapore", "TH": "Thailand", "TR": "Turkey", "US": "United States", "ZA": "South Africa",
-    "Columbia": "Colombia", "UAE": "United Arab Emirates",
-    "(nu": None,   # corrupt big5 row (n=369); country unidentifiable from the aggregate CSV
-}
-
-# The named outliers on the Economist chart, bolded on our maps where present. -- added by Claude
-ECONOMIST_OUTLIERS = {"China", "South Korea", "United States", "Great Britain", "Japan",
-                      "Nigeria", "Pakistan", "Sweden"}
-
-
-def _zone_of(country: str) -> str | None:
-    """IW zone of a verbatim country string, or None for a known-corrupt row. KeyErrors (fail loud)
-    on an unrecognised country so a normalization bug can't silently drop it."""
-    canon = _COUNTRY_CANON.get(country, country)
-    return None if canon is None else IW_ZONE[canon]
-
-
-def zones_for(countries: list[str]) -> tuple[dict[str, list[str]], set[str]]:
-    """Group verbatim country strings by IW zone + the subset to emphasize. Fails loud (KeyError)
-    on a country absent from the taxonomy so a name-normalization bug can't silently drop a dot from
-    its hull; a `None` canon (known-corrupt row) is excluded with a warning instead."""
-    groups: dict[str, list[str]] = {}
-    dropped: list[str] = []
-    emph: set[str] = set()
-    for c in countries:
-        z = _zone_of(c)
-        if z is None:
-            dropped.append(c)
-            continue
-        groups.setdefault(z, []).append(c)
-        if _COUNTRY_CANON.get(c, c) in ECONOMIST_OUTLIERS:
-            emph.add(c)
-    if dropped:
-        logger.warning(f"excluded known-unmapped countries from zone hulls: {dropped}")
-    return groups, emph
 
 
 def _frac(x, scale_max: int) -> np.ndarray:
