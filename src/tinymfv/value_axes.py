@@ -35,8 +35,10 @@ VALUE_AXES: dict[str, tuple] = {
         ("Liberty", "Authority", [("liberty", -1), ("authority", 1)]),
     ),
     "big5": (
-        ("low Plasticity", "Plasticity", [("extraversion", 1), ("openness", 1)]),
-        ("low Stability", "Stability",
+        # DeYoung's meta-traits are unipolar, but name BOTH ends so every axis reads as a contrast
+        # (like the others): low Plasticity = reserved/conventional; low Stability = volatile.
+        ("Reserved", "Exploratory", [("extraversion", 1), ("openness", 1)]),
+        ("Volatile", "Stable",
          [("agreeableness", 1), ("conscientiousness", 1), ("neuroticism", -1)]),
     ),
     "humor_styles": (

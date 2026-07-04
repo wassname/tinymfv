@@ -43,12 +43,6 @@ from tinymfv.read import read_items, resolve_answer_ids
 from tinymfv.read_api import read_items_sampled
 from tinymfv.iw_axes import AXIS_ITEMS, X_AXIS, Y_AXIS, SKIP, resolve_items, positiveness
 
-# model-star palette: saturated/dark tones, distinct from the muted ZONE_COLORS. Long enough for a
-# big model panel (zip truncates silently, so a short list would just drop stars). The coloured
-# textalloc label ties each star to its name, so near-collisions between star colours are tolerable.
-MODEL_COLORS = ["#111111", "#d81b9a", "#5b2c86", "#008b8b", "#b8860b", "#8b0000",
-                "#c2185b", "#00429d", "#5d1451", "#1a5e1a", "#7a3b00", "#444444",
-                "#a80000", "#006d6d"]
 # option labels are single digits 0..n-1 -- single-token (unlike '10' on the justifiable scale) and
 # the format the answer-token reader is tuned for (a bare digit, not a letter the model ignores in
 # favour of the option word).
@@ -208,74 +202,16 @@ def main() -> None:
 
     models = {k: model_axis_scores(v, meta, resolved) for k, v in vecs.items()}
 
-    # Generic legibility rule (same on every map): draw only the zones that cover the most separate
-    # space (farthest-first over macro-zone centroids), colour dots by their drawn zone (grey if their
-    # zone wasn't selected), and label the named landmarks (US/Japan/China...) plus the 4 most-outlying
-    # countries.
-    zones_all, emph = zones_for(countries)                       # 6 macro zones
-    zones = maps.select_spread_zones(P, countries, zones_all, 4)
-    zone_of_c = {c: z for z, members in zones.items() for c in members}
-    dot_cols = [maps.ZONE_COLORS.get(zone_of_c.get(c), "#888888") for c in countries]
-    # Labels: named landmarks + the 4 most-outlying + one representative per drawn zone (its most
-    # central member) so every region has at least one identifiable country.
-    cidx = {c: i for i, c in enumerate(countries)}
-    reps = set()
-    for members in zones.values():
-        mem = [c for c in members if c in cidx]
-        pts = P[[cidx[c] for c in mem]]
-        reps.add(mem[int(np.argmin(np.hypot(*(pts - pts.mean(0)).T)))])
-    label_set = emph | maps.outlying_countries(P, countries, 4) | reps
-    med_x, med_y = float(np.median(P[:, 0])), float(np.median(P[:, 1]))   # the typical human society
-    fig, ax = plt.subplots(figsize=(11, 9))
-    ax.set_facecolor("#faf8f2")
-    ax.grid(True, color="#eceadf", lw=0.3, zorder=0)
-    ax.axhline(med_y, color="#c9c4b4", lw=1.0, zorder=1)   # crosshair through the human median (Economist)
-    ax.axvline(med_x, color="#c9c4b4", lw=1.0, zorder=1)
-    maps.draw_zone_hulls(ax, P, countries, zones)
-    ax.scatter(P[:, 0], P[:, 1], s=28, c=dot_cols, alpha=0.85, edgecolors="white", linewidths=0.5, zorder=3)
-    mnames = list(models)
-    mpts = np.array([models[k] for k in mnames])
-    for (name, pt), col in zip(models.items(), MODEL_COLORS):
-        ax.scatter(*pt, s=190, marker="*", c=col, edgecolors="white", linewidths=1.0, zorder=8)
-    # All labels (country + LLM) placed by textalloc: non-overlapping, with leader lines back to the
-    # dot/star. LLM labels ON the map (not a legend), coloured to their star; country labels dark. The
-    # scatter set it avoids is every dot + star, so no label lands on a point.
-    import textalloc as ta
-    lab_i = [i for i, c in enumerate(countries) if c in label_set]
-    tx = [P[i, 0] for i in lab_i] + list(mpts[:, 0])
-    ty = [P[i, 1] for i in lab_i] + list(mpts[:, 1])
-    txt = [countries[i] for i in lab_i] + mnames
-    tcol = ["#111"] * len(lab_i) + list(MODEL_COLORS[:len(mnames)])
-    ta.allocate_text(fig, ax, tx, ty, txt,
-                     x_scatter=list(P[:, 0]) + list(mpts[:, 0]), y_scatter=list(P[:, 1]) + list(mpts[:, 1]),
-                     textsize=9, textcolor=tcol, linecolor="#aaa", linewidth=0.6, draw_lines=True)
-    # Four pole signposts, each arrow sitting ON its neutral crosshair (x=0.5 for the vertical axis,
-    # y=0.5 for the horizontal one -- these lines are NOT at the plot centre) and pointing out to its
-    # pole, in the padded inner margin. All labels horizontal so they stay readable.
-    from matplotlib.transforms import blended_transform_factory
-    import matplotlib.patheffects as pe
-    ax.margins(0.13)
-    tX = blended_transform_factory(ax.transData, ax.transAxes)   # x = data (on x=0.5 line), y = axes frac
-    tY = blended_transform_factory(ax.transAxes, ax.transData)   # x = axes frac, y = data (on y=0.5 line)
-    pkw = dict(fontsize=11, fontweight="bold", color="#555", zorder=10, ha="center", va="center",
-               path_effects=[pe.withStroke(linewidth=3.0, foreground="white")])
-    awp = dict(arrowstyle="-|>", color="#999", lw=1.3)
-    ax.annotate("Secular-Rational", xy=(med_x, 0.995), xytext=(med_x, 0.945), xycoords=tX, arrowprops=awp, **pkw)
-    ax.annotate("Traditional", xy=(med_x, 0.005), xytext=(med_x, 0.055), xycoords=tX, arrowprops=awp, **pkw)
-    ax.annotate("Survival", xy=(0.006, med_y), xytext=(0.08, med_y), xycoords=tY, arrowprops=awp, **pkw)
-    ax.annotate("Self-expression", xy=(0.994, med_y), xytext=(0.9, med_y), xycoords=tY, arrowprops=awp, **pkw)
-    ax.set_xlabel("")
-    ax.set_ylabel("")
-    ax.set_xticks([])                                    # Economist: no ticks; the crosshair is the reference
-    ax.set_yticks([])
-    ax.set_title(f"WVS Inglehart-Welzel map: LLMs among {len(countries)} human societies "
-                 f"(approximate IW axes)", fontsize=12)
-    ax.text(0.01, 0.01,
-            "Approximate IW: axes built from GlobalOpinionQA WVS items (3 themes/axis, not the\n"
-            "canonical 5; national pride / authority / materialism absent). Not a verbatim WVS "
-            "factor score.",
-            transform=ax.transAxes, fontsize=6.5, color="#888", va="bottom", ha="left", zorder=10)
-    fig.tight_layout()
+    # Render through the SHARED value-map renderer (same one the instrument value maps use): pole
+    # signposts through the human median, 4 auto-selected zone hulls, textalloc labels, model stars.
+    _, emph = zones_for(countries)
+    fig = maps.plot_value_map(
+        "WVS Inglehart-Welzel", countries, P,
+        ("Survival", "Self-expression", "Traditional", "Secular-Rational"),
+        models=models, emphasize=emph,
+        title=f"WVS Inglehart-Welzel map: LLMs among {len(countries)} human societies (approximate IW axes)",
+        note=("Approximate IW: axes built from GlobalOpinionQA WVS items (3 themes/axis, not the\n"
+              "canonical 5; national pride / authority / materialism absent). Not a verbatim WVS factor score."))
     fig.savefig(args.out, dpi=200, bbox_inches="tight")
     logger.info(f"wrote {args.out}")
 
