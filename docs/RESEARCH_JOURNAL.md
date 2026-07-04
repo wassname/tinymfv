@@ -725,3 +725,27 @@ stronger steering. The binding constraint on a joint-coherent C across all five
 instruments is the side instruments' -C neutral-degeneracy (profile pins to 3.0,
 already at C=1; pmass stays ~1.0), a model property, not an ordinal coherence
 break. C=1 stands as a valid, coherent real coefficient.
+
+## 2026-07-04 — Inglehart-Welzel zone overlays on the ipsative maps (Economist comparison)
+
+Prompted by the Economist's "Godless hippies" chart placing AI models on the WVS
+Inglehart-Welzel cultural map. Added two zone overlays to plot_ipsative_pca:
+country-mean convex HULLS (all instruments) and, for mfq2 only, per-zone p90
+respondent ELLIPSES (real Atari individuals). Caller owns the IW taxonomy +
+name/ISO2 normalizer (scripts/plot_steer_showcase.py), fails loud on unmapped
+countries; the corrupt big5 "(nu" row (n=369, country unidentifiable from the
+aggregate CSV) is excluded with a warning.
+
+Finding: the two methods answer different questions and only the hull matches the
+Economist look. The country-mean hull separates zones cleanly (between-country
+signal), because society means are low-variance. The individual-respondent p90
+ellipse is HUGE and overlaps every neighbour -- within-culture variance dominates
+between-culture variance in MFQ-2 foundations (the standard Atari/Graham result),
+so at the person level the zones are not separable. What still separates at the
+individual level is the zone CENTROID (labelled): African-Islamic top, Confucian
+by Japan, Latin America left, the Europes right, English-Speaking lower-centre.
+So the Economist's clean "zone blobs" are hulls over country dots, not contours
+over people; a person-level contour honestly shows the overlap the country-mean
+view hides. Secondary caveat: several mfq2 zones are single-country in the Atari
+19 (Confucian=Japan, Orthodox=Russia, Protestant=Switzerland), so those ellipses
+are one country's spread wearing a zone label.

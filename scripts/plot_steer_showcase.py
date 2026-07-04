@@ -104,6 +104,13 @@ ECONOMIST_OUTLIERS = {"China", "South Korea", "United States", "Great Britain", 
                       "Nigeria", "Pakistan", "Sweden"}
 
 
+def _zone_of(country: str) -> str | None:
+    """IW zone of a verbatim country string, or None for a known-corrupt row. KeyErrors (fail loud)
+    on an unrecognised country so a normalization bug can't silently drop it."""
+    canon = _COUNTRY_CANON.get(country, country)
+    return None if canon is None else IW_ZONE[canon]
+
+
 def zones_for(countries: list[str]) -> tuple[dict[str, list[str]], set[str]]:
     """Group verbatim country strings by IW zone + the subset to emphasize. Fails loud (KeyError)
     on a country absent from the taxonomy so a name-normalization bug can't silently drop a dot from
@@ -112,12 +119,12 @@ def zones_for(countries: list[str]) -> tuple[dict[str, list[str]], set[str]]:
     dropped: list[str] = []
     emph: set[str] = set()
     for c in countries:
-        canon = _COUNTRY_CANON.get(c, c)
-        if canon is None:
+        z = _zone_of(c)
+        if z is None:
             dropped.append(c)
             continue
-        groups.setdefault(IW_ZONE[canon], []).append(c)
-        if canon in ECONOMIST_OUTLIERS:
+        groups.setdefault(z, []).append(c)
+        if _COUNTRY_CANON.get(c, c) in ECONOMIST_OUTLIERS:
             emph.add(c)
     if dropped:
         logger.warning(f"excluded known-unmapped countries from zone hulls: {dropped}")
@@ -269,16 +276,23 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float,
     # fit the ipsative PCA on it (better-conditioned, the true envelope). Other instruments have no raw
     # per-person data, so scatter a marginal resample from each country's published mean+sd as the haze
     # while keeping the PCA basis on the society means M.
+    # mfq2 has real per-respondent data -> draw a p90 respondent ELLIPSE per zone (grounded in
+    # people) and drop the country-mean hull. Other instruments have only society means -> the
+    # country-mean convex HULL is the best-available zone blob.
+    _, emph = zones_for(countries)
     if name == "mfq2":
-        respondents, haze = T.maps.respondent_profiles(dims, instr.scale_max), None
+        resp_countries, respondents = T.maps.respondent_profiles(dims, instr.scale_max)
+        haze, zones = None, None
+        respondent_zones = [_zone_of(c) for c in resp_countries]
     else:
         respondents, haze = None, human_haze(instr)
+        zones, respondent_zones = zones_for(countries)[0], None
     traj = {c: _frac(prof_c[c], instr.scale_max) for c in coh_cs}
-    zones, emph = zones_for(countries)
     figm = T.maps.plot_ipsative_pca(instr, dims, countries, Mfrac,
                                     _frac(base, instr.scale_max), _frac(pos, instr.scale_max),
                                     _frac(neg, instr.scale_max), respondents=respondents, haze=haze,
-                                    traj=traj, zones=zones, emphasize=emph, labels=labels)
+                                    traj=traj, zones=zones, emphasize=emph,
+                                    respondent_zones=respondent_zones, labels=labels)
     figm.axes[0].set_title(f"{instr.display}: humans vs LLMs steered for {vec_label}", fontsize=10)
     paths = [T.maps.save_both(figm, out / name, "map_pca_ipsative")]
     plt.close(figm)

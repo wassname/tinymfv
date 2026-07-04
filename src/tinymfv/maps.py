@@ -25,6 +25,7 @@ from pathlib import Path
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse
 
 from .instrument import Instrument
 
@@ -42,11 +43,12 @@ MFQ2_FOUNDATION_ITEMS = {
 }
 
 
-def respondent_profiles(foundations: list[str], scale_max: int = 5) -> np.ndarray:
+def respondent_profiles(foundations: list[str], scale_max: int = 5) -> tuple[list[str], np.ndarray]:
     """Per-respondent MFQ-2 6-foundation profiles (each foundation = mean of its 6 raw 1-5 items),
-    returned as 0-1 FRACTION (same scale as `M` in plot_ipsative_pca) in `foundations` order.
-    Rows with any NA in the keyed items are dropped (fail-fast, no imputation). MFQ-2 only --
-    keying is MFQ2_FOUNDATION_ITEMS. Source: data/atari_study2_raw.csv (Atari et al. 2023 Study 2)."""
+    returned as (countries, X) where X is a 0-1 FRACTION matrix (same scale as `M` in
+    plot_ipsative_pca) in `foundations` order and `countries[i]` is respondent i's country. Rows with
+    any NA in the keyed items are dropped (fail-fast, no imputation). MFQ-2 only -- keying is
+    MFQ2_FOUNDATION_ITEMS. Source: data/atari_study2_raw.csv (Atari et al. 2023 Study 2)."""
     raw_path = DATA / "atari_study2_raw.csv"
     rows = list(csv.DictReader(raw_path.open(newline="")))
     cols = rows[0].keys()
@@ -55,13 +57,14 @@ def respondent_profiles(foundations: list[str], scale_max: int = 5) -> np.ndarra
         raise KeyError(f"keying columns absent from {raw_path.name}: {missing}")
     def cell(v: str) -> float:
         return np.nan if v in ("NA", "", "-99") else float(v)
-    out = []
+    out, countries = [], []
     for r in rows:
         prof = [np.mean([cell(r[c]) for c in MFQ2_FOUNDATION_ITEMS[f]]) for f in foundations]
         if not np.isnan(prof).any():
             out.append(prof)
+            countries.append(r["country"])
     X = np.array(out)                                   # (n_resp x K), raw 1-5
-    return (X - 1) / (scale_max - 1)                    # -> 0-1 fraction
+    return countries, (X - 1) / (scale_max - 1)         # -> 0-1 fraction
 
 # range-plot palette + geometry (shared with the experiment's prior fig_profile_sweeps look)
 CLOUD_GREY = "0.78"      # individual respondents (subtle backdrop)
@@ -216,6 +219,7 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
                       traj: dict[float, np.ndarray] | None = None, traj_incoherent: set | None = None,
                       boots: dict | None = None,
                       zones: dict[str, list[str]] | None = None, emphasize: set[str] | None = None,
+                      respondent_zones: list[str] | None = None,
                       labels: tuple[str, str, str] = ("baseline (c=0)", "honest (c=+2)", "dishonest (c=-2)")):
     """Ipsative culture map. M is societies x K (0-1 fraction); base / pos / neg are the length-K
     fraction vectors for the base model and its two steer poles (or None). `labels` is the legend
@@ -235,7 +239,10 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     each zone with >=3 members gets a shaded convex hull (echoes the Economist WVS map's zone blobs),
     testing whether moral-foundation space recovers the WVS clusters. `emphasize` is a subset of
     `countries` labelled bold-first so named outliers (China, US, Sweden...) always survive the
-    label-collision drop. Returns the Figure."""
+    label-collision drop. `respondent_zones` (length = rows of the projected cloud, i.e.
+    `respondents` when `haze` is None) is each respondent's IW zone; each zone with enough respondents
+    gets a p90 Gaussian ellipse of its cloud (the real-respondent analogue of a zone hull, mfq2 only).
+    Returns the Figure."""
     try:
         import textalloc as ta
     except ImportError:
@@ -256,6 +263,25 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
         Pi = (cloud @ Pc - mu) @ Vt[:2].T
         ax.scatter(Pi[:, 0], Pi[:, 1], s=4, c="#8f8a7e", alpha=0.14, edgecolors="none",
                    zorder=1, rasterized=True)
+        # Per-zone p90 respondent ellipse (mfq2 only): the real-respondent analogue of a zone hull.
+        # A 90%-mass contour of the bivariate-Gaussian fit to each zone's projected cloud; the radius
+        # is the chi-square(2 dof) 0.90 quantile, sqrt(4.605)=2.1459 (hardcoded to avoid a scipy dep).
+        if respondent_zones is not None:
+            assert len(respondent_zones) == Pi.shape[0], "respondent_zones must align with the cloud rows"
+            zr = np.asarray(respondent_zones)
+            for zname in dict.fromkeys(respondent_zones):  # stable order, unique
+                zp = Pi[zr == zname]
+                if len(zp) < 30:                          # too few respondents -> unreliable contour
+                    continue
+                cen = zp.mean(0)
+                evals, evecs = np.linalg.eigh(np.cov(zp.T))
+                ang = np.degrees(np.arctan2(evecs[1, -1], evecs[0, -1]))
+                w, h = 2 * 2.1459 * np.sqrt(np.maximum(evals[::-1], 0))
+                zcol = ZONE_COLORS.get(zname, "#888888")
+                ax.add_patch(Ellipse(cen, w, h, angle=ang, facecolor="none",
+                             edgecolor=zcol, alpha=0.75, lw=1.4, ls="--", zorder=1.6))
+                ax.text(cen[0], cen[1], zname, fontsize=8.5, color=zcol, ha="center",
+                        va="center", style="italic", fontweight="bold", zorder=2, alpha=0.9)
     # Inglehart-Welzel zone hulls: a shaded convex blob per zone with >=3 member societies, drawn
     # UNDER the society dots (zorder<3). The zone name sits at the hull centroid in grey, echoing the
     # Economist WVS map. A 2-member zone has no polygon, so it's shown as its connecting segment.
