@@ -181,6 +181,92 @@ def draw_zone_hulls(ax, P: np.ndarray, countries: list[str], zones: dict[str, li
                 path_effects=[pe.withStroke(linewidth=3.0, foreground="white")])
 
 
+def _pole_signposts(ax, med_x: float, med_y: float, poles: tuple[str, str, str, str]) -> None:
+    """Four arrowed pole signposts sitting ON the median crosshairs (x=med_x vertical, y=med_y
+    horizontal), pointing out to each pole, in the padded inner margin. poles = (x_neg, x_pos, y_neg,
+    y_pos). All labels horizontal."""
+    import matplotlib.patheffects as pe
+    from matplotlib.transforms import blended_transform_factory
+    xn, xp, yn, yp = poles
+    tX = blended_transform_factory(ax.transData, ax.transAxes)   # x=data (on x=med line), y=axes frac
+    tY = blended_transform_factory(ax.transAxes, ax.transData)   # x=axes frac, y=data (on y=med line)
+    kw = dict(fontsize=11, fontweight="bold", color="#555", zorder=10, ha="center", va="center",
+              path_effects=[pe.withStroke(linewidth=3.0, foreground="white")])
+    awp = dict(arrowstyle="-|>", color="#999", lw=1.3)
+    ax.annotate(yp, xy=(med_x, 0.995), xytext=(med_x, 0.945), xycoords=tX, arrowprops=awp, **kw)
+    ax.annotate(yn, xy=(med_x, 0.005), xytext=(med_x, 0.055), xycoords=tX, arrowprops=awp, **kw)
+    ax.annotate(xn, xy=(0.006, med_y), xytext=(0.085, med_y), xycoords=tY, arrowprops=awp, **kw)
+    ax.annotate(xp, xy=(0.994, med_y), xytext=(0.9, med_y), xycoords=tY, arrowprops=awp, **kw)
+
+
+# model-star palette: saturated/dark tones, distinct from the muted ZONE_COLORS (shared by the WVS map
+# script + plot_value_map). The coloured label ties each star to its name.
+MODEL_STAR_COLORS = ["#111111", "#d81b9a", "#5b2c86", "#008b8b", "#b8860b", "#8b0000",
+                     "#c2185b", "#00429d", "#5d1451", "#1a5e1a", "#7a3b00", "#444444",
+                     "#a80000", "#006d6d"]
+
+
+def plot_value_map(display: str, countries: list[str], P: np.ndarray,
+                   poles: tuple[str, str, str, str], *, models: dict[str, tuple[float, float]] | None = None,
+                   emphasize: set[str] | None = None, title: str | None = None, note: str | None = None):
+    """The interpretable "4-value map": two NAMED axes with four pole signposts through the human
+    MEDIAN crosshair, Economist-style zone hulls (the 4 most-separate zones), zone-coloured dots, and
+    textalloc labels (landmarks + corner outliers + one representative per zone + any models). NO
+    compass / minimap / ticks -- this is the alternative to plot_ipsative_pca, not a replacement.
+
+    P is countries x 2 already in the named-axis space (see value_axes.value_coords / iw_axes). `models`
+    maps a model name to its (x, y) in the SAME space -> drawn as labelled stars. Returns the Figure."""
+    from .zones import zones_for
+    import textalloc as ta
+    zones_all, emph = zones_for(countries)
+    emph = (emphasize or set()) | emph
+    zones = select_spread_zones(P, countries, zones_all, 4)
+    zone_of_c = {c: z for z, ms in zones.items() for c in ms}
+    dot_cols = [ZONE_COLORS.get(zone_of_c.get(c), "#888888") for c in countries]
+    cidx = {c: i for i, c in enumerate(countries)}
+    reps = set()
+    for ms in zones.values():
+        mem = [c for c in ms if c in cidx]
+        mp = P[[cidx[c] for c in mem]]
+        reps.add(mem[int(np.argmin(np.hypot(*(mp - mp.mean(0)).T)))])
+    label_set = emph | outlying_countries(P, countries, 4) | reps
+
+    med_x, med_y = float(np.median(P[:, 0])), float(np.median(P[:, 1]))
+    fig, ax = plt.subplots(figsize=(10.5, 8.5))
+    ax.set_facecolor("#faf8f2")
+    ax.grid(True, color="#eceadf", lw=0.3, zorder=0)
+    ax.axhline(med_y, color="#c9c4b4", lw=1.0, zorder=1)
+    ax.axvline(med_x, color="#c9c4b4", lw=1.0, zorder=1)
+    draw_zone_hulls(ax, P, countries, zones)
+    ax.scatter(P[:, 0], P[:, 1], s=28, c=dot_cols, alpha=0.85, edgecolors="white", linewidths=0.5, zorder=3)
+
+    lab_i = [i for i, c in enumerate(countries) if c in label_set]
+    tx = [P[i, 0] for i in lab_i]
+    ty = [P[i, 1] for i in lab_i]
+    txt = [countries[i] for i in lab_i]
+    tcol = ["#111"] * len(lab_i)
+    if models:
+        mnames = list(models)
+        mpts = np.array([models[k] for k in mnames])
+        for (name, pt), col in zip(models.items(), MODEL_STAR_COLORS):
+            ax.scatter(*pt, s=190, marker="*", c=col, edgecolors="white", linewidths=1.0, zorder=8)
+        tx += list(mpts[:, 0]); ty += list(mpts[:, 1]); txt += mnames
+        tcol += list(MODEL_STAR_COLORS[:len(mnames)])
+        sx = list(P[:, 0]) + list(mpts[:, 0]); sy = list(P[:, 1]) + list(mpts[:, 1])
+    else:
+        sx, sy = list(P[:, 0]), list(P[:, 1])
+    ax.margins(0.13)
+    ta.allocate_text(fig, ax, tx, ty, txt, x_scatter=sx, y_scatter=sy,
+                     textsize=9, textcolor=tcol, linecolor="#aaa", linewidth=0.6, draw_lines=True)
+    _pole_signposts(ax, med_x, med_y, poles)
+    ax.set_xticks([]); ax.set_yticks([]); ax.set_xlabel(""); ax.set_ylabel("")
+    ax.set_title(title or f"{display}: value map", fontsize=12)
+    if note:
+        ax.text(0.01, 0.01, note, transform=ax.transAxes, fontsize=6.5, color="#888",
+                va="bottom", ha="left", zorder=10)
+    return fig
+
+
 def draw_zone_regions(ax, P: np.ndarray, countries: list[str], zones: dict[str, list[str]],
                       cloud_P: np.ndarray | None = None, cloud_countries: list[str] | None = None,
                       sigma: float = 1.0) -> None:
