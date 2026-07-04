@@ -112,6 +112,33 @@ def _country_region(cen: np.ndarray, pts: np.ndarray | None, sigma: float, r_fix
     return Point(*cen).buffer(r_fixed, quad_segs=24)
 
 
+def draw_zone_hulls(ax, P: np.ndarray, countries: list[str], zones: dict[str, list[str]],
+                    pad: float = 0.022, alpha: float = 0.13) -> None:
+    """Economist-style zone outline: the tight CONVEX HULL of a zone's country-mean points, rounded
+    and slightly inflated (shapely buffer), lightly filled with the zone colour, thin outline, and a
+    white-haloed italic label at the centroid. A 1- or 2-country zone degenerates to a rounded
+    disc/capsule via the same buffer. Far cleaner than a union of per-country discs when the axes
+    already separate the countries (WVS IW map); the disc-union `draw_zone_regions` stays for the
+    instrument maps that overlay real within-country respondent spread."""
+    import matplotlib.patheffects as pe
+    from shapely.geometry import MultiPoint
+    from matplotlib.patches import Polygon as MplPolygon
+    cidx = {c: i for i, c in enumerate(countries)}
+    buf = pad * float(np.hypot(*(P.max(0) - P.min(0))))
+    for zname, members in zones.items():
+        pts = np.array([P[cidx[c]] for c in members if c in cidx])
+        if not len(pts):
+            continue
+        geom = MultiPoint([tuple(p) for p in pts]).convex_hull.buffer(buf, quad_segs=16)
+        zcol = ZONE_COLORS.get(zname, "#888888")
+        ax.add_patch(MplPolygon(np.asarray(geom.exterior.coords), closed=True, facecolor=zcol,
+                                edgecolor=zcol, alpha=alpha, lw=1.1, zorder=1.5))
+        cen = pts.mean(0)
+        ax.text(cen[0], cen[1], zname, fontsize=9.5, color=zcol, ha="center", va="center",
+                style="italic", fontweight="bold", zorder=5,
+                path_effects=[pe.withStroke(linewidth=3.0, foreground="white")])
+
+
 def draw_zone_regions(ax, P: np.ndarray, countries: list[str], zones: dict[str, list[str]],
                       cloud_P: np.ndarray | None = None, cloud_countries: list[str] | None = None,
                       sigma: float = 1.0) -> None:
@@ -123,7 +150,7 @@ def draw_zone_regions(ax, P: np.ndarray, countries: list[str], zones: dict[str, 
     from shapely.ops import unary_union
     from matplotlib.patches import Polygon as MplPolygon
     cidx = {c: i for i, c in enumerate(countries)}
-    r_fixed = 0.06 * float(np.hypot(*(P.max(0) - P.min(0))))
+    r_fixed = 0.09 * float(np.hypot(*(P.max(0) - P.min(0))))   # ~50% bigger than the first pass
     by_country: dict[str, np.ndarray] = {}
     if cloud_P is not None and cloud_countries is not None:
         cc = np.asarray(cloud_countries)
@@ -148,8 +175,12 @@ def draw_zone_regions(ax, P: np.ndarray, countries: list[str], zones: dict[str, 
             ax.add_patch(MplPolygon(np.asarray(g.exterior.coords), closed=True, facecolor=zcol,
                          edgecolor=zcol, alpha=0.15, lw=1.1, zorder=1.5))
         cen = P[idxs].mean(0)
-        ax.text(cen[0], cen[1], zname, fontsize=8.5, color=zcol, ha="center", va="center",
-                style="italic", fontweight="bold", zorder=2, alpha=0.9)
+        # white halo so the zone-coloured label reads on top of the same-coloured blob (no contrast
+        # otherwise). Darkened text + heavier stroke over the pale fill.
+        import matplotlib.patheffects as pe
+        ax.text(cen[0], cen[1], zname, fontsize=9.5, color=zcol, ha="center", va="center",
+                style="italic", fontweight="bold", zorder=5,
+                path_effects=[pe.withStroke(linewidth=3.0, foreground="white")])
 
 
 
