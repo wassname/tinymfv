@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import argparse
 import ast
+import json
 import re
 from collections import Counter
+from pathlib import Path
 
 import dotenv
 import numpy as np
@@ -124,6 +126,8 @@ def main() -> None:
     ap.add_argument("--max-think-tokens", type=int, default=64)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--out", default="/tmp/claude-1000/wvs_map.png")
+    ap.add_argument("--cache", default="/tmp/claude-1000/wvs_model_vectors.json",
+                    help="cache model E-vectors so re-plotting (new zone style) skips the API calls")
     args = ap.parse_args()
 
     recs = load_wvs(args.n_opts)
@@ -134,27 +138,42 @@ def main() -> None:
     P, Vt, var, mu, Pc = maps.ipsative_pca(Hfrac)
     instr = build_instrument(block, args.n_opts)
 
-    models: dict[str, np.ndarray] = {}       # model name -> projected 2D point
+    # cache keyed by the exact question block: same block -> reuse E-vectors, only re-projecting +
+    # re-drawing (so iterating on the zone style costs no API calls).
+    sig = f"{args.n_opts}:{len(block)}:{hash(tuple(r['q'] for r in block)) & 0xffffffff}"
+    cpath = Path(args.cache)
+    cache = json.loads(cpath.read_text()).get(sig, {}) if cpath.exists() else {}
+    vecs: dict[str, np.ndarray] = {k: np.array(v) for k, v in cache.items()}
+
     if args.local_model:
-        tok = AutoTokenizer.from_pretrained(args.local_model)
-        if tok.pad_token is None:
-            tok.pad_token = tok.eos_token
-        tok.padding_side = "left"
-        lm = AutoModelForCausalLM.from_pretrained(args.local_model, dtype=torch.bfloat16).to(args.device).eval()
-        rows = read_items(lm, tok, instr, instr.items, resolve_answer_ids(tok, instr.answer_space),
-                          max_think_tokens=args.max_think_tokens, batch_size=16, verbose_first=True)
-        v = model_vector(rows, len(block), args.n_opts)
-        models[args.local_model.split("/")[-1] + " (lp)"] = ((v @ Pc) - mu) @ Vt[:2].T
+        key = args.local_model.split("/")[-1] + " (lp)"
+        if key not in vecs:
+            tok = AutoTokenizer.from_pretrained(args.local_model)
+            if tok.pad_token is None:
+                tok.pad_token = tok.eos_token
+            tok.padding_side = "left"
+            lm = AutoModelForCausalLM.from_pretrained(args.local_model, dtype=torch.bfloat16).to(args.device).eval()
+            rows = read_items(lm, tok, instr, instr.items, resolve_answer_ids(tok, instr.answer_space),
+                              max_think_tokens=args.max_think_tokens, batch_size=16, verbose_first=True)
+            vecs[key] = model_vector(rows, len(block), args.n_opts)
     for m in args.api_models:
-        rows = read_items_sampled(m, instr, instr.items, n_samples=args.api_samples, verbose_first=True)
-        v = model_vector(rows, len(block), args.n_opts)
-        models[m.split("/")[-1] + " (sampled)"] = ((v @ Pc) - mu) @ Vt[:2].T
+        key = m.split("/")[-1] + " (sampled)"
+        if key not in vecs:
+            rows = read_items_sampled(m, instr, instr.items, n_samples=args.api_samples, verbose_first=True)
+            vecs[key] = model_vector(rows, len(block), args.n_opts)
+
+    cpath.parent.mkdir(parents=True, exist_ok=True)
+    allc = json.loads(cpath.read_text()) if cpath.exists() else {}
+    allc[sig] = {k: v.tolist() for k, v in vecs.items()}
+    cpath.write_text(json.dumps(allc))
+    hmean = Hfrac.mean(0)      # a question the model didn't answer coherently -> the human average there
+    models = {k: ((np.where(np.isnan(v), hmean, v) @ Pc) - mu) @ Vt[:2].T for k, v in vecs.items()}
 
     zones, emph = zones_for(countries)
     fig, ax = plt.subplots(figsize=(10, 8))
     ax.set_facecolor("#faf8f2")
     ax.grid(True, color="#eceadf", lw=0.3, zorder=0)
-    maps.draw_zone_ellipses(ax, P, countries, zones)
+    maps.draw_zone_regions(ax, P, countries, zones)
     ax.scatter(P[:, 0], P[:, 1], s=22, c=maps.C_HUM, alpha=0.7, edgecolors="white", linewidths=0.4, zorder=3)
     for i, c in enumerate(countries):
         is_e = c in emph
