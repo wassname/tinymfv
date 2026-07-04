@@ -209,6 +209,20 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float,
     paths = [T.maps.save_both(figm, out / name, "map_pca_ipsative")]
     plt.close(figm)
 
+    # Alternative NAMED-AXIS value map (interpretable poles, no compass/minimap): project the
+    # societies + the AI base/steered points onto the instrument's two named value axes.
+    from tinymfv.value_axes import VALUE_AXES, value_coords, axis_score
+    if name in VALUE_AXES:
+        Pval, poles = value_coords(Mfrac, dims, name)
+        (_, _, xa), (_, _, ya) = VALUE_AXES[name]
+        ai = {lab: (axis_score(_frac(v, instr.scale_max), dims, xa),
+                    axis_score(_frac(v, instr.scale_max), dims, ya))
+              for lab, v in zip(labels, (base, pos, neg))}
+        figv = T.maps.plot_value_map(instr.display, countries, Pval, poles, models=ai, emphasize=emph,
+                                     title=f"{instr.display}: value map, LLM steered for {vec_label}")
+        paths.append(T.maps.save_both(figv, out / name, "map_value"))
+        plt.close(figv)
+
     prof_plot = {c: prof_c[c] for c in coh_cs}
     figr = T.maps.plot_range(instr, dims, coh_cs, prof_plot, humans, None, vec_label)
     paths.append(T.maps.save_both(figr, out / name, "range"))
