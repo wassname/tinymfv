@@ -96,11 +96,14 @@ def zone_of(country: str) -> str | None:
     return None if canon is None else IW_ZONE[canon]
 
 
-def zones_for(countries: list[str], macro: bool = True) -> tuple[dict[str, list[str]], set[str]]:
+def zones_for(countries: list[str], macro: bool = True,
+              macro_map: dict[str, str | None] | None = None) -> tuple[dict[str, list[str]], set[str]]:
     """Group verbatim country strings by IW zone + the subset to emphasize (Economist outliers).
-    `macro` (default) collapses the nine fine zones to six broader ones (IW_MACRO) so low-dimensional
-    maps aren't over-fragmented. Known-corrupt rows are dropped with a warning; unrecognised countries
-    KeyError via zone_of."""
+    `macro` (default) collapses the nine fine zones via `macro_map` (default IW_MACRO -> six zones;
+    pass IW_MACRO4 for the Economist's four). A fine zone mapping to None is UNGROUPED: its countries
+    return no hull group (plotted as bare grey dots). Known-corrupt rows are dropped with a warning;
+    unrecognised countries KeyError via zone_of."""
+    macro_map = macro_map or IW_MACRO
     groups: dict[str, list[str]] = {}
     dropped: list[str] = []
     emph: set[str] = set()
@@ -109,7 +112,9 @@ def zones_for(countries: list[str], macro: bool = True) -> tuple[dict[str, list[
         if z is None:
             dropped.append(c)
             continue
-        groups.setdefault(IW_MACRO[z] if macro else z, []).append(c)
+        coarse = macro_map[z] if macro else z
+        if coarse is not None:                     # None -> ungrouped (no hull), still a grey dot
+            groups.setdefault(coarse, []).append(c)
         if _CANON.get(c, c) in ECONOMIST_OUTLIERS:
             emph.add(c)
     if dropped:

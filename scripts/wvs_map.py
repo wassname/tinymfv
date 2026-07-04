@@ -42,7 +42,9 @@ from tinymfv.read import read_items, resolve_answer_ids
 from tinymfv.read_api import read_items_sampled
 from tinymfv.iw_axes import AXIS_ITEMS, X_AXIS, Y_AXIS, SKIP, resolve_items, positiveness
 
-MODEL_COLORS = ["#c0392b", "#8e44ad", "#16a085", "#d35400", "#2980b9", "#c2185b"]
+# model-star palette deliberately DISJOINT from ZONE_COLORS (muted blue/red/orange/brown/yellow/
+# green), so a star never camouflages into a zone -- black / magenta / deep-purple read as "model".
+MODEL_COLORS = ["#111111", "#d81b9a", "#5b2c86", "#008b8b", "#b8860b", "#8b0000"]
 # option labels are single digits 0..n-1 -- single-token (unlike '10' on the justifiable scale) and
 # the format the answer-token reader is tuned for (a bare digit, not a letter the model ignores in
 # favour of the option word).
@@ -192,29 +194,53 @@ def main() -> None:
     cpath.write_text(json.dumps(allc))
     models = {k: model_axis_scores(v, meta, resolved) for k, v in vecs.items()}
 
-    zones, emph = zones_for(countries)
+    # Generic legibility rule (same on every map): draw only the zones that cover the most separate
+    # space (farthest-first over macro-zone centroids), colour dots by their drawn zone (grey if their
+    # zone wasn't selected), and label the named landmarks (US/Japan/China...) plus the 4 most-outlying
+    # countries.
+    zones_all, emph = zones_for(countries)                       # 6 macro zones
+    zones = maps.select_spread_zones(P, countries, zones_all, 4)
     zone_of_c = {c: z for z, members in zones.items() for c in members}
-    dot_cols = [maps.ZONE_COLORS.get(zone_of_c[c], "#888888") for c in countries]
+    dot_cols = [maps.ZONE_COLORS.get(zone_of_c.get(c), "#888888") for c in countries]
+    # Labels: named landmarks + the 4 most-outlying + one representative per drawn zone (its most
+    # central member) so every region has at least one identifiable country.
+    cidx = {c: i for i, c in enumerate(countries)}
+    reps = set()
+    for members in zones.values():
+        mem = [c for c in members if c in cidx]
+        pts = P[[cidx[c] for c in mem]]
+        reps.add(mem[int(np.argmin(np.hypot(*(pts - pts.mean(0)).T)))])
+    label_set = emph | maps.outlying_countries(P, countries, 4) | reps
     fig, ax = plt.subplots(figsize=(11, 9))
     ax.set_facecolor("#faf8f2")
     ax.grid(True, color="#eceadf", lw=0.3, zorder=0)
     ax.axhline(0.5, color="#d9d5c6", lw=0.8, zorder=1)
     ax.axvline(0.5, color="#d9d5c6", lw=0.8, zorder=1)
     maps.draw_zone_hulls(ax, P, countries, zones)
-    # Dots coloured by zone (region shown by colour, like the Economist) + only the named outliers
-    # labelled -- 90 country labels is the clutter the user flagged; the region name (drawn by
-    # draw_zone_regions at each zone centroid) carries the rest.
     ax.scatter(P[:, 0], P[:, 1], s=28, c=dot_cols, alpha=0.85, edgecolors="white", linewidths=0.5, zorder=3)
     for i, c in enumerate(countries):
-        if c in emph:
+        if c in label_set:
             ax.annotate(c, (P[i, 0], P[i, 1]), fontsize=9, xytext=(4, 3),
                         textcoords="offset points", color="#111", fontweight="bold", zorder=6)
     for (name, pt), col in zip(models.items(), MODEL_COLORS):
         ax.scatter(*pt, s=150, marker="*", c=col, edgecolors="white", linewidths=1.0, zorder=8)
         ax.annotate(name, pt, xytext=(7, 4), textcoords="offset points", fontsize=9,
                     fontweight="bold", color=col, zorder=9)
-    ax.set_xlabel(f"{X_AXIS}  (right = self-expression)")
-    ax.set_ylabel(f"{Y_AXIS}  (up = secular-rational)")
+    # Four pole signposts in the padded inner margin (Economist style): the label sits in whitespace
+    # just inside each edge with an arrow pointing OUT to its pole, so the two axes read unambiguously
+    # without colliding with ticks or the title.
+    ax.margins(0.13)
+
+    def pole(tx, ty, tipx, tipy, text, rot):
+        ax.annotate(text, xy=(tipx, tipy), xytext=(tx, ty), xycoords="axes fraction",
+                    ha="center", va="center", rotation=rot, fontsize=11, fontweight="bold",
+                    color="#555", zorder=10, arrowprops=dict(arrowstyle="-|>", color="#999", lw=1.3))
+    pole(0.5, 0.955, 0.5, 0.998, "Secular-Rational", 0)
+    pole(0.5, 0.045, 0.5, 0.002, "Traditional", 0)
+    pole(0.052, 0.5, 0.002, 0.5, "Survival", 90)
+    pole(0.948, 0.5, 0.998, 0.5, "Self-expression", 270)
+    ax.set_xlabel("")
+    ax.set_ylabel("")
     ax.set_title(f"WVS Inglehart-Welzel map: LLMs among {len(countries)} human societies "
                  f"(approximate IW axes)", fontsize=12)
     ax.text(0.01, 0.01,

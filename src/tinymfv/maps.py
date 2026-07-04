@@ -112,14 +112,52 @@ def _country_region(cen: np.ndarray, pts: np.ndarray | None, sigma: float, r_fix
     return Point(*cen).buffer(r_fixed, quad_segs=24)
 
 
+def _zone_hull(P: np.ndarray, cidx: dict, members: list[str], buf: float):
+    """Buffered convex hull of a zone's country-mean points, or None if <2 members (can't contour)."""
+    from shapely.geometry import MultiPoint
+    pts = [tuple(P[cidx[c]]) for c in members if c in cidx]
+    return MultiPoint(pts).convex_hull.buffer(buf, quad_segs=16) if len(pts) >= 2 else None
+
+
+def select_spread_zones(P: np.ndarray, countries: list[str], zones: dict[str, list[str]],
+                        n: int = 4, pad: float = 0.022) -> dict[str, list[str]]:
+    """The `n` zones that COVER THE MOST SEPARATE SPACE -- greedy max-coverage on the actual hull
+    areas: seed with the largest-area zone, then repeatedly add whichever zone contributes the most
+    NEW (non-overlapping) area to the union. Central zones whose hull is already covered by the picks
+    (Orthodox sitting inside West+East-Asia) add little and are dropped; corner cultures win. Purely
+    geometric, so it works identically on any map. Zones with <2 members can't be contoured and are
+    skipped."""
+    cidx = {c: i for i, c in enumerate(countries)}
+    buf = pad * float(np.hypot(*(P.max(0) - P.min(0))))
+    hulls = {z: h for z, m in zones.items() if (h := _zone_hull(P, cidx, m, buf)) is not None}
+    if len(hulls) <= n:
+        return {z: zones[z] for z in hulls}
+    sel = [max(hulls, key=lambda z: hulls[z].area)]
+    union = hulls[sel[0]]
+    while len(sel) < n:
+        best = max((z for z in hulls if z not in sel), key=lambda z: hulls[z].difference(union).area)
+        sel.append(best)
+        union = union.union(hulls[best])
+    return {z: zones[z] for z in sel}
+
+
+def outlying_countries(P: np.ndarray, countries: list[str], n: int = 4) -> set[str]:
+    """The `n` countries farthest from the data centroid -- the automatic extreme labels for ANY map,
+    unioned with a named-major set (US/Japan/China...) so every map labels the same few landmarks plus
+    whatever its own extremes are."""
+    d = np.hypot(*(P - P.mean(0)).T)
+    return {countries[i] for i in np.argsort(d)[::-1][:n]}
+
+
 def draw_zone_hulls(ax, P: np.ndarray, countries: list[str], zones: dict[str, list[str]],
-                    pad: float = 0.022, alpha: float = 0.13) -> None:
+                    pad: float = 0.022) -> None:
     """Economist-style zone outline: the tight CONVEX HULL of a zone's country-mean points, rounded
-    and slightly inflated (shapely buffer), lightly filled with the zone colour, thin outline, and a
-    white-haloed italic label at the centroid. A 1- or 2-country zone degenerates to a rounded
-    disc/capsule via the same buffer. Far cleaner than a union of per-country discs when the axes
-    already separate the countries (WVS IW map); the disc-union `draw_zone_regions` stays for the
-    instrument maps that overlay real within-country respondent spread."""
+    and slightly inflated (shapely buffer), drawn as a coloured EDGE ONLY (no fill, so overlapping
+    zones don't muddy), with the zone label in the same colour anchored to the TOP of its own hull --
+    so each label attaches unambiguously to one boundary even where hulls overlap. A 1- or 2-country
+    zone degenerates to a rounded disc/capsule via the same buffer. Cleaner than a union of
+    per-country discs when the axes already separate the countries (WVS IW map); the disc-union
+    `draw_zone_regions` stays for the instrument maps that overlay within-country respondent spread."""
     import matplotlib.patheffects as pe
     from shapely.geometry import MultiPoint
     from matplotlib.patches import Polygon as MplPolygon
@@ -127,14 +165,15 @@ def draw_zone_hulls(ax, P: np.ndarray, countries: list[str], zones: dict[str, li
     buf = pad * float(np.hypot(*(P.max(0) - P.min(0))))
     for zname, members in zones.items():
         pts = np.array([P[cidx[c]] for c in members if c in cidx])
-        if not len(pts):
+        if len(pts) < 2:                                # convex hull needs 2+ members to contour
             continue
         geom = MultiPoint([tuple(p) for p in pts]).convex_hull.buffer(buf, quad_segs=16)
+        coords = np.asarray(geom.exterior.coords)
         zcol = ZONE_COLORS.get(zname, "#888888")
-        ax.add_patch(MplPolygon(np.asarray(geom.exterior.coords), closed=True, facecolor=zcol,
-                                edgecolor=zcol, alpha=alpha, lw=1.1, zorder=1.5))
-        cen = pts.mean(0)
-        ax.text(cen[0], cen[1], zname, fontsize=9.5, color=zcol, ha="center", va="center",
+        ax.add_patch(MplPolygon(coords, closed=True, facecolor="none", edgecolor=zcol,
+                                lw=1.8, alpha=0.9, zorder=1.5))
+        apex = coords[np.argmax(coords[:, 1])]          # the hull's actual top vertex -> label sits ON the edge
+        ax.text(apex[0], apex[1], zname, fontsize=10, color=zcol, ha="center", va="bottom",
                 style="italic", fontweight="bold", zorder=5,
                 path_effects=[pe.withStroke(linewidth=3.0, foreground="white")])
 
