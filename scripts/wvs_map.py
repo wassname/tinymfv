@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -158,7 +159,10 @@ def main() -> None:
     logger.info(f"{len(recs)} WVS questions -> {len(countries)} countries on 2 IW axes")
 
     instrs, meta = build_instruments(resolved)
-    sig = str(hash(tuple(sorted((s, m["n"]) for s, m in meta.items()))) & 0xffffffff)
+    # DETERMINISTIC key over the item set: Python's builtin hash() is salted per process
+    # (PYTHONHASHSEED), so it changes every run and the cache never hits across processes -- costing a
+    # fresh API call each time. hashlib is stable.
+    sig = hashlib.md5(repr(sorted((s, m["n"]) for s, m in meta.items())).encode()).hexdigest()[:8]
     cpath = Path(args.cache)
     cache = json.loads(cpath.read_text()).get(sig, {}) if cpath.exists() else {}
     vecs: dict[str, dict[str, np.ndarray]] = {k: {s: np.array(p) for s, p in v.items()}
@@ -223,10 +227,13 @@ def main() -> None:
         if c in label_set:
             ax.annotate(c, (P[i, 0], P[i, 1]), fontsize=9, xytext=(4, 3),
                         textcoords="offset points", color="#111", fontweight="bold", zorder=6)
+    # LLM stars cluster in one corner (that IS the result), so their inline labels collide -- use a
+    # legend in the empty lower-right instead; the distinct colours tie each star to its name.
     for (name, pt), col in zip(models.items(), MODEL_COLORS):
-        ax.scatter(*pt, s=150, marker="*", c=col, edgecolors="white", linewidths=1.0, zorder=8)
-        ax.annotate(name, pt, xytext=(7, 4), textcoords="offset points", fontsize=9,
-                    fontweight="bold", color=col, zorder=9)
+        ax.scatter(*pt, s=190, marker="*", c=col, edgecolors="white", linewidths=1.0, zorder=8,
+                   label=name)
+    ax.legend(loc="lower right", fontsize=9, framealpha=0.92, title="LLMs (sampled)",
+              title_fontproperties={"weight": "bold"}, borderpad=0.7, labelspacing=0.5).set_zorder(11)
     # Four pole signposts, each arrow sitting ON its neutral crosshair (x=0.5 for the vertical axis,
     # y=0.5 for the horizontal one -- these lines are NOT at the plot centre) and pointing out to its
     # pole, in the padded inner margin. All labels horizontal so they stay readable.
