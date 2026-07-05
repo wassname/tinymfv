@@ -223,9 +223,31 @@ def _pole_signposts(ax, med_x: float, med_y: float, poles: tuple[str, str, str, 
     ax.annotate(xp, xy=(0.994, med_y), xytext=(0.9, med_y), xycoords=tY, arrowprops=awp, **kw)
 
 
-# Economist convention: every model is the SAME bold red (bigger than the grey society dots), told
-# apart by its on-map label, not by colour. Distinct from the muted ZONE_COLORS.
+# Economist convention: every model is the SAME bold red, told apart by its label. We keep MODEL_RED
+# as the fallback but colour each model STAR by its lab FAMILY, with the hue chosen to echo the lab's
+# home region (Chinese labs warm / near the East-Asia red; US labs cool blue-purple; Europe green) so a
+# family clusters by colour at a glance, not just by reading labels. -- added by Claude
 MODEL_RED = "#d0021b"
+MODEL_FAMILY_COLORS = {
+    "deepseek": "#ff6fa3",   # DeepSeek (China) -> pink, a lighter East-Asia red
+    "qwen":     "#f28e2b",   # Qwen / Alibaba (China) -> orange
+    "claude":   "#7b3fa0",   # Anthropic (US) -> purple
+    "gpt":      "#1f77b4",   # OpenAI (US) -> blue
+    "gemini":   "#1198a6",   # Gemini / Google (US) -> sea blue
+    "gemma":    "#5fc9d3",   # Gemma / Google open sibling -> lighter sea blue
+    "grok":     "#3b4cc0",   # Grok / xAI (US) -> indigo
+    "llama":    "#4e79a7",   # Llama / Meta (US) -> steel blue
+    "mistral":  "#59a14f",   # Mistral (France / Europe) -> green
+}
+
+
+def model_family_color(name: str) -> str:
+    """The lab-family colour for a model key (substring match on the family name), MODEL_RED if none."""
+    key = name.lower()
+    for fam, col in MODEL_FAMILY_COLORS.items():
+        if fam in key:
+            return col
+    return MODEL_RED
 
 
 def plot_value_map(display: str, countries: list[str], P: np.ndarray,
@@ -269,15 +291,16 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
     sx, sy = list(P[:, 0]), list(P[:, 1])
     if models:
         # models carry (x, y[, x_se, y_se]); the CI is NOT drawn -- with a dozen+ models the whisker
-        # crosses overlap into noise. Uncertainty lives in the companion table (wvs_map save_ci_table),
-        # which also shows it's item-disagreement (irreducible by N), not sampling noise.
+        # crosses overlap into noise. Uncertainty lives in the companion table (wvs_map's CI table),
+        # which also shows it's item-disagreement (irreducible by N), not sampling noise. Each model is
+        # a STAR coloured by its lab family (model_family_color), and its label takes the same colour.
         mnames = list(models)
         mx = np.array([models[k][0] for k in mnames])
         my = np.array([models[k][1] for k in mnames])
-        ax.scatter(mx, my, s=120, marker="o", c=MODEL_RED,   # Economist: bigger red dots
-                   edgecolors="white", linewidths=1.0, zorder=8)
+        mcols = [model_family_color(k) for k in mnames]
+        ax.scatter(mx, my, s=230, marker="*", c=mcols, edgecolors="white", linewidths=0.8, zorder=8)
         tx += list(mx); ty += list(my); txt += mnames
-        tcol += [MODEL_RED] * len(mnames)
+        tcol += mcols
         sx += list(mx); sy += list(my)
     if steer:
         bx, by, _ = steer["base"]
@@ -300,14 +323,21 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
                      textsize=9, textcolor=tcol, linecolor="#aaa", linewidth=0.6, draw_lines=True)
     _pole_signposts(ax, med_x, med_y, poles)
     ax.set_xticks([]); ax.set_yticks([]); ax.set_xlabel(""); ax.set_ylabel("")
-    if models:                                          # minimal colour legend (red = models, grey = societies)
+    if models:                                          # legend: one star swatch per lab family present
         from matplotlib.lines import Line2D
-        handles = [Line2D([], [], marker="o", linestyle="none", markerfacecolor=MODEL_RED,
-                          markeredgecolor="white", markersize=11, label="AI models"),
-                   Line2D([], [], marker="o", linestyle="none", markerfacecolor="#8f8a80",
-                          markeredgecolor="white", markersize=8, label=f"{len(countries)} societies")]
-        ax.legend(handles=handles, loc="upper left", fontsize=9, frameon=False,
-                  borderaxespad=0.8, handletextpad=0.3).set_zorder(11)
+        fams, seen_f = [], set()
+        for k in mnames:                                # keep map order, dedupe to one entry per family
+            low = k.lower()
+            fam = next((f for f in MODEL_FAMILY_COLORS if f in low), None)
+            if fam and fam not in seen_f:
+                seen_f.add(fam)
+                fams.append((fam, MODEL_FAMILY_COLORS[fam]))
+        handles = [Line2D([], [], marker="*", linestyle="none", markerfacecolor=col,
+                          markeredgecolor="white", markersize=12, label=fam) for fam, col in fams]
+        handles.append(Line2D([], [], marker="o", linestyle="none", markerfacecolor="#8f8a80",
+                              markeredgecolor="white", markersize=8, label=f"{len(countries)} societies"))
+        ax.legend(handles=handles, loc="upper left", fontsize=8, frameon=False,
+                  borderaxespad=0.6, handletextpad=0.3, labelspacing=0.3, ncol=2).set_zorder(11)
     # Title + caption are OFF by default -- the README carries the headline + sources (nicer voice
     # there than baked jargon). Pass title/note only for a standalone figure.
     if title:

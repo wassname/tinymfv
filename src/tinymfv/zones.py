@@ -74,9 +74,11 @@ _CANON = {
     "(nu": None,   # corrupt big5 row (n=369); country unidentifiable from the aggregate CSV
 }
 
-# The named outliers on the Economist chart, bolded on our maps where present.
+# The named outliers on the Economist chart, bolded on our maps where present. Nigeria dropped: Egypt
+# already anchors the bottom-left corner (it's the corner-outlier auto-label), so both crowds the
+# African-Islamic corner. -- Claude
 ECONOMIST_OUTLIERS = {"China", "South Korea", "United States", "Great Britain", "Japan",
-                      "Nigeria", "Pakistan", "Sweden"}
+                      "Pakistan", "Sweden"}
 
 # Coarser macro-zones for the maps. The nine fine IW zones over-fragment low-dimensional maps: the
 # English-speaking world and the European religions (Protestant/Catholic/Baltic) don't separate, so

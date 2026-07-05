@@ -286,10 +286,13 @@ def main() -> None:
     # signposts through the human median, 4 auto-selected zone hulls, textalloc labels, model stars.
     _, emph = zones_for(countries)
     # Title + caption live in the README (nicer voice, editable), not baked into the figure.
+    # Drop the " (rated)" readout tag from the on-map labels (the cache/CI-table keep it) -- the map is
+    # crowded and every model here is rated, so the tag adds nothing.
+    plot_models = {k.replace(" (rated)", ""): v for k, v in models.items()}
     fig = maps.plot_value_map(
         "WVS Inglehart-Welzel", countries, P,
         ("Survival", "Self-expression", "Traditional", "Secular-Rational"),
-        models=models, emphasize=emph)
+        models=plot_models, emphasize=emph)
     fig.savefig(args.out, dpi=200, bbox_inches="tight")
     logger.info(f"wrote {args.out}")
 
