@@ -289,10 +289,19 @@ def main() -> None:
     # Drop the " (rated)" readout tag from the on-map labels (the cache/CI-table keep it) -- the map is
     # crowded and every model here is rated, so the tag adds nothing.
     plot_models = {k.replace(" (rated)", ""): v for k, v in models.items()}
+    # Too many model names to label them all. Plot every star (colour = family) but LABEL only the
+    # latest model per family (highest version number), and drop the redundant "claude-" so the flagship
+    # reads "opus-4.8". Colour + legend carry the unlabelled siblings.
+    fams: dict[str, list[str]] = {}
+    for k in plot_models:
+        fams.setdefault(maps.model_family_color(k), []).append(k)
+    def _ver(k: str) -> list[float]:
+        return [float(n) for n in re.findall(r"\d+(?:\.\d+)?", k)]
+    model_labels = {max(ks, key=_ver): max(ks, key=_ver).replace("claude-", "") for ks in fams.values()}
     fig = maps.plot_value_map(
         "WVS Inglehart-Welzel", countries, P,
         ("Survival", "Self-expression", "Traditional", "Secular-Rational"),
-        models=plot_models, emphasize=emph)
+        models=plot_models, model_labels=model_labels, emphasize=emph)
     fig.savefig(args.out, dpi=200, bbox_inches="tight")
     logger.info(f"wrote {args.out}")
 

@@ -190,7 +190,6 @@ def draw_zone_hulls(ax, P: np.ndarray, countries: list[str], zones: dict[str, li
     from matplotlib.patches import Polygon as MplPolygon
     cidx = {c: i for i, c in enumerate(countries)}
     buf = pad * float(np.hypot(*(P.max(0) - P.min(0))))
-    center = P.mean(0)                                   # the crowded middle -- push zone labels away from it
     specs: list[tuple[str, tuple[float, float], str]] = []
     for zname, members in zones.items():
         pts = np.array([P[cidx[c]] for c in members if c in cidx])
@@ -201,14 +200,13 @@ def draw_zone_hulls(ax, P: np.ndarray, countries: list[str], zones: dict[str, li
         zcol = ZONE_COLORS.get(zname, "#888888")
         ax.add_patch(MplPolygon(coords, closed=True, facecolor="none", edgecolor=zcol,
                                 lw=1.8, alpha=0.9, zorder=1.5))
-        # anchor at the hull vertex FARTHEST from the plot centre: seeds the label in the sparse outer
-        # region (the allocator then fine-tunes), instead of the top vertex which can face the crowd.
-        apex = coords[int(np.argmax(np.hypot(*(coords - center).T)))]
+        anchor = pts.mean(0)                            # zone centroid: the leader ties the label here
         if label:
-            ax.text(apex[0], apex[1], zname, fontsize=10, color=zcol, ha="center", va="bottom",
+            top = coords[np.argmax(coords[:, 1])]       # ipsative maps draw it at the hull top vertex
+            ax.text(top[0], top[1], zname, fontsize=10, color=zcol, ha="center", va="bottom",
                     style="italic", fontweight="bold", zorder=5,
                     path_effects=[pe.withStroke(linewidth=3.0, foreground="white")])
-        specs.append((zname, (float(apex[0]), float(apex[1])), zcol))
+        specs.append((zname, (float(anchor[0]), float(anchor[1])), zcol))
     return specs
 
 
@@ -260,8 +258,32 @@ def model_family_color(name: str) -> str:
     return MODEL_RED
 
 
+def _open_slot(anchor: tuple[float, float], obstacles: list[tuple[float, float]],
+               xlim: tuple[float, float], ylim: tuple[float, float], span: np.ndarray,
+               radii=(0.08, 0.14, 0.22, 0.32, 0.44)) -> tuple[float, float]:
+    """A label position in the emptiest nearby space: scan a ring of candidate offsets (fractions of
+    the data span) around `anchor` and keep the one whose NEAREST obstacle (a dot or an already-placed
+    label) is farthest, with a mild penalty for straying from the anchor. Distances are normalised by
+    the data span so x/y crowding weigh equally. Used for the few big zone labels, which adjustText's
+    local force-relaxation otherwise parks in a crowded local minimum."""
+    ax0, ay0 = anchor
+    best, best_score = (ax0, ay0), -np.inf
+    for r in radii:
+        for deg in range(0, 360, 20):
+            a = np.radians(deg)
+            x, y = ax0 + r * span[0] * np.cos(a), ay0 + r * span[1] * np.sin(a)
+            if not (xlim[0] < x < xlim[1] and ylim[0] < y < ylim[1]):
+                continue
+            dmin = min(np.hypot((x - ox) / span[0], (y - oy) / span[1]) for ox, oy in obstacles)
+            score = dmin - 0.35 * r                      # prefer open space; mild pull toward the anchor
+            if score > best_score:
+                best_score, best = score, (x, y)
+    return best
+
+
 def plot_value_map(display: str, countries: list[str], P: np.ndarray,
                    poles: tuple[str, str, str, str], *, models: dict[str, tuple[float, float]] | None = None,
+                   model_labels: dict[str, str] | None = None,
                    steer: dict[str, tuple[float, float, str]] | None = None,
                    emphasize: set[str] | None = None, title: str | None = None, note: str | None = None):
     """The interpretable "4-value map": two NAMED axes with four pole signposts through the human
@@ -294,22 +316,25 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
     zone_specs = draw_zone_hulls(ax, P, countries, zones, label=False)   # labels go through the allocator
     ax.scatter(P[:, 0], P[:, 1], s=26, c=dot_cols, alpha=0.85, edgecolors="white", linewidths=0.5, zorder=3)
 
-    # ONE allocator for EVERY label -- country, model star, AND zone name. Each is created at its anchor
-    # then MOVED by adjustText off the dots (obs_x/obs_y) and off the other labels into open space, with
-    # a leader line. The zone names used to be nailed to their hull's top vertex (which lands in crowded
-    # spots); routing them through the same allocator is the fix.
+    # Two-stage placement. Point labels (country / model / steer) go through ONE adjustText pass (force
+    # repulsion off the dots and each other, leader lines). The few big ZONE labels get a dedicated
+    # emptiest-slot search first (adjustText's local relaxation parks them in crowded local minima), and
+    # the point labels then avoid those. obs_x/obs_y are the dots every label must dodge.
     obs_x, obs_y = list(P[:, 0]), list(P[:, 1])
     lab_specs = [(P[i, 0], P[i, 1], countries[i], "#111", "normal", "normal", 9)
                  for i, c in enumerate(countries) if c in label_set]
     if models:
-        # each model is a STAR coloured by lab family (model_family_color); its label takes that colour.
-        # The 95% CI is NOT drawn (whiskers overlap into noise with a dozen+ models) -- it lives in the
-        # companion table, which also shows the wide ones are item-disagreement, not sampling noise.
+        # each model is a STAR coloured by lab family. Every model is plotted, but only `model_labels`
+        # get a text label (default: all) -- the WVS panel labels ONE representative per family and lets
+        # colour + legend carry the rest. The 95% CI is not drawn (it lives in the companion table).
         mnames = list(models)
         mx = np.array([models[k][0] for k in mnames]); my = np.array([models[k][1] for k in mnames])
         mcols = [model_family_color(k) for k in mnames]
         ax.scatter(mx, my, s=230, marker="*", c=mcols, edgecolors="white", linewidths=0.8, zorder=8)
-        lab_specs += [(x, y, k, col, "bold", "normal", 9) for k, x, y, col in zip(mnames, mx, my, mcols)]
+        for k, x, y, col in zip(mnames, mx, my, mcols):
+            disp = k if model_labels is None else model_labels.get(k)
+            if disp:
+                lab_specs.append((x, y, disp, col, "bold", "normal", 9))
         obs_x += list(mx); obs_y += list(my)
     if steer:
         bx, by, blab = steer["base"]
@@ -324,13 +349,24 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
         ax.scatter(bx, by, s=90, c=C_BASE, edgecolors="white", linewidths=1.0, zorder=8)
         lab_specs.append((bx, by, blab, C_BASE, "bold", "normal", 9))
         obs_x.append(bx); obs_y.append(by)
-    lab_specs += [(zx, zy, zn, zc, "bold", "italic", 10) for zn, (zx, zy), zc in zone_specs]
 
     ax.margins(0.13)
+    fig.canvas.draw()
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    span = P.max(0) - P.min(0)
+    obs_pts = list(zip(obs_x, obs_y))
+    zone_texts, zplaced = [], []
+    for zn, (zx, zy), zc in zone_specs:                 # big zone labels -> emptiest slot, leader to hull
+        lx, ly = _open_slot((zx, zy), obs_pts + zplaced, xlim, ylim, span)
+        zplaced.append((lx, ly))
+        zone_texts.append(ax.annotate(
+            zn, xy=(zx, zy), xytext=(lx, ly), color=zc, fontsize=10, fontweight="bold", fontstyle="italic",
+            ha="center", va="center", zorder=9, arrowprops=dict(arrowstyle="-", color=zc, lw=0.7, alpha=0.6),
+            path_effects=[pe.withStroke(linewidth=2.5, foreground="white")]))
     texts = [ax.text(x, y, t, color=c, fontsize=fs, fontweight=fw, fontstyle=st, ha="center",
                      va="center", zorder=9, path_effects=[pe.withStroke(linewidth=2.5, foreground="white")])
              for x, y, t, c, fw, st, fs in lab_specs]
-    adjust_text(texts, x=obs_x, y=obs_y, ax=ax, expand=(1.15, 1.4),
+    adjust_text(texts, x=obs_x, y=obs_y, ax=ax, objects=zone_texts, expand=(1.15, 1.4),
                 arrowprops=dict(arrowstyle="-", color="#aaa", lw=0.6))
     _pole_signposts(ax, med_x, med_y, poles)
     ax.set_xticks([]); ax.set_yticks([]); ax.set_xlabel(""); ax.set_ylabel("")
