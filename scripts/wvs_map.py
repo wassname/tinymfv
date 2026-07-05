@@ -298,13 +298,14 @@ def main() -> None:
     def _ver(k: str) -> list[float]:
         return [float(n) for n in re.findall(r"\d+(?:\.\d+)?", k)]
     model_labels = {max(ks, key=_ver): max(ks, key=_ver).replace("claude-", "") for ks in fams.values()}
-    # Flip X so Self-expression is on the LEFT and Survival on the RIGHT (invert_x). We are building a
-    # better map than the Economist's, not xeroxing it, and this puts the cultural "West" on the left.
-    # poles are (x_left, x_right, y_bottom, y_top) as DRAWN, so the x pair is swapped to match.
+    # Poles in NATURAL data order (x_neg, x_pos, y_neg, y_pos): raw X is high on Self-expression, raw Y
+    # high on Secular-Rational. plot_value_map's orient_geographic then flips X so the cultural West
+    # lands in the west (Self-expression left) and confirms African-Islamic sits south -- the same
+    # orientation every other map now uses, so we build a better map than the Economist's, consistently.
     fig = maps.plot_value_map(
         "WVS Inglehart-Welzel", countries, P,
-        ("Self-expression", "Survival", "Traditional", "Secular-Rational"),
-        models=plot_models, model_labels=model_labels, emphasize=emph, invert_x=True)
+        ("Survival", "Self-expression", "Traditional", "Secular-Rational"),
+        models=plot_models, model_labels=model_labels, emphasize=emph)
     fig.savefig(args.out, dpi=200, bbox_inches="tight")
     logger.info(f"wrote {args.out}")
 

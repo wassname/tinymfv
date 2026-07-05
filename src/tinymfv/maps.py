@@ -153,6 +153,28 @@ def outlying_countries(P: np.ndarray, countries: list[str], n: int = 4) -> set[s
     return {countries[int(np.argmax(Pc[:, 0] * dx + Pc[:, 1] * dy))] for dx, dy in dirs}
 
 
+def orient_geographic(P: np.ndarray, countries: list[str],
+                      zones: dict[str, list[str]] | None) -> tuple[float, float]:
+    """Per-axis sign (+1 / -1) that puts the cultural West to the WEST (small x, left) and the
+    African-Islamic global South to the SOUTH (small y, bottom), so every map shares one orientation
+    and a reader never re-learns left/right (the Economist/WVS convention). Anchors on each zone's
+    country-mean centroid vs the map centroid; a missing zone leaves that axis unflipped. The two
+    anchors pin two different axes, so they don't fight. -- authored by Claude"""
+    if not zones:
+        return 1.0, 1.0
+    cidx = {c: i for i, c in enumerate(countries)}
+    ctr = P.mean(0)
+
+    def centroid(zname: str):
+        idx = [cidx[c] for c in zones.get(zname, []) if c in cidx]
+        return P[idx].mean(0) if idx else None
+
+    west, south = centroid("West"), centroid("African-Islamic")
+    sx = -1.0 if (west is not None and west[0] > ctr[0]) else 1.0
+    sy = -1.0 if (south is not None and south[1] > ctr[1]) else 1.0
+    return sx, sy
+
+
 def _map_annotations(P: np.ndarray, countries: list[str], zones_all: dict[str, list[str]] | None,
                      emphasize: set[str] | None, grey: str):
     """Shared map policy for plot_value_map + plot_ipsative_pca -- one copy so the two renderers can't
@@ -265,7 +287,7 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
                    poles: tuple[str, str, str, str], *, models: dict[str, tuple[float, float]] | None = None,
                    model_labels: dict[str, str] | None = None,
                    steer: dict[str, tuple[float, float, str]] | None = None,
-                   emphasize: set[str] | None = None, invert_x: bool = False,
+                   emphasize: set[str] | None = None,
                    title: str | None = None, note: str | None = None):
     """The interpretable "4-value map": two NAMED axes with four pole signposts through the human
     MEDIAN crosshair, Economist-style zone hulls (the 4 most-separate zones), zone-coloured dots, and
@@ -284,6 +306,22 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
     from .zones import zones_for
     zones_all, emph = zones_for(countries)
     emph = (emphasize or set()) | emph
+    # Anchor orientation geographically (West -> west, African-Islamic -> south) so every map reads the
+    # same way. Flip the coords and swap the pole labels for any flipped axis; models/steer live in the
+    # same space, so flip them too. Reflection leaves zone selection + corner outliers unchanged.
+    P = np.asarray(P, float).copy()
+    sgx, sgy = orient_geographic(P, countries, zones_all)
+    xn, xp, yn, yp = poles
+    if sgx < 0:
+        P[:, 0] *= -1; xn, xp = xp, xn
+    if sgy < 0:
+        P[:, 1] *= -1; yn, yp = yp, yn
+    poles = (xn, xp, yn, yp)
+    flip = lambda t: (t[0] * sgx, t[1] * sgy, *t[2:])
+    if models:
+        models = {k: flip(v) for k, v in models.items()}
+    if steer:
+        steer = {k: flip(v) for k, v in steer.items()}
     zones, dot_cols, label_set = _map_annotations(P, countries, zones_all, emph, "#888888")
 
     med_x, med_y = float(np.median(P[:, 0])), float(np.median(P[:, 1]))
@@ -330,9 +368,9 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
         obs_x.append(bx); obs_y.append(by)
 
     ax.margins(0.17)                                     # roomy edges: the pole signposts sit in the inner
-    if invert_x:                                          # margin and edge labels (Serbia, Adaptive) need to fit; e.g. Self-expression on the LEFT. Flip BEFORE
-        ax.invert_xaxis()                                # placement so the pixel-space allocator sees the
-    ax.autoscale(False)                                  # final orientation (else every label mirrors left).
+    ax.autoscale(False)                                  # margin and edge labels (Serbia, Adaptive) need to fit.
+    # Orientation is already baked into the coords (orient_geographic above), so the pixel-space label
+    # allocator sees the final left/right; no ax.invert_xaxis() that would mirror every placed label.
     # ONE placement pass for everything (see labelplace.allocate_labels). Each zone name is a REGION
     # label whose candidate anchors are its whole densified hull perimeter -- so it seats itself in the
     # emptiest open air outside the hull, no white box, no leader. Country/model/steer names are MARKER
@@ -545,6 +583,12 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     fit on the country means M; `respondents`/`haze` only scatter + set the crop. Returns the
     Figure."""
     _, Vt, var, mu, Pc = ipsative_pca(M)               # fit on country means: between-country axes
+    P = (M @ Pc - mu) @ Vt[:2].T
+    # Anchor orientation geographically (West -> west, African-Islamic -> south) by folding the axis
+    # signs into Vt itself, so EVERY downstream projection (dots, haze, steer path, compass loadings,
+    # axis gloss) inherits the flip from one place and cannot mirror-diverge. -- authored by Claude
+    sgx, sgy = orient_geographic(P, countries, zones)
+    Vt = Vt.copy(); Vt[0] *= sgx; Vt[1] *= sgy
     P = (M @ Pc - mu) @ Vt[:2].T
     cloud = haze if haze is not None else respondents  # what we scatter + crop to (fit is separate)
 
