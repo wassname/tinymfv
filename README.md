@@ -14,19 +14,19 @@ What happens when we steer them? Below we steer models with `authority-respectin
 
 ### Value maps: where a model sits, on named axes
 
-The clearest view is the value ("quadrant") map. Each has two named axes borrowed from the psychology that built the survey, the human societies drawn as cultural regions, and the model as a black dot with a coloured path showing where steering takes it: turning the Authority push up (red) or down (blue). Every map keeps one orientation, the cultural West to the west and the global South to the south, so they all read the same way.
+The clearest view is the value ("quadrant") map. Each has two named axes borrowed from the psychology that built the survey, the human societies drawn as cultural regions, and the model as a black dot with a coloured path showing where steering takes it. Steering here means nudging the model's internal state toward the authority-respecting side (red, more Authority) or away from it (blue, less), without retraining. Every map keeps one orientation, the cultural West to the west and the global South to the south, so they all read the same way.
 
-![MFQ-2 value map: named individualizing/binding and equality/proportionality axes with Authority steering](docs/img/showcase/mfq2/map_value.png)
+![MFQ-2 value map: individual-first vs group-first morality, with the Authority steer path](docs/img/showcase/mfq2/map_value.png)
 
 Moral-foundations theory (Jonathan Haidt's) holds that our moral sense runs on a few basic concerns: caring for others, fairness, loyalty to the group, respect for authority, and a sense of the sacred. The MFQ-2 survey scores a person, or a model, on each. On this map, left to right runs from an individual-first morality (care, equality) to a group-first one (loyalty, authority, purity); bottom to top splits fairness into equal-shares versus earned-shares. The base model sits in the Western, individual-first corner, and pushing it toward Authority walks it clear across to the group-first corner shared by the African-Islamic and East-Asian societies.
 
-![Big Five value map: named plasticity/stability meta-trait axes with Authority steering](docs/img/showcase/big5/map_value.png)
+![Big Five value map: outgoing/open vs even-keeled axes, with the Authority steer path](docs/img/showcase/big5/map_value.png)
 
 Big Five personality collapses to two broad traits: how outgoing and open a person is (reserved to exploratory, left to right) and how even-keeled they are (volatile to stable, bottom to top). The Authority push barely moves the base model here, which is the point: it shifts values, not personality.
 
-![Humor Styles value map: named adaptive/maladaptive and self/other axes with Authority steering](docs/img/showcase/humor_styles/map_value.png)
+![Humor Styles value map: adaptive vs maladaptive humor, with the Authority steer path](docs/img/showcase/humor_styles/map_value.png)
 
-Humor is the honest negative result. On adaptive-vs-maladaptive and self-vs-other axes the human zones overlap almost completely: humor style does not sort societies the way values do. Worth knowing the instrument is flat before reading anything into a steer on it.
+Humor is the honest negative result. On its axes (warm, healthy humor versus put-down humor; joking at yourself versus at others) the human regions overlap almost completely: humor style does not sort societies the way values do. Worth knowing a survey can't tell societies apart at all before reading anything into a steer on it.
 
 ### Range plots: one factor at a time
 
@@ -44,9 +44,9 @@ MFV (moral-foundation vignettes, the repo's namesake) hands the model a short st
 
 The surveys echo their maps: MFQ-2's binding factors climb under the steer, while Big Five and humor stay flat.
 
-### Blind-PCA maps
+### Maps with data-picked axes
 
-When a survey has no ready-made named axes (MFV), or just as a cross-check on the value maps, we let the data pick the axes: find the two directions along which human societies differ most, and place the model in them. A small compass shows which traits each axis is built from, and an inset shows where the zoomed-in frame sits within the full crowd of human respondents.
+When a survey has no ready-made named axes (MFV), or just as a cross-check on the value maps, we let the data pick the axes instead: find the two directions along which human societies differ most, and place the model in them. A small compass shows which traits each axis is built from, and an inset shows where the zoomed-in frame sits within the full crowd of human respondents.
 
 ![MFV culture map: Authority steering against human countries](docs/img/showcase/mfv/map_pca_ipsative.png)
 
