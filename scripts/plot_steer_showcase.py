@@ -245,8 +245,9 @@ def _zscore(v: np.ndarray) -> np.ndarray:
 
 def read_human_mfv() -> tuple[list[str], dict[str, dict[str, float]]]:
     """(countries, {country: {foundation: mean_1to5}}) from the bundled MFV human norms.
-    JimenezLeal2025 (LatAm) + Yamada2025 (MFV-J) + Hopp2024 (Dutch): 6 countries x 6 foundations
-    (no Social Norms)."""
+    JimenezLeal2025 (LatAm: Argentina/Colombia/Peru/US) + Yamada2025 (MFV-J: Japan)
+    + Hopp2024 (Dutch: Netherlands) + Marques2020 (Brazil) + Crone2021 (Australia):
+    8 countries x 6 foundations (no Social Norms). Provenance: mfv_country_factors_SOURCES.md."""
     path = T.maps.DATA / "human" / "mfv_country_factors.csv"
     by_country: dict[str, dict[str, float]] = {}
     with open(path, newline="") as fh:
@@ -300,7 +301,7 @@ def plot_mfv_map(run_dir: Path, out: Path, vec_label: str, C: float, coh_cs: lis
     neg_c = min(c for c in coh_cs if c < 0.0)
     labels = ("base (c=0)", f"c={pos_c:+g}", f"c={neg_c:+g}")
     traj = {c: prof[c] for c in coh_cs}
-    zones, emph = zones_for(countries)                 # MFV: 5 country dots, no cloud
+    zones, emph = zones_for(countries)                 # MFV: 8 country dots, no cloud
     fig = T.maps.plot_ipsative_pca(_MFV_INSTR, founds, countries, M, prof[0.0], prof[pos_c], prof[neg_c],
                                    traj=traj, emphasize=emph, zones=zones, labels=labels)
     fig.axes[0].set_title(f"MFV vignettes: humans vs LLMs steered for {vec_label}", fontsize=10)

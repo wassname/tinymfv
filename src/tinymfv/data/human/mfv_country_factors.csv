@@ -41,3 +41,9 @@ Brazil,fairness,4.25,0.46,494,0.0207,4.2,4.29,5,Marques2020_BrazilMFV_fig3digiti
 Brazil,liberty,4.14,0.62,494,0.0279,4.09,4.19,5,Marques2020_BrazilMFV_fig3digitized_affinecal
 Brazil,loyalty,3.06,0.85,494,0.0382,2.98,3.13,5,Marques2020_BrazilMFV_fig3digitized_affinecal
 Brazil,sanctity,3.45,0.79,494,0.0355,3.38,3.52,5,Marques2020_BrazilMFV_fig3digitized_affinecal
+Australia,authority,3.183,0.603,756,0.0219,3.140,3.226,5,Crone2021_AusUndergrad_MFV90raw
+Australia,care,3.940,0.532,756,0.0193,3.902,3.978,5,Crone2021_AusUndergrad_MFV90raw
+Australia,fairness,3.734,0.514,756,0.0187,3.698,3.771,5,Crone2021_AusUndergrad_MFV90raw
+Australia,liberty,3.689,0.579,756,0.0211,3.647,3.730,5,Crone2021_AusUndergrad_MFV90raw
+Australia,loyalty,2.977,0.676,756,0.0246,2.929,3.025,5,Crone2021_AusUndergrad_MFV90raw
+Australia,sanctity,3.745,0.731,756,0.0266,3.693,3.798,5,Crone2021_AusUndergrad_MFV90raw
