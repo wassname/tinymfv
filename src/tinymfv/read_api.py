@@ -141,6 +141,28 @@ def _parse_ratings(text: str, n: int) -> dict[int, float] | None:
     return out
 
 
+_FORCE_MSG = ('You are out of time. Output ONLY a single-line compact JSON object mapping each answer '
+              'number to its 1-5 rating, e.g. {{"0": 1, "1": 5}}. No markdown, no reasoning, nothing else.')
+
+
+async def _force_answer(model: str, prompt: str, phase1_msg: dict, temperature: float,
+                        max_tokens: int, req_timeout: float) -> str:
+    """Phase-2 rescue (wassname's bounded-thinking pattern, gist 72eed3a1): a reasoning model that
+    spent its whole budget thinking and truncated the JSON mid-object gets a follow-up in the SAME
+    conversation -- feed its (truncated) reasoning back as the assistant turn, then demand a compact
+    one-line answer NOW. It has already thought, so it just commits. Works even where reasoning can't
+    be disabled (some providers, e.g. gemini-2.5-pro, MANDATE it and 400 on reasoning_effort=none), so
+    we do NOT pass a reasoning-off knob -- we constrain the OUTPUT instead. A bigger cap than phase 1
+    (reasoning models re-think briefly). Still parsed by the caller; may fail again -> dropped sample."""
+    tail = (phase1_msg.get("reasoning") or phase1_msg.get("content") or "")[-1500:] or "(thinking truncated)"
+    msgs = [{"role": "user", "content": prompt},
+            {"role": "assistant", "content": tail},
+            {"role": "user", "content": _FORCE_MSG.format()}]
+    payload = {"model": model, "messages": msgs, "temperature": temperature, "max_tokens": max(max_tokens, 2048)}
+    data = await asyncio.wait_for(openrouter_request(payload), timeout=req_timeout)
+    return data["choices"][0]["message"].get("content") or ""
+
+
 def _rate_plan(items: list[dict], n_samples: int, per_call: int = 1) -> list[dict]:
     """Flatten (item, presented-order, count) into a list of <=per_call requests. A binary item splits
     its draws between the two orders (positional-bias control); an ordinal item keeps natural order
@@ -168,7 +190,8 @@ def read_items_rated(model: str, items: list[dict], *, n_samples: int = 12, temp
     forced choice, and positional bias is controlled by permuting the PRESENTED order of BINARY items
     (n==2) across samples then mapping ratings back to the canonical option order. All requests for the
     model fire CONCURRENTLY (asyncio.gather, capped at `concurrency`) so a 12-item panel is ~1 round
-    trip, not 24 sequential ones.
+    trip, not 24 sequential ones. A reasoning model that burns its token budget thinking and truncates
+    the JSON is rescued by a one-shot force-answer follow-up (_force_answer) instead of being dropped.
 
     `items`: [{"id", "question", "options"(canonical), "n"}]. Returns per item: id, p (mean over valid
     samples, canonical order), p_samples (per-sample canonical p arrays for bootstrap CIs),
@@ -180,13 +203,21 @@ def read_items_rated(model: str, items: list[dict], *, n_samples: int = 12, temp
         sem = asyncio.Semaphore(concurrency)
         async def call(req):
             async with sem:
+                n = items[req["i"]]["n"]
                 payload = {"model": model, "messages": [{"role": "user", "content": req["prompt"]}],
                            "temperature": temperature, "n": req["cnt"], "max_tokens": max_tokens}
                 # per-request wall-clock cap: one request stuck in the wrapper's stamina backoff (a
                 # rate-limited provider) must not stall the whole model's gather -- time it out and drop
                 # it as a failed sample (return_exceptions catches the TimeoutError) so the panel moves on.
                 data = await asyncio.wait_for(openrouter_request(payload), timeout=req_timeout)
-                return [(c["message"].get("content") or "") for c in data["choices"]]
+                out = []
+                for c in data["choices"]:
+                    content = c["message"].get("content") or ""
+                    if _parse_ratings(content, n) is None:   # truncated JSON / reasoning ate the budget
+                        content = await _force_answer(model, req["prompt"], c["message"],
+                                                      temperature, max_tokens, req_timeout)
+                    out.append(content)
+                return out
         return await asyncio.gather(*(call(r) for r in plan), return_exceptions=True)
 
     results = asyncio.run(run_all())
