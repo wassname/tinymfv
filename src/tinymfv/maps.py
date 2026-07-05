@@ -255,12 +255,19 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
     tcol = ["#111"] * len(lab_i)
     if models:
         mnames = list(models)
-        mpts = np.array([models[k] for k in mnames])
-        ax.scatter(mpts[:, 0], mpts[:, 1], s=150, marker="o", c=MODEL_RED,   # Economist: bigger red dots
+        mx = np.array([models[k][0] for k in mnames])
+        my = np.array([models[k][1] for k in mnames])
+        # optional bootstrap SE (rated models carry (x, y, x_se, y_se); logprob models just (x, y))
+        xse = np.array([models[k][2] if len(models[k]) > 2 else 0.0 for k in mnames])
+        yse = np.array([models[k][3] if len(models[k]) > 3 else 0.0 for k in mnames])
+        if (xse > 0).any() or (yse > 0).any():           # 95% CI -> a mushy model reads as uncertain
+            ax.errorbar(mx, my, xerr=1.96 * xse, yerr=1.96 * yse, fmt="none", ecolor=MODEL_RED,
+                        elinewidth=1.0, alpha=0.4, capsize=2.5, capthick=0.8, zorder=7)
+        ax.scatter(mx, my, s=150, marker="o", c=MODEL_RED,   # Economist: bigger red dots
                    edgecolors="white", linewidths=1.0, zorder=8)
-        tx += list(mpts[:, 0]); ty += list(mpts[:, 1]); txt += mnames
+        tx += list(mx); ty += list(my); txt += mnames
         tcol += [MODEL_RED] * len(mnames)
-        sx = list(P[:, 0]) + list(mpts[:, 0]); sy = list(P[:, 1]) + list(mpts[:, 1])
+        sx = list(P[:, 0]) + list(mx); sy = list(P[:, 1]) + list(my)
     else:
         sx, sy = list(P[:, 0]), list(P[:, 1])
     ax.margins(0.13)
