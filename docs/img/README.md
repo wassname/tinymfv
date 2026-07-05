@@ -13,7 +13,7 @@ Regenerate everything with the two commands at the bottom.
 
 ---
 
-## The models are all godless hippies
+## No country thinks like a chatbot
 
 *17 frontier LLMs placed among ~90 human societies on the World Values Survey map*
 
@@ -22,9 +22,11 @@ Regenerate everything with the two commands at the bottom.
 Grey dots are human societies, coloured stars are language models tinted by lab family (warm for
 Chinese labs, cool for Western). Left to right runs from survival values to self-expression; bottom to
 top from traditional to secular-rational. Every model lands in the top-left, more secular and more
-self-expressive than almost any country on earth. The open-weight models (llama, mistral, gemma) sit
-nearest the human West, while the big reasoning models (gpt-5.5, gemini, grok) drift furthest out. The
-axis is flipped from the textbook chart so the West sits in the west.
+self-expressive than almost any country on earth, well inside the rich-world quadrant and often past
+its edge. The open-weight and Chinese models (llama, mistral, gemma, qwen, deepseek) sit a little
+nearer the human West, while the big Western reasoning models (gpt-5.5, gemini, grok) push furthest
+out; none of them sits anywhere near the African or Muslim societies. Orientation follows the map
+convention used throughout this gallery: the cultural West to the west, the global South to the south.
 
 <sub>Each position is the mean signed 0-1 endorsement over that axis's World-Values items. Human
 values are approximated from GlobalOpinionQA (the WVS/EVS subset), so this is an *approximate*
