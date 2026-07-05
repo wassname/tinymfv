@@ -172,22 +172,26 @@ def _map_annotations(P: np.ndarray, countries: list[str], zones_all: dict[str, l
 
 
 def draw_zone_hulls(ax, P: np.ndarray, countries: list[str], zones: dict[str, list[str]],
-                    pad: float = 0.022) -> list[tuple[float, float]]:
-    """Economist-style zone outline: the tight CONVEX HULL of a zone's country-mean points, rounded
-    and slightly inflated (shapely buffer), drawn as a coloured EDGE ONLY (no fill, so overlapping
-    zones don't muddy), with the zone label in the same colour anchored to the TOP of its own hull --
-    so each label attaches unambiguously to one boundary even where hulls overlap. A 1- or 2-country
-    zone degenerates to a rounded disc/capsule via the same buffer. Cleaner than a union of
-    per-country discs when the axes already separate the countries (WVS IW map); the disc-union
-    `draw_zone_regions` stays for the instrument maps that overlay within-country respondent spread.
-    Returns the zone-label anchor points so the caller can feed them to textalloc as obstacles (a
-    country/model label must not land on a zone name)."""
+                    pad: float = 0.022, label: bool = True) -> list[tuple[str, tuple[float, float], str]]:
+    """Economist-style zone outline: the tight CONVEX HULL of a zone's country-mean points, rounded and
+    slightly inflated (shapely buffer), drawn as a coloured EDGE ONLY (no fill, so overlapping zones
+    don't muddy). A 1- or 2-country zone degenerates to a rounded disc/capsule via the same buffer.
+    Cleaner than a union of per-country discs when the axes already separate the countries (WVS IW
+    map); the disc-union `draw_zone_regions` stays for the instrument maps that overlay within-country
+    respondent spread.
+
+    Returns [(zone_name, (anchor_x, anchor_y), colour)] anchored at the hull's TOP vertex. With
+    label=True (ipsative maps) the label is drawn here, nailed to that vertex. With label=False
+    (value maps) it is NOT drawn -- the caller feeds these specs to the label allocator so the zone
+    name gets MOVED to open space with a leader line, same as the country/model labels, instead of
+    landing in a crowded spot."""
     import matplotlib.patheffects as pe
     from shapely.geometry import MultiPoint
     from matplotlib.patches import Polygon as MplPolygon
     cidx = {c: i for i, c in enumerate(countries)}
     buf = pad * float(np.hypot(*(P.max(0) - P.min(0))))
-    anchors: list[tuple[float, float]] = []
+    center = P.mean(0)                                   # the crowded middle -- push zone labels away from it
+    specs: list[tuple[str, tuple[float, float], str]] = []
     for zname, members in zones.items():
         pts = np.array([P[cidx[c]] for c in members if c in cidx])
         if len(pts) < 2:                                # convex hull needs 2+ members to contour
@@ -197,12 +201,15 @@ def draw_zone_hulls(ax, P: np.ndarray, countries: list[str], zones: dict[str, li
         zcol = ZONE_COLORS.get(zname, "#888888")
         ax.add_patch(MplPolygon(coords, closed=True, facecolor="none", edgecolor=zcol,
                                 lw=1.8, alpha=0.9, zorder=1.5))
-        apex = coords[np.argmax(coords[:, 1])]          # the hull's actual top vertex -> label sits ON the edge
-        ax.text(apex[0], apex[1], zname, fontsize=10, color=zcol, ha="center", va="bottom",
-                style="italic", fontweight="bold", zorder=5,
-                path_effects=[pe.withStroke(linewidth=3.0, foreground="white")])
-        anchors.append((float(apex[0]), float(apex[1])))
-    return anchors
+        # anchor at the hull vertex FARTHEST from the plot centre: seeds the label in the sparse outer
+        # region (the allocator then fine-tunes), instead of the top vertex which can face the crowd.
+        apex = coords[int(np.argmax(np.hypot(*(coords - center).T)))]
+        if label:
+            ax.text(apex[0], apex[1], zname, fontsize=10, color=zcol, ha="center", va="bottom",
+                    style="italic", fontweight="bold", zorder=5,
+                    path_effects=[pe.withStroke(linewidth=3.0, foreground="white")])
+        specs.append((zname, (float(apex[0]), float(apex[1])), zcol))
+    return specs
 
 
 def _pole_signposts(ax, med_x: float, med_y: float, poles: tuple[str, str, str, str]) -> None:
@@ -228,16 +235,19 @@ def _pole_signposts(ax, med_x: float, med_y: float, poles: tuple[str, str, str, 
 # home region (Chinese labs warm / near the East-Asia red; US labs cool blue-purple; Europe green) so a
 # family clusters by colour at a glance, not just by reading labels. -- added by Claude
 MODEL_RED = "#d0021b"
+# Hues spread ~30-50 deg apart so no two families read alike (the earlier set had grok~gpt and
+# llama~gemini~gemma colliding). Chinese labs stay warm (pink/orange, near the East-Asia red), Google's
+# two share a teal/sea-blue sibling pair, grok is xAI-brand near-black to sit clear of gpt's blue.
 MODEL_FAMILY_COLORS = {
-    "deepseek": "#ff6fa3",   # DeepSeek (China) -> pink, a lighter East-Asia red
-    "qwen":     "#f28e2b",   # Qwen / Alibaba (China) -> orange
-    "claude":   "#7b3fa0",   # Anthropic (US) -> purple
-    "gpt":      "#1f77b4",   # OpenAI (US) -> blue
-    "gemini":   "#1198a6",   # Gemini / Google (US) -> sea blue
-    "gemma":    "#5fc9d3",   # Gemma / Google open sibling -> lighter sea blue
-    "grok":     "#3b4cc0",   # Grok / xAI (US) -> indigo
-    "llama":    "#4e79a7",   # Llama / Meta (US) -> steel blue
-    "mistral":  "#59a14f",   # Mistral (France / Europe) -> green
+    "deepseek": "#ec4899",   # DeepSeek (China) -> pink
+    "qwen":     "#f97316",   # Qwen / Alibaba (China) -> orange
+    "mistral":  "#2ca02c",   # Mistral (France / Europe) -> green
+    "gemma":    "#14b8a6",   # Gemma / Google -> teal
+    "gemini":   "#0ea5e9",   # Gemini / Google -> sea blue (sibling of gemma, bluer)
+    "gpt":      "#2563eb",   # OpenAI -> blue
+    "llama":    "#6d5ae0",   # Llama / Meta -> indigo
+    "claude":   "#c026d3",   # Anthropic -> purple / magenta
+    "grok":     "#2b2d42",   # Grok / xAI -> near-black (brand), well clear of gpt blue
 }
 
 
@@ -269,7 +279,8 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
       same visual language as plot_ipsative_pca's trajectory, so the two map families read alike.
     Returns the Figure."""
     from .zones import zones_for
-    import textalloc as ta
+    from adjustText import adjust_text
+    import matplotlib.patheffects as pe
     zones_all, emph = zones_for(countries)
     emph = (emphasize or set()) | emph
     zones, dot_cols, label_set = _map_annotations(P, countries, zones_all, emph, "#888888")
@@ -280,47 +291,47 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
     ax.grid(True, color="#eceadf", lw=0.3, zorder=0)
     ax.axhline(med_y, color="#c9c4b4", lw=1.0, zorder=1)
     ax.axvline(med_x, color="#c9c4b4", lw=1.0, zorder=1)
-    zone_anchors = draw_zone_hulls(ax, P, countries, zones)   # feed to textalloc so labels avoid zone names
+    zone_specs = draw_zone_hulls(ax, P, countries, zones, label=False)   # labels go through the allocator
     ax.scatter(P[:, 0], P[:, 1], s=26, c=dot_cols, alpha=0.85, edgecolors="white", linewidths=0.5, zorder=3)
 
-    lab_i = [i for i, c in enumerate(countries) if c in label_set]
-    tx = [P[i, 0] for i in lab_i]
-    ty = [P[i, 1] for i in lab_i]
-    txt = [countries[i] for i in lab_i]
-    tcol = ["#111"] * len(lab_i)
-    sx, sy = list(P[:, 0]), list(P[:, 1])
+    # ONE allocator for EVERY label -- country, model star, AND zone name. Each is created at its anchor
+    # then MOVED by adjustText off the dots (obs_x/obs_y) and off the other labels into open space, with
+    # a leader line. The zone names used to be nailed to their hull's top vertex (which lands in crowded
+    # spots); routing them through the same allocator is the fix.
+    obs_x, obs_y = list(P[:, 0]), list(P[:, 1])
+    lab_specs = [(P[i, 0], P[i, 1], countries[i], "#111", "normal", "normal", 9)
+                 for i, c in enumerate(countries) if c in label_set]
     if models:
-        # models carry (x, y[, x_se, y_se]); the CI is NOT drawn -- with a dozen+ models the whisker
-        # crosses overlap into noise. Uncertainty lives in the companion table (wvs_map's CI table),
-        # which also shows it's item-disagreement (irreducible by N), not sampling noise. Each model is
-        # a STAR coloured by its lab family (model_family_color), and its label takes the same colour.
+        # each model is a STAR coloured by lab family (model_family_color); its label takes that colour.
+        # The 95% CI is NOT drawn (whiskers overlap into noise with a dozen+ models) -- it lives in the
+        # companion table, which also shows the wide ones are item-disagreement, not sampling noise.
         mnames = list(models)
-        mx = np.array([models[k][0] for k in mnames])
-        my = np.array([models[k][1] for k in mnames])
+        mx = np.array([models[k][0] for k in mnames]); my = np.array([models[k][1] for k in mnames])
         mcols = [model_family_color(k) for k in mnames]
         ax.scatter(mx, my, s=230, marker="*", c=mcols, edgecolors="white", linewidths=0.8, zorder=8)
-        tx += list(mx); ty += list(my); txt += mnames
-        tcol += mcols
-        sx += list(mx); sy += list(my)
+        lab_specs += [(x, y, k, col, "bold", "normal", 9) for k, x, y, col in zip(mnames, mx, my, mcols)]
+        obs_x += list(mx); obs_y += list(my)
     if steer:
-        bx, by, _ = steer["base"]
-        for key, col, dxy, ha in [("pos", POS_COL, (10, 9), "left"), ("neg", NEG_COL, (-10, -11), "right")]:
+        bx, by, blab = steer["base"]
+        for key, col in [("pos", POS_COL), ("neg", NEG_COL)]:
             if key not in steer:
                 continue
             ex, ey, elab = steer[key]
-            ax.plot([bx, ex], [by, ey], "-", color=col, lw=1.6, alpha=0.85, zorder=7)  # connected arm
+            ax.plot([bx, ex], [by, ey], "-", color=col, lw=1.6, alpha=0.85, zorder=7)   # connected arm
             ax.scatter(ex, ey, s=90, c=col, edgecolors="white", linewidths=1.0, zorder=8)
-            ax.annotate(elab, (ex, ey), xytext=dxy, textcoords="offset points", fontsize=9,
-                        color=col, fontweight="bold", ha=ha, va="center", zorder=9)
-            sx.append(ex); sy.append(ey)
+            lab_specs.append((ex, ey, elab, col, "bold", "normal", 9))
+            obs_x.append(ex); obs_y.append(ey)
         ax.scatter(bx, by, s=90, c=C_BASE, edgecolors="white", linewidths=1.0, zorder=8)
-        ax.annotate(steer["base"][2], (bx, by), xytext=(10, -12), textcoords="offset points",
-                    fontsize=9, color=C_BASE, fontweight="bold", ha="left", va="center", zorder=9)
-        sx.append(bx); sy.append(by)
+        lab_specs.append((bx, by, blab, C_BASE, "bold", "normal", 9))
+        obs_x.append(bx); obs_y.append(by)
+    lab_specs += [(zx, zy, zn, zc, "bold", "italic", 10) for zn, (zx, zy), zc in zone_specs]
+
     ax.margins(0.13)
-    ta.allocate_text(fig, ax, tx, ty, txt, x_scatter=sx + [a[0] for a in zone_anchors],
-                     y_scatter=sy + [a[1] for a in zone_anchors],
-                     textsize=9, textcolor=tcol, linecolor="#aaa", linewidth=0.6, draw_lines=True)
+    texts = [ax.text(x, y, t, color=c, fontsize=fs, fontweight=fw, fontstyle=st, ha="center",
+                     va="center", zorder=9, path_effects=[pe.withStroke(linewidth=2.5, foreground="white")])
+             for x, y, t, c, fw, st, fs in lab_specs]
+    adjust_text(texts, x=obs_x, y=obs_y, ax=ax, expand=(1.15, 1.4),
+                arrowprops=dict(arrowstyle="-", color="#aaa", lw=0.6))
     _pole_signposts(ax, med_x, med_y, poles)
     ax.set_xticks([]); ax.set_yticks([]); ax.set_xlabel(""); ax.set_ylabel("")
     if models:                                          # legend: one star swatch per lab family present
