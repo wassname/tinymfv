@@ -283,7 +283,7 @@ def main() -> None:
         logger.info("model coords + 95% CI (widest first):\n" + table)
 
     # Render through the SHARED value-map renderer (same one the instrument value maps use): pole
-    # signposts through the human median, 4 auto-selected zone hulls, textalloc labels, model stars.
+    # signposts through the human median, 4 auto-selected zone hulls, auto-placed labels, model stars.
     _, emph = zones_for(countries)
     # Title + caption live in the README (nicer voice, editable), not baked into the figure.
     # Drop the " (rated)" readout tag from the on-map labels (the cache/CI-table keep it) -- the map is

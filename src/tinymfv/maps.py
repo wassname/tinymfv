@@ -266,14 +266,14 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
                    title: str | None = None, note: str | None = None):
     """The interpretable "4-value map": two NAMED axes with four pole signposts through the human
     MEDIAN crosshair, Economist-style zone hulls (the 4 most-separate zones), zone-coloured dots, and
-    textalloc labels (landmarks + corner outliers + one representative per zone + any models). NO
-    compass / minimap / ticks -- this is the alternative to plot_ipsative_pca, not a replacement.
+    auto-placed labels (landmarks + corner outliers + one representative per zone + any models; see
+    labelplace.allocate_labels). NO compass / minimap / ticks -- the alternative to plot_ipsative_pca.
 
     P is countries x 2 already in the named-axis space (see value_axes.value_coords / iw_axes).
 
     Two ways to overlay AI (mutually exclusive):
-    - `models`: name -> (x, y[, x_se, y_se]) INDEPENDENT points (the WVS panel), each a bold red dot
-      with an optional 95% CI cross and a textalloc label.
+    - `models`: name -> (x, y[, x_se, y_se]) INDEPENDENT points (the WVS panel), each a family-coloured
+      star with an auto-placed label (CI lives in the companion table, not on the figure).
     - `steer`: {"base": (x, y, label), "pos": (...), "neg": (...)} ONE model's steer, drawn as a
       CONNECTED path (black base, red +c arm, blue -c arm) with directly-placed pole labels -- the
       same visual language as plot_ipsative_pca's trajectory, so the two map families read alike.
