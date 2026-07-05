@@ -163,12 +163,15 @@ def _map_annotations(P: np.ndarray, countries: list[str], zones_all: dict[str, l
     zone_of_c = {c: z for z, ms in zones.items() for c in ms}
     dot_cols = [ZONE_COLORS.get(zone_of_c.get(c), grey) for c in countries]
     cidx = {c: i for i, c in enumerate(countries)}
+    emph = emphasize or set()
     reps = set()
     for ms in zones.values():
+        if emph & set(ms):                          # zone already has a landmark labelled -> no rep
+            continue                                # (else e.g. Macau SAR reps East Asia next to Japan/China)
         mem = [c for c in ms if c in cidx]
         mp = P[[cidx[c] for c in mem]]
         reps.add(mem[int(np.argmin(np.hypot(*(mp - mp.mean(0)).T)))])
-    label_set = (emphasize or set()) | outlying_countries(P, countries, 4) | reps
+    label_set = emph | outlying_countries(P, countries, 4) | reps
     return zones, dot_cols, label_set
 
 
@@ -351,21 +354,9 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
                     anchor_pad=anchor_pad)
     _pole_signposts(ax, med_x, med_y, poles)
     ax.set_xticks([]); ax.set_yticks([]); ax.set_xlabel(""); ax.set_ylabel("")
-    if models:                                          # legend: one star swatch per lab family present
-        from matplotlib.lines import Line2D
-        fams, seen_f = [], set()
-        for k in mnames:                                # keep map order, dedupe to one entry per family
-            low = k.lower()
-            fam = next((f for f in MODEL_FAMILY_COLORS if f in low), None)
-            if fam and fam not in seen_f:
-                seen_f.add(fam)
-                fams.append((fam, MODEL_FAMILY_COLORS[fam]))
-        handles = [Line2D([], [], marker="*", linestyle="none", markerfacecolor=col,
-                          markeredgecolor="white", markersize=12, label=fam) for fam, col in fams]
-        handles.append(Line2D([], [], marker="o", linestyle="none", markerfacecolor="#8f8a80",
-                              markeredgecolor="white", markersize=8, label=f"{len(countries)} societies"))
-        ax.legend(handles=handles, loc="upper left", fontsize=8, frameon=False,
-                  borderaxespad=0.6, handletextpad=0.3, labelspacing=0.3, ncol=2).set_zorder(11)
+    # NO legend: each model family already has a directly-placed, family-coloured label on the map, so a
+    # swatch legend would just duplicate that ink (Tufte eraser test). Grey dots read as societies from
+    # the labelled examples (Sweden, Japan...); the count lives in the README caption.
     # Title + caption are OFF by default -- the README carries the headline + sources (nicer voice
     # there than baked jargon). Pass title/note only for a standalone figure.
     if title:
@@ -465,18 +456,21 @@ def compass(ax_main, L: np.ndarray, labels: list[str], title: str = "compass",
     cax = ax_main.inset_axes(list(box))
     cax.patch.set_facecolor("#faf8f2"); cax.patch.set_alpha(0.92)   # opaque: sits in the padded legend strip
     cax.add_patch(plt.Circle((0, 0), circle_r, fill=False, color="#bbbbbb", lw=0.7))
-    tx, ty, tips_x, tips_y = [], [], [], []
-    for j, lab in enumerate(labels):
-        x, y = L[j]
+    for x, y in L:
         cax.annotate("", xy=(x, y), xytext=(0, 0), arrowprops=dict(arrowstyle="->", color=color, lw=1.1))
-        r = np.hypot(x, y)
-        tx.append(x / r * (r + 0.07)); ty.append(y / r * (r + 0.07)); tips_x.append(x); tips_y.append(y)
     cax.set_xlim(-1.5, 1.5); cax.set_ylim(-1.5, 1.5)
-    import textalloc as ta                                      # textalloc spreads colliding tip labels
-    ta.allocate_text(ax_main.figure, cax, tx, ty, [l.capitalize() for l in labels],
-                     x_scatter=tips_x + [0], y_scatter=tips_y + [0], textsize=7.5,
-                     linecolor=color, linewidth=0.5, textcolor=color, draw_lines=True)
-    cax.set_aspect("equal"); cax.axis("off")
+    cax.set_aspect("equal")
+    # A compass is a RADIAL layout, not a map -- the general placer's 'nearest clear slot' fights the
+    # rose. Each factor name sits just beyond its own arrow tip, pushed straight OUT from the origin,
+    # with outward ha/va so long names lean away from the centre. -- authored by Claude
+    for (x, y), lab in zip(L, labels):
+        r = np.hypot(x, y) or 1.0
+        ux, uy = x / r, y / r
+        ha = "left" if ux > 0.25 else "right" if ux < -0.25 else "center"
+        va = "bottom" if uy > 0.25 else "top" if uy < -0.25 else "center"
+        cax.text(x + ux * 0.16, y + uy * 0.16, lab.capitalize(), fontsize=7, color=color,
+                 ha=ha, va=va, zorder=10)
+    cax.axis("off")
     cax.set_title(title, fontsize=10, fontweight="bold", color=color, pad=3)
 
 
@@ -561,32 +555,19 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
     # Same clean treatment as the WVS map (shared policy via _map_annotations): draw only the 4 zones
     # covering the most separate space, as edge-only hulls, and colour each dot by its drawn zone.
     sel_zones, dot_cols, label_set = _map_annotations(P, countries, zones, emphasize, C_HUM)
-    if sel_zones:
-        draw_zone_hulls(ax, P, countries, sel_zones)
+    zone_specs = draw_zone_hulls(ax, P, countries, sel_zones, label=False) if sel_zones else []
     ax.scatter(P[:, 0], P[:, 1], s=26, c=dot_cols, alpha=0.75, edgecolors="white", linewidths=0.5, zorder=3)
-    # Society labels: each name/ISO code is pinned RIGHT NEXT to its dot (small fixed offset, no
-    # leader line). A label is dropped if its box would collide with an already-placed one -- better an
-    # omitted code than one flung far from its point. `emphasize` countries are placed FIRST (so they
-    # win contested space) and drawn bold+dark, so the named outliers always survive the drop.
-    # Label only the landmarks (emphasize) + the 4 most-outlying + one representative (most-central
-    # member) per drawn zone -- the same de-clutter rule as the WVS map, so no map letters all N dots.
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
-    placed_boxes = []
+    # Labels go through labelplace.allocate_labels (the same placer as the WVS/value maps), so the
+    # ipsative map reads alike: zone names hug their hull, society codes sit adjacent to their dot with
+    # a short leader only when crowded, emphasize (landmark) countries are bold+dark. Collect the specs
+    # here; PLACE them after the crop below, so the pixel-space allocator sees the final axis window.
+    # Label only landmarks (emphasize) + 4 most-outlying + one central rep per drawn zone (de-clutter).
     emph = emphasize or set()
-    order_lr = [i for i in np.argsort(P[:, 0]) if countries[i] in label_set]   # leftmost wins contested space
-    order = [i for i in order_lr if countries[i] in emph] + [i for i in order_lr if countries[i] not in emph]
-    for i in order:
-        is_e = countries[i] in emph
-        t = ax.annotate(countries[i], (P[i, 0], P[i, 1]),
-                        fontsize=8.5 if is_e else 7, color="#111111" if is_e else "#555555",
-                        fontweight="bold" if is_e else "normal",
-                        xytext=(3, 2), textcoords="offset points", zorder=7 if is_e else 6)
-        bb = t.get_window_extent(renderer)
-        if any(bb.overlaps(b) for b in placed_boxes):
-            t.remove()
-        else:
-            placed_boxes.append(bb)
+    mk_specs = [(P[i, 0], P[i, 1], countries[i],
+                 "#111111" if countries[i] in emph else "#555555",
+                 "bold" if countries[i] in emph else "normal",
+                 8.5 if countries[i] in emph else 7.0, 5.0)     # (x,y,text,colour,weight,fontsize,pad)
+                for i in range(len(countries)) if countries[i] in label_set]
     for key, col, pt in [("base", C_BASE, pb), ("honest", C_HON, ph), ("dis", C_DIS, pf)]:
         if boots and key in boots and pt is not None:
             bp = (np.asarray(boots[key]) @ Pc - mu) @ Vt[:2].T
@@ -594,10 +575,10 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
             ax.errorbar(pt[0], pt[1], xerr=e1, yerr=e2, fmt="none", ecolor=col,
                         elinewidth=0.7, alpha=0.55, capsize=2.5, capthick=0.8, zorder=4)
     base_lab, pos_lab, neg_lab = labels
+    pt_specs = list(mk_specs)                              # (x,y,text,colour,weight,fontsize,pad); placed post-crop
     if pb is not None:
         ax.scatter(*pb, s=72, c=C_BASE, marker="o", edgecolors="white", linewidths=1.0, zorder=7)
-        ax.annotate(base_lab, pb, xytext=(9, -13), textcoords="offset points", fontsize=9,
-                    color=C_BASE, fontweight="bold", ha="left", va="center", zorder=8)
+        pt_specs.append((pb[0], pb[1], base_lab, C_BASE, "bold", 9.0, 8.0))
     traj_pts = None
     if traj:
         inco = traj_incoherent or set()
@@ -621,17 +602,13 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
                            linewidths=1.25, zorder=6)
                 if c == c_end:
                     lab = pos_lab if c > 0 else neg_lab
-                    dxy, ha = ((9, 9), "left") if c > 0 else ((-9, -1), "right")
-                    ax.annotate(lab, p, xytext=dxy, textcoords="offset points", fontsize=9,
-                                color=col, fontweight="bold", ha=ha, va="center", zorder=8)
+                    pt_specs.append((p[0], p[1], lab, col, "bold", 9.0, 8.0))
     else:
-        for pt, col, lab, dxy, ha in [(ph, C_HON, pos_lab, (9, 9), "left"),
-                                      (pf, C_DIS, neg_lab, (-9, -1), "right")]:
+        for pt, col, lab in [(ph, C_HON, pos_lab), (pf, C_DIS, neg_lab)]:
             if pt is None:
                 continue
             ax.scatter(*pt, s=42, c=col, marker="o", edgecolors="white", linewidths=1.0, zorder=7)
-            ax.annotate(lab, pt, xytext=dxy, textcoords="offset points", fontsize=9, color=col,
-                        fontweight="bold", ha=ha, va="center", zorder=8)
+            pt_specs.append((pt[0], pt[1], lab, col, "bold", 9.0, 8.0))
     # Crop to the SOCIETIES + steer anchors for EVERY instrument (the human cloud is far wider and would
     # bury them in a central blob; it stays a clipped backdrop). Then PAD THE BOTTOM to reserve a clean
     # strip for the legend insets -- deterministic placement, identical on every plot, no overlap with
@@ -650,6 +627,24 @@ def plot_ipsative_pca(instr: Instrument, dims: list[str], countries: list[str], 
         dview = (x0, x1, y0, y1); sy = y1 - y0
     ax.set_xlim(dview[0], dview[1])
     ax.set_ylim(dview[2] - PAD_B * sy, dview[3])
+    # ONE placement pass, now that the axis window is final (see labelplace.allocate_labels). Zone names
+    # are REGION labels hugging their hull; society codes + base/steer are MARKER labels. hard_pts = all
+    # society dots (+ steer anchors); soft_pts = hull edges (only zone names dodge them).
+    step = 0.02 * float(np.mean(P.max(0) - P.min(0)))
+    zone_perims = [densify_polygon(coords, step) for _, coords, _ in zone_specs]
+    soft_pts = np.vstack(zone_perims) if zone_perims else np.empty((0, 2))
+    steer_pts = [p for p in (pb, ph, pf) if p is not None] + ([traj_pts] if traj_pts is not None else [])
+    hard_pts = np.vstack([P] + [np.atleast_2d(p) for p in steer_pts]) if steer_pts else P
+    anchor_sets = zone_perims + [np.array([[s[0], s[1]]]) for s in pt_specs]
+    allocate_labels(
+        ax, anchor_sets,
+        [zn for zn, _, _ in zone_specs] + [s[2] for s in pt_specs],
+        [zc for _, _, zc in zone_specs] + [s[3] for s in pt_specs],
+        ["bold"] * len(zone_specs) + [s[4] for s in pt_specs], hard_pts, soft_pts=soft_pts,
+        region=[True] * len(zone_specs) + [False] * len(pt_specs),
+        fontsizes=[10.0] * len(zone_specs) + [s[5] for s in pt_specs],
+        styles=["italic"] * len(zone_specs) + ["normal"] * len(pt_specs),
+        anchor_pad=[3.0] * len(zone_specs) + [s[6] for s in pt_specs])
     # legend strip along the padded bottom: minimap bottom-right (it reads like a small map), compass
     # bottom-left. Both insets are opaque (set in compass()/_minimap) so the faint haze stays behind them.
     if cloud is not None:
@@ -883,7 +878,6 @@ def plot_range_zoom(instr: Instrument, dims: list[str], cs: list[float], prof: d
     """Zoomed companion: one subplot per factor with its OWN y-axis, so the steer (small vs the
     human spread) is legible. Societies near the steer named; off-range extremes in the corners.
     Returns the Figure."""
-    import textalloc as ta
     n = len(dims)
     ncol = min(3, n)
     nrow = (n + ncol - 1) // ncol
@@ -922,8 +916,10 @@ def plot_range_zoom(instr: Instrument, dims: list[str], cs: list[float], prof: d
         txt = [("c=0" if c == 0 else f"c={c:+g}") for c in cs] + list(named)
         dot_x = [xs] * len(cs) + (list(soc_x) if near else [])
         dot_y = list(map(float, yv)) + ([v for _, v in near] if near else [])
-        ta.allocate_text(fig, ax, tx, ty, txt, x_scatter=dot_x, y_scatter=dot_y,
-                         textsize=6.5, linecolor="#bbbbbb", linewidth=0.4, textcolor="#333333")
+        allocate_labels(ax, [np.array([[x, y]]) for x, y in zip(tx, ty)], txt,
+                        ["#333333"] * len(txt), ["normal"] * len(txt),
+                        np.column_stack([dot_x, dot_y]) if dot_x else np.empty((0, 2)),
+                        fontsize=6.5, anchor_pad=[4.0] * len(txt), linecolor="#bbbbbb", linewidth=0.4)
         mx_name, mx_val = max(soc, key=lambda t: t[1])
         mn_name, mn_val = min(soc, key=lambda t: t[1])
         if mx_val > yhi:

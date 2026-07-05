@@ -18,10 +18,8 @@ dependencies = [
 # numeric-only consumers (steering-lite) skip this. Install with `pip install tiny-mfv[maps]`.
 maps = [
     "matplotlib>=3.8",
-    "textalloc>=1.2.3",   # non-overlapping label placement on the maps
     "shapely>=2.0",       # union of per-country discs into one merged zone region
-    "adjusttext>=1.3",
-]
+]                          # label placement is in-repo (tinymfv.labelplace); no textalloc/adjustText dep
 # tinymfv.read_api (sampling readout for logprob-less API models) only. Install with
 # `pip install tiny-mfv[api]`. The local logprob reader (read.py) needs none of this.
 api = [
