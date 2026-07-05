@@ -122,31 +122,31 @@ The same run on blind PCA axes; the zones stay tangled here too.
 
 ---
 
-## Range plots
+## The steer, factor by factor
 
-A range plot takes one instrument factor by factor. The human societies are the grey strip, their
-median a black rule, and the steer is a directed sweep from -c (blue) to +c (red), so a small model
-move stays legible against the human spread.
-
-**Moral Foundations Questionnaire-2** -- the fairness and binding factors move most under the steer.
+*One instrument per plot: the human societies as a grey strip, their median a black rule, and the
+Authority steer as a sweep from -c (blue) to +c (red), so a small model move stays legible against
+the human spread.*
 
 ![MFQ-2 range plot: per-factor Authority steer vs human societies](showcase/mfq2/range.png)
 
-**Moral-foundation vignettes** -- authority and sanctity climb as the model is steered up.
+Moral Foundations Questionnaire-2. The fairness and binding factors move most under the steer.
 
 ![MFV range plot: per-foundation Authority steer vs human societies](showcase/mfv/range.png)
 
-**Big Five** -- personality factors barely budge; the steer is a values push, not a personality one.
+Moral-foundation vignettes. Authority and sanctity climb as the model is steered up.
 
 ![Big Five range plot: per-factor Authority steer vs human societies](showcase/big5/range.png)
 
-**Humour styles** -- flat, matching the tangled map above.
+Big Five. The personality factors barely budge; this is a values push, not a personality one.
 
 ![Humour Styles range plot: per-factor Authority steer vs human societies](showcase/humor_styles/range.png)
 
-**Cattell 16PF** -- the widest instrument, sixteen factors, shown for completeness.
+Humour styles. Flat, matching the tangled map above.
 
 ![16PF range plot: per-factor Authority steer vs human societies](showcase/16pf/range.png)
+
+Cattell's 16PF, the widest instrument at sixteen factors, shown for completeness.
 
 ---
 
