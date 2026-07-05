@@ -29,6 +29,19 @@ Runs in PIXEL space (measures real rendered text extents), so call it AFTER the 
 final limits and orientation -- e.g. after ax.invert_xaxis() -- otherwise the 'try every side'
 geometry is mirrored and every label drifts one way.
 
+Principles (Tufte, verified by reading each rendered PNG -- code/SVG alone can't judge a plot):
+  - Direct labels over legends: a swatch legend duplicating on-plot labels fails the eraser test; drop
+    it. Colour + a placed name carry the identity.
+  - A leader line is a FALLBACK, not decoration: draw one only when a label had to move far. A good
+    adjacent placement needs none, so most labels have no line.
+  - Nearest clear slot, not farthest empty space: labels hug their marker / hull so the eye pairs them
+    without tracing. (Maximising clearance sends a label fleeing to the void -- the opposite of what you
+    want.)
+  - Anisotropic spacing: text stacks tighter vertically than horizontally, so pull labels in more on y
+    than x. Keep a ~half-character gap from every obstacle for legibility.
+  - Collision test on the real box: promote polygon PATHS to sampled points (densify_polygon) so a wide
+    label box actually feels a hull edge it would cross, not just the corners.
+
 Adapted from textalloc (ckjellson/textalloc, MIT) and wassname's plotly placer
 (gist b0b34492cd1679f1daeb5892ef714dce). -- authored by Claude
 """
@@ -74,7 +87,7 @@ def allocate_labels(ax, anchor_sets: list[np.ndarray], texts: list[str], colors:
                     region: list[bool] | None = None, fontsize: float = 9.0,
                     fontsizes: list[float] | None = None, styles: list[str] | None = None,
                     anchor_pad: list[float] | None = None, gap_frac: float = 0.28,
-                    spacing_x: float = 0.5, spacing_y: float = 0.3,
+                    spacing_x: float = 0.4, spacing_y: float = 0.3,
                     stroke: float = 2.0, linecolor: str = "#9a958a", linewidth: float = 0.6):
     """Place N labels. See the module docstring for the model. Draws directly onto `ax`.
 
