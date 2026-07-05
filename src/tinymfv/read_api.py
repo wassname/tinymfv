@@ -161,7 +161,8 @@ def _rate_plan(items: list[dict], n_samples: int, per_call: int = 1) -> list[dic
 
 
 def read_items_rated(model: str, items: list[dict], *, n_samples: int = 12, temperature: float = 1.0,
-                     max_tokens: int = 512, concurrency: int = 8, verbose_first: bool = False) -> list[dict]:
+                     max_tokens: int = 512, concurrency: int = 8, req_timeout: float = 90.0,
+                     verbose_first: bool = False) -> list[dict]:
     """Dense Likert readout: per item, ask the model to rate EVERY option 1-5 as JSON, N times, and
     normalize the mean rating to a per-option distribution `p`. Higher signal per call than a single
     forced choice, and positional bias is controlled by permuting the PRESENTED order of BINARY items
@@ -181,7 +182,10 @@ def read_items_rated(model: str, items: list[dict], *, n_samples: int = 12, temp
             async with sem:
                 payload = {"model": model, "messages": [{"role": "user", "content": req["prompt"]}],
                            "temperature": temperature, "n": req["cnt"], "max_tokens": max_tokens}
-                data = await openrouter_request(payload)
+                # per-request wall-clock cap: one request stuck in the wrapper's stamina backoff (a
+                # rate-limited provider) must not stall the whole model's gather -- time it out and drop
+                # it as a failed sample (return_exceptions catches the TimeoutError) so the panel moves on.
+                data = await asyncio.wait_for(openrouter_request(payload), timeout=req_timeout)
                 return [(c["message"].get("content") or "") for c in data["choices"]]
         return await asyncio.gather(*(call(r) for r in plan), return_exceptions=True)
 
