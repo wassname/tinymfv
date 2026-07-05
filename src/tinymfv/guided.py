@@ -285,7 +285,6 @@ def _rollout_natural_or_forced(
                 # confident answer from garbage. Mark the row UNSCORABLE (pmass=NaN, lp=NaN),
                 # the same "do not compare" signal as case (c): the read is undefined, not zero
                 # coherence, so it drops from the nanmean and counts toward frac_unscorable.
-                # (Was torch.nan_to_num clamp to +-1e4: silent corruption.)
                 raw = step_scores[answer_pos][i].float()
                 if not torch.isfinite(raw).all():
                     slots[i].append({

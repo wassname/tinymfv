@@ -131,7 +131,9 @@ def _soft_nll(p_human: np.ndarray, p_model: np.ndarray) -> float:
     """Soft cross-entropy: -sum_f p_human[f] log p_model[f], in nats.
 
     Standard quantity for matching a predicted distribution to a soft-labelled
-    target. Unbounded; sensitive to confident-wrong rows.
+    target. Sensitive to confident-wrong rows, but p_model is floored at 1e-12
+    (~27.6 nats/row) so a single legit p=0 cell (an unsampled token from the
+    sampling reader, not a bug) can't send the aggregate mean to +inf.
     """
     p_model = np.clip(p_model, 1e-12, 1.0)
     return float(-(p_human * np.log(p_model)).sum())

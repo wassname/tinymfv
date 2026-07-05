@@ -1,9 +1,8 @@
 """Sampling readout for API models that do NOT expose token logprobs (OpenRouter / OpenAI-compatible).
 
-The frontier models on the Economist's WVS chart (GPT-5.4, Claude, Gemini, Grok) return no
-next-token distribution, so read.py's forced-slot logprob reader cannot touch them. This is the
-fallback the Economist itself used ("average of ten responses"): SAMPLE N chat completions at
-temperature and take the empirical answer frequency as the per-(item, frame) categorical `p`.
+Chat-completions-only API models return no next-token distribution, so read.py's forced-slot logprob
+reader cannot touch them. Fallback (the "average of N responses" approach): SAMPLE N chat completions
+at temperature and take the empirical answer frequency as the per-(item, frame) categorical `p`.
 
 Why this stays comparable to the logprob reader: temperature-1 sampling is an unbiased estimator of
 the model's softmax categorical, so the empirical `p` -> the true next-token `p` as N grows, and

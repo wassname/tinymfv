@@ -232,8 +232,12 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float,
 
 def _zscore(v: np.ndarray) -> np.ndarray:
     """Relative emphasis: centre and scale a profile across foundations, so a logit profile (model)
-    and a 1-5 wrongness profile (human cultures) are comparable by PATTERN regardless of units."""
-    return (v - v.mean()) / (v.std() + 1e-9)
+    and a 1-5 wrongness profile (human cultures) are comparable by PATTERN regardless of units. A
+    flat profile has no relative emphasis to show -- fail loud rather than divide by ~0 and draw a
+    degenerate all-zero map that looks valid."""
+    sd = v.std()
+    assert sd > 0, "flat profile (zero variance across foundations): relative-emphasis map is undefined"
+    return (v - v.mean()) / sd
 
 
 def read_human_mfv() -> tuple[list[str], dict[str, dict[str, float]]]:

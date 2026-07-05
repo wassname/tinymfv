@@ -169,8 +169,8 @@ def main() -> None:
                                               for k, v in cache.items()}
 
     def save_cache() -> None:
-        """Persist after EACH model so a killed run (session teardown) keeps finished models -- the
-        write-once-at-end version silently discarded every sampled model when interrupted."""
+        """Persist after EACH model so a killed run (session teardown) keeps every finished model
+        (kill-safe incremental write, not write-once-at-end)."""
         allc = json.loads(cpath.read_text()) if cpath.exists() else {}
         allc[sig] = {k: {s: p.tolist() for s, p in v.items()} for k, v in vecs.items()}
         cpath.write_text(json.dumps(allc))
