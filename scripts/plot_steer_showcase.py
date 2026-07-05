@@ -210,15 +210,18 @@ def plot_ordinal(run_dir: Path, out: Path, name: str, vec_label: str, C: float,
     plt.close(figm)
 
     # Alternative NAMED-AXIS value map (interpretable poles, no compass/minimap): project the
-    # societies + the AI base/steered points onto the instrument's two named value axes.
+    # societies + the AI base/steered points onto the instrument's two named value axes, and draw the
+    # steer as a CONNECTED base->+c/-c path (same visual language as the ipsative map's trajectory).
     from tinymfv.value_axes import VALUE_AXES, value_coords, axis_score
     if name in VALUE_AXES:
         Pval, poles = value_coords(Mfrac, dims, name)
         (_, _, xa), (_, _, ya) = VALUE_AXES[name]
-        ai = {lab: (axis_score(_frac(v, instr.scale_max), dims, xa),
-                    axis_score(_frac(v, instr.scale_max), dims, ya))
-              for lab, v in zip(labels, (base, pos, neg))}
-        figv = T.maps.plot_value_map(instr.display, countries, Pval, poles, models=ai, emphasize=emph,
+        def _vscore(v):
+            fv = _frac(v, instr.scale_max)
+            return axis_score(fv, dims, xa), axis_score(fv, dims, ya)
+        steer = {k: (*_vscore(v), lab) for k, v, lab in
+                 [("base", base, labels[0]), ("pos", pos, labels[1]), ("neg", neg, labels[2])]}
+        figv = T.maps.plot_value_map(instr.display, countries, Pval, poles, steer=steer, emphasize=emph,
                                      title=f"{instr.display}: value map, LLM steered for {vec_label}")
         paths.append(T.maps.save_both(figv, out / name, "map_value"))
         plt.close(figv)
@@ -242,7 +245,8 @@ def _zscore(v: np.ndarray) -> np.ndarray:
 
 def read_human_mfv() -> tuple[list[str], dict[str, dict[str, float]]]:
     """(countries, {country: {foundation: mean_1to5}}) from the bundled MFV human norms.
-    JimenezLeal2025 (LatAm) + Yamada2025 (MFV-J): 5 countries x 6 foundations (no Social Norms)."""
+    JimenezLeal2025 (LatAm) + Yamada2025 (MFV-J) + Hopp2024 (Dutch): 6 countries x 6 foundations
+    (no Social Norms)."""
     path = T.maps.DATA / "human" / "mfv_country_factors.csv"
     by_country: dict[str, dict[str, float]] = {}
     with open(path, newline="") as fh:

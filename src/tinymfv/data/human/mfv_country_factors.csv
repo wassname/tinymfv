@@ -29,3 +29,9 @@ Japan,fairness,3.818,0.531,564,0.0224,3.774,3.862,5,Yamada2025_MFV-J
 Japan,liberty,3.535,0.564,564,0.0237,3.488,3.581,5,Yamada2025_MFV-J
 Japan,loyalty,2.699,0.616,564,0.0259,2.648,2.749,5,Yamada2025_MFV-J
 Japan,sanctity,3.489,0.599,564,0.0252,3.44,3.539,5,Yamada2025_MFV-J
+Netherlands,authority,2.89,0.92,269,0.0561,2.78,3.0,5,Hopp2024_DutchMFV
+Netherlands,care,3.81,0.99,655,0.0387,3.73,3.89,5,Hopp2024_DutchMFV
+Netherlands,fairness,3.72,0.91,318,0.051,3.62,3.82,5,Hopp2024_DutchMFV
+Netherlands,liberty,3.94,0.89,304,0.051,3.84,4.04,5,Hopp2024_DutchMFV
+Netherlands,loyalty,2.68,1.09,345,0.0587,2.57,2.8,5,Hopp2024_DutchMFV
+Netherlands,sanctity,3.64,1.15,353,0.0612,3.52,3.76,5,Hopp2024_DutchMFV
