@@ -200,13 +200,12 @@ def draw_zone_hulls(ax, P: np.ndarray, countries: list[str], zones: dict[str, li
         zcol = ZONE_COLORS.get(zname, "#888888")
         ax.add_patch(MplPolygon(coords, closed=True, facecolor="none", edgecolor=zcol,
                                 lw=1.8, alpha=0.9, zorder=1.5))
-        anchor = pts.mean(0)                            # zone centroid: the leader ties the label here
         if label:
             top = coords[np.argmax(coords[:, 1])]       # ipsative maps draw it at the hull top vertex
             ax.text(top[0], top[1], zname, fontsize=10, color=zcol, ha="center", va="bottom",
                     style="italic", fontweight="bold", zorder=5,
                     path_effects=[pe.withStroke(linewidth=3.0, foreground="white")])
-        specs.append((zname, (float(anchor[0]), float(anchor[1])), zcol))
+        specs.append((zname, coords, zcol))
     return specs
 
 
@@ -258,26 +257,22 @@ def model_family_color(name: str) -> str:
     return MODEL_RED
 
 
-def _open_slot(anchor: tuple[float, float], obstacles: list[tuple[float, float]],
-               xlim: tuple[float, float], ylim: tuple[float, float], span: np.ndarray,
-               radii=(0.08, 0.14, 0.22, 0.32, 0.44)) -> tuple[float, float]:
-    """A label position in the emptiest nearby space: scan a ring of candidate offsets (fractions of
-    the data span) around `anchor` and keep the one whose NEAREST obstacle (a dot or an already-placed
-    label) is farthest, with a mild penalty for straying from the anchor. Distances are normalised by
-    the data span so x/y crowding weigh equally. Used for the few big zone labels, which adjustText's
-    local force-relaxation otherwise parks in a crowded local minimum."""
-    ax0, ay0 = anchor
-    best, best_score = (ax0, ay0), -np.inf
-    for r in radii:
-        for deg in range(0, 360, 20):
-            a = np.radians(deg)
-            x, y = ax0 + r * span[0] * np.cos(a), ay0 + r * span[1] * np.sin(a)
-            if not (xlim[0] < x < xlim[1] and ylim[0] < y < ylim[1]):
-                continue
-            dmin = min(np.hypot((x - ox) / span[0], (y - oy) / span[1]) for ox, oy in obstacles)
-            score = dmin - 0.35 * r                      # prefer open space; mild pull toward the anchor
-            if score > best_score:
-                best_score, best = score, (x, y)
+def _hull_label_pos(coords: np.ndarray, center: np.ndarray, obstacles: list[tuple[float, float]],
+                    span: np.ndarray, out: float = 0.018) -> tuple[float, float]:
+    """Place a zone label directly ON its hull's boundary, hugging the emptiest arc -- NO leader line. A
+    convex hull has plenty of perimeter, so rather than fling the label into open space with an arrow,
+    walk its boundary vertices, nudge each slightly OUTWARD (away from the plot centre so the text sits
+    just outside the edge), and keep the one whose NEAREST dot/label is farthest (distances normalised
+    by the data span so x/y crowding weigh equally). The label lands against an uncrowded stretch of
+    its own outline."""
+    best, best_score = tuple(coords[0]), -np.inf
+    for vx, vy in coords:
+        dn = np.array([(vx - center[0]) / span[0], (vy - center[1]) / span[1]])
+        u = dn / (np.hypot(*dn) or 1.0)                  # outward unit vector (normalised space)
+        cx, cy = vx + out * u[0] * span[0], vy + out * u[1] * span[1]
+        dmin = min(np.hypot((cx - ox) / span[0], (cy - oy) / span[1]) for ox, oy in obstacles)
+        if dmin > best_score:
+            best_score, best = dmin, (cx, cy)
     return best
 
 
@@ -285,7 +280,8 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
                    poles: tuple[str, str, str, str], *, models: dict[str, tuple[float, float]] | None = None,
                    model_labels: dict[str, str] | None = None,
                    steer: dict[str, tuple[float, float, str]] | None = None,
-                   emphasize: set[str] | None = None, title: str | None = None, note: str | None = None):
+                   emphasize: set[str] | None = None, invert_x: bool = False,
+                   title: str | None = None, note: str | None = None):
     """The interpretable "4-value map": two NAMED axes with four pole signposts through the human
     MEDIAN crosshair, Economist-style zone hulls (the 4 most-separate zones), zone-coloured dots, and
     textalloc labels (landmarks + corner outliers + one representative per zone + any models). NO
@@ -351,24 +347,24 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
         obs_x.append(bx); obs_y.append(by)
 
     ax.margins(0.13)
-    fig.canvas.draw()
-    xlim, ylim = ax.get_xlim(), ax.get_ylim()
     span = P.max(0) - P.min(0)
+    center = P.mean(0)
     obs_pts = list(zip(obs_x, obs_y))
     zone_texts, zplaced = [], []
-    for zn, (zx, zy), zc in zone_specs:                 # big zone labels -> emptiest slot, leader to hull
-        lx, ly = _open_slot((zx, zy), obs_pts + zplaced, xlim, ylim, span)
+    for zn, coords, zc in zone_specs:                   # label hugs the emptiest arc of its OWN hull edge
+        lx, ly = _hull_label_pos(coords, center, obs_pts + zplaced, span)
         zplaced.append((lx, ly))
-        zone_texts.append(ax.annotate(
-            zn, xy=(zx, zy), xytext=(lx, ly), color=zc, fontsize=10, fontweight="bold", fontstyle="italic",
-            ha="center", va="center", zorder=9, arrowprops=dict(arrowstyle="-", color=zc, lw=0.7, alpha=0.6),
-            path_effects=[pe.withStroke(linewidth=2.5, foreground="white")]))
+        zone_texts.append(ax.text(lx, ly, zn, color=zc, fontsize=10, fontweight="bold", fontstyle="italic",
+                                  ha="center", va="center", zorder=9,
+                                  path_effects=[pe.withStroke(linewidth=3.0, foreground="white")]))
     texts = [ax.text(x, y, t, color=c, fontsize=fs, fontweight=fw, fontstyle=st, ha="center",
                      va="center", zorder=9, path_effects=[pe.withStroke(linewidth=2.5, foreground="white")])
              for x, y, t, c, fw, st, fs in lab_specs]
     adjust_text(texts, x=obs_x, y=obs_y, ax=ax, objects=zone_texts, expand=(1.15, 1.4),
                 arrowprops=dict(arrowstyle="-", color="#aaa", lw=0.6))
     _pole_signposts(ax, med_x, med_y, poles)
+    if invert_x:                                        # e.g. put Self-expression on the LEFT
+        ax.invert_xaxis()
     ax.set_xticks([]); ax.set_yticks([]); ax.set_xlabel(""); ax.set_ylabel("")
     if models:                                          # legend: one star swatch per lab family present
         from matplotlib.lines import Line2D

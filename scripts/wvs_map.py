@@ -298,10 +298,13 @@ def main() -> None:
     def _ver(k: str) -> list[float]:
         return [float(n) for n in re.findall(r"\d+(?:\.\d+)?", k)]
     model_labels = {max(ks, key=_ver): max(ks, key=_ver).replace("claude-", "") for ks in fams.values()}
+    # Flip X so Self-expression is on the LEFT and Survival on the RIGHT (invert_x). We are building a
+    # better map than the Economist's, not xeroxing it, and this puts the cultural "West" on the left.
+    # poles are (x_left, x_right, y_bottom, y_top) as DRAWN, so the x pair is swapped to match.
     fig = maps.plot_value_map(
         "WVS Inglehart-Welzel", countries, P,
-        ("Survival", "Self-expression", "Traditional", "Secular-Rational"),
-        models=plot_models, model_labels=model_labels, emphasize=emph)
+        ("Self-expression", "Survival", "Traditional", "Secular-Rational"),
+        models=plot_models, model_labels=model_labels, emphasize=emph, invert_x=True)
     fig.savefig(args.out, dpi=200, bbox_inches="tight")
     logger.info(f"wrote {args.out}")
 
