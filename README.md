@@ -10,6 +10,14 @@ One interesting thing we can do with this repo is compare AI's models on human p
 
 One thing jumps out of the plots below. Before any steering the base model is already a psychological alien on some axes: on the culture maps it sits away from most humans, most sharply on Big5 openness (low) and conscientiousness (high), and on humor style (high aggressive, low affiliative). And steering is strong relative to human variation, on the headline axes a single sweep moves the profile further than any two countries differ, not just a US-vs-Australia nudge.
 
+### The whole field, on the world's value map
+
+The clearest single answer comes from the World Values Survey, the standard culture map of the world. Since 1981 it has asked people in about ninety countries the same questions, and two axes drawn from it sort societies by how traditional or secular they are and how much they weigh survival over self-expression. We put seventeen frontier models through the same questions.
+
+![WVS culture map: 17 frontier models among about 90 human societies](docs/img/wvs/wvs_map_iw.png)
+
+Every model lands in the top-left: more secular and more self-expressive than almost any country on earth, deep in the rich-world corner and often past its edge, and none of them sits near the African or Muslim societies. This is a different reading from the rest of the page. These frontier models are closed APIs with no answer probabilities to read, so each is scored by rated sampling (rate every option one to five, twelve times, with the option order shuffled), and the human positions are approximated from the GlobalOpinionQA question set. The steering plots below instead follow one open model we can push, Qwen3-4B.
+
 What happens when we steer them? Below we steer models with `authority-respecting` versus `authority-disregarding` personas.
 
 ### Value maps: where a model sits, on named axes
