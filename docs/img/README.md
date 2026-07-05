@@ -74,16 +74,17 @@ split (Graham, Haidt & Nosek 2009). Read by logprobs, N=8.</sub>
 
 *The namesake instrument: a moral foundation read straight from short vignettes*
 
-![MFV ipsative PCA culture map with Authority steering path](showcase/mfv/map_pca_ipsative.png)
+MFV has no culture map. Its country norms fail cross-country measurement invariance
+([Jimenez-Leal et al. 2025](https://doi.org/10.1525/collabra.128178): non-invariance + DIF, "cross-cultural
+comparisons with this tool are restricted") and are stitched from five studies with different samples and
+scales, so any map over them draws false cultural structure. MFV therefore appears only as a range plot
+(below), against a single pooled human reference rather than a per-country spread. The trustworthy signal
+is the model: it emphasises Authority far more than the pooled human reference, and the steer pushes it
+further still.
 
-MFV scores a foundation from a moral vignette rather than a survey item, so its map is the blind
-ipsative (relative-emphasis) PCA only. PC1 separates liberty and care from sanctity and fairness; the
-Authority steer pushes the model down and to the right, toward the binding foundations. A named-axis
-quadrant map is still pending here, because the readout lives in z-scored emphasis space, not the 0-1
-endorsement the other quadrant maps assume.
-
-<sub>Sources: MFV (Clifford et al. 2015; human norms per the bundled CSV provenance). Read by logprobs,
-N=8.</sub>
+<sub>Sources: MFV (Clifford et al. 2015); country norms Jimenez-Leal 2025, Marques 2020, Hopp 2024, Yamada
+2025, Crone 2021, used pooled only (see `src/tinymfv/data/human/MFV_country_norms_NOTE.md`). Read by
+logprobs, N=8.</sub>
 
 ### Big Five
 
@@ -134,9 +135,9 @@ the human spread.*
 
 Moral Foundations Questionnaire-2. The fairness and binding factors move most under the steer.
 
-![MFV range plot: per-foundation Authority steer vs human societies](showcase/mfv/range.png)
+![MFV range plot: per-foundation Authority steer vs a pooled human reference](showcase/mfv/range.png)
 
-Moral-foundation vignettes. Authority and sanctity climb as the model is steered up.
+Moral-foundation vignettes. Authority and sanctity climb as the model is steered up. The grey dot is a single pooled human reference (not a per-country spread), because MFV country norms are not comparable across societies.
 
 ![Big Five range plot: per-factor Authority steer vs human societies](showcase/big5/range.png)
 

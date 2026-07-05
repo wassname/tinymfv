@@ -42,7 +42,7 @@ A range plot takes an instrument one factor at a time: the spread of human socie
 
 ![MFV range plot: foundation emphasis beside Authority steering](docs/img/showcase/mfv/range.png)
 
-MFV (moral-foundation vignettes, the repo's namesake) hands the model a short story about someone breaking a moral rule and asks which kind of wrong it is: cruelty, cheating, betrayal, defiance of authority, or defiling the sacred. Pushed toward Authority, the model does just what you would hope, it calls out the authority violations far more often and the others less. The move is large: about as wide as the gap between the least and the most authority-minded societies on earth, not a nudge.
+MFV (moral-foundation vignettes, the repo's namesake) hands the model a short story about someone breaking a moral rule and asks which kind of wrong it is: cruelty, cheating, betrayal, defiance of authority, or defiling the sacred. Pushed toward Authority, the model does what steering should: it flags the authority violations far more often and the others less. The grey dot per foundation is a pooled human reference; the base model already leans on authority well above it, and the steer pushes it further still. That human dot is pooled on purpose: MFV country norms fail cross-country measurement invariance ([Jimenez-Leal et al. 2025](https://doi.org/10.1525/collabra.128178)) and are stitched from five different studies, so MFV gets no culture map here, only this range against one pooled reference (details in [`src/tinymfv/data/human/MFV_country_norms_NOTE.md`](src/tinymfv/data/human/MFV_country_norms_NOTE.md)).
 
 ![MFQ-2 range plot: human society ranges beside Authority steering](docs/img/showcase/mfq2/range.png)
 
@@ -54,9 +54,7 @@ The surveys echo their maps: MFQ-2's binding factors climb under the steer, whil
 
 ### Maps with data-picked axes
 
-When a survey has no ready-made named axes (MFV), or just as a cross-check on the value maps, we let the data pick the axes instead: find the two directions along which human societies differ most, and place the model in them. A small compass shows which traits each axis is built from, and an inset shows where the zoomed-in frame sits within the full crowd of human respondents.
-
-![MFV culture map: Authority steering against human countries](docs/img/showcase/mfv/map_pca_ipsative.png)
+As a cross-check on the value maps, we let the data pick the axes instead: find the two directions along which human societies differ most, and place the model in them. A small compass shows which traits each axis is built from, and an inset shows where the zoomed-in frame sits within the full crowd of human respondents. (MFV has no map here: its country norms are not comparable across societies, so it stays a range plot against a pooled reference.)
 
 ![MFQ-2 culture map: Authority steering against human societies](docs/img/showcase/mfq2/map_pca_ipsative.png)
 

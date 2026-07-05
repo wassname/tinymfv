@@ -31,12 +31,10 @@ VALUE_AXES: dict[str, tuple] = {
           ("loyalty", 1), ("authority", 1), ("purity", 1)]),
         ("Equality", "Proportionality", [("equality", -1), ("proportionality", 1)]),
     ),
-    "mfv": (
-        ("Individualizing", "Binding",
-         [("care", -1), ("fairness", -1), ("liberty", -1),
-          ("authority", 1), ("loyalty", 1), ("sanctity", 1)]),
-        ("Liberty", "Authority", [("liberty", -1), ("authority", 1)]),
-    ),
+    # NB: no "mfv" here. The MFV named-axis quadrant was removed: MFV country norms fail cross-country
+    # measurement invariance (Jimenez-Leal et al. 2025, doi 10.1525/collabra.128178 -- non-invariance +
+    # DIF, "cross-cultural comparisons with this tool are restricted"), so a cultures map over them
+    # misleads. MFV keeps only the range plot vs a pooled human reference. See RESEARCH_JOURNAL.md.
     "big5": (
         # DeYoung's meta-traits are unipolar, but name BOTH ends so every axis reads as a contrast
         # (like the others): low Plasticity = reserved/conventional; low Stability = volatile.

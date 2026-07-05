@@ -297,29 +297,22 @@ _MFV_INSTR = SimpleNamespace(name="mfv", display="MFV vignettes")
 _MFV_YLABEL = "relative emphasis  (z across foundations)"
 
 
-def plot_mfv_map(run_dir: Path, out: Path, vec_label: str, C: float, coh_cs: list[float]) -> Path:
-    """MFV ipsative culture map via the SAME plot_ipsative_pca the ordinal instruments use, in the
-    z-scored relative-emphasis space (logit-violation and 1-5 wrongness cannot share a raw axis).
-    Red/blue endpoint points show where the steer moves the AI among human cultures."""
-    founds, countries, M, prof, _pmass = _mfv_zspace(run_dir)
-    pos_c = max(c for c in coh_cs if c > 0.0)
-    neg_c = min(c for c in coh_cs if c < 0.0)
-    labels = ("base (c=0)", f"c={pos_c:+g}", f"c={neg_c:+g}")
-    traj = {c: prof[c] for c in coh_cs}
-    zones, emph = zones_for(countries)                 # MFV: 8 country dots, no cloud
-    fig = T.maps.plot_ipsative_pca(_MFV_INSTR, founds, countries, M, prof[0.0], prof[pos_c], prof[neg_c],
-                                   traj=traj, emphasize=emph, zones=zones, labels=labels)
-    fig.axes[0].set_title(f"MFV vignettes: humans vs LLMs steered for {vec_label}", fontsize=10)
-    path = T.maps.save_both(fig, out / "mfv", "map_pca_ipsative")
-    plt.close(fig)
-    return path
+# NB: MFV has NO 2D culture map. The per-country MFV norms fail cross-country measurement invariance
+# (Jimenez-Leal et al. 2025, doi 10.1525/collabra.128178: non-invariance + uniform DIF, "cross-cultural
+# comparisons with this tool are restricted"), and they are stitched from 5 studies with different
+# samples/scales/translations (see RESEARCH_JOURNAL.md 2026-07-05). A PCA/quadrant over them draws
+# confident-but-false cultural structure (it even inverts West vs Latin America). So MFV keeps only the
+# range plot, and against a POOLED human reference (no per-country identity), not a cultural spread.
 
 
 def plot_mfv_range(run_dir: Path, out: Path, vec_label: str, C: float, coh_cs: list[float]) -> Path:
-    """MFV range via the SAME plot_range the ordinal instruments use, in z relative-emphasis space."""
+    """MFV range vs a single POOLED human reference per foundation (mean of the 8 z-scored samples).
+    We deliberately do NOT plot the per-country spread: it is not comparable across the source studies
+    (see the note above). The pooled mean carries only the robust aggregate pattern (care/fairness
+    emphasised, loyalty least) that replicates across MFV validations. -- authored by Claude"""
     founds, countries, M, prof, _pmass = _mfv_zspace(run_dir)
-    humans = {f: sorted(((countries[ci], float(M[ci, fi])) for ci in range(len(countries))), key=lambda t: t[1])
-              for fi, f in enumerate(founds)}
+    pooled = M.mean(axis=0)                             # one z-profile: the pooled human reference
+    humans = {f: [("", float(pooled[fi]))] for fi, f in enumerate(founds)}   # empty label = no country id
     fig = T.maps.plot_range(_MFV_INSTR, founds, coh_cs, {c: prof[c] for c in coh_cs},
                             humans, None, vec_label, ylabel=_MFV_YLABEL)
     path = T.maps.save_both(fig, out / "mfv", "range")
@@ -356,8 +349,7 @@ def main() -> None:
     for name in ordinal_names:
         written += [str(p) for p in plot_ordinal(args.run_dir, args.out, name, vec_label, C, coh_cs)]
     if (args.run_dir / "mfv_profiles.csv").exists():
-        written.append(str(plot_mfv_map(args.run_dir, args.out, vec_label, C, coh_cs)))    # shared ipsative map (z-space)
-        written.append(str(plot_mfv_range(args.run_dir, args.out, vec_label, C, coh_cs)))  # shared range (z-space)
+        written.append(str(plot_mfv_range(args.run_dir, args.out, vec_label, C, coh_cs)))  # range vs pooled human ref (NO culture map -- see note above plot_mfv_range)
     print(f"wrote {len(written)} figures under {args.out}:")
     for w in written:
         print(" ", w)
