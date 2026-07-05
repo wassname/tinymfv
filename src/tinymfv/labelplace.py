@@ -87,7 +87,7 @@ def allocate_labels(ax, anchor_sets: list[np.ndarray], texts: list[str], colors:
                     region: list[bool] | None = None, fontsize: float = 9.0,
                     fontsizes: list[float] | None = None, styles: list[str] | None = None,
                     anchor_pad: list[float] | None = None, gap_frac: float = 0.28,
-                    spacing_x: float = 0.4, spacing_y: float = 0.3,
+                    spacing_x: float = 0.4, spacing_y: float = 0.3, edge_pad: float = 4.0,
                     stroke: float = 2.0, linecolor: str = "#9a958a", linewidth: float = 0.6):
     """Place N labels. See the module docstring for the model. Draws directly onto `ax`.
 
@@ -142,8 +142,9 @@ def allocate_labels(ax, anchor_sets: list[np.ndarray], texts: list[str], colors:
                     cx, cy = ax0 + ux * (rx + w_i / 2), ay0 + uy * (ry + h_i / 2)
                     box = (cx - w_i / 2 - gap, cy - h_i / 2 - gap, cx + w_i / 2 + gap, cy + h_i / 2 + gap)
                     pen = 0.0
-                    if box[0] < abox.x0 or box[2] > abox.x1 or box[1] < abox.y0 or box[3] > abox.y1:
-                        pen += 1000.0                        # off-canvas: last resort
+                    if (box[0] < abox.x0 + edge_pad or box[2] > abox.x1 - edge_pad or
+                            box[1] < abox.y0 + edge_pad or box[3] > abox.y1 - edge_pad):
+                        pen += 1000.0                        # off-canvas / flush-to-frame: last resort
                     inside, clear = _box_metrics(box, obstacles)
                     pen += 50.0 * inside
                     for pb in placed:                        # overlap area with settled labels

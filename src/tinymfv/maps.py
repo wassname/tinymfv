@@ -329,8 +329,8 @@ def plot_value_map(display: str, countries: list[str], P: np.ndarray,
         lab_specs.append((bx, by, blab, C_BASE, "bold", 8.0))
         obs_x.append(bx); obs_y.append(by)
 
-    ax.margins(0.13)
-    if invert_x:                                         # e.g. Self-expression on the LEFT. Flip BEFORE
+    ax.margins(0.17)                                     # roomy edges: the pole signposts sit in the inner
+    if invert_x:                                          # margin and edge labels (Serbia, Adaptive) need to fit; e.g. Self-expression on the LEFT. Flip BEFORE
         ax.invert_xaxis()                                # placement so the pixel-space allocator sees the
     ax.autoscale(False)                                  # final orientation (else every label mirrors left).
     # ONE placement pass for everything (see labelplace.allocate_labels). Each zone name is a REGION
