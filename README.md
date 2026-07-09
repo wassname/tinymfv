@@ -1,6 +1,6 @@
-# tinymfv: moral and value maps for LLMs
+# moralmaps: moral and value maps for LLMs
 
-tinymfv is a small set of fast value evals for LLM steering work. It asks survey questions and moral vignettes, reads answer-token probabilities (or rated samples, for API models without logprobs), and turns them into model profiles that you can compare to humans.
+moralmaps is a small set of fast value evals for LLM steering work. It asks survey questions and moral vignettes, reads answer-token probabilities (or rated samples, for API models without logprobs), and turns them into model profiles that you can compare to humans.
 
 When comparing models or checkpoints you can use it to check three things: did the intended value move?, what else moved?, how does this compare to human responses? The evals are quick and sensitive enough to show probability shifts.
 
@@ -18,13 +18,18 @@ Start with the World Values Survey, the standard culture map of the world. Since
 
 ![WVS culture map: 17 frontier models among about 90 human societies](docs/img/wvs/wvs_map_iw.png)
 
-Every model sits in the top-left: more secular and more self-expressive than almost any country on earth, deep in the rich-world corner and often past its edge, and none of them sits near the African or Muslim societies. This map is measured differently from everything else on the page. These frontier models are closed APIs with no answer probabilities to read, so each is scored by rated sampling (rate every option one to five, twelve times, with the option order shuffled; `scripts/wvs_map.py`), and the human positions are approximated from the GlobalOpinionQA question set (axis construction in `src/tinymfv/iw_axes.py`). The steering plots below instead follow one open model we can push, Qwen3-4B.
+Every model sits in the top-left: more secular and more self-expressive than almost any country on earth, deep in the rich-world corner and often past its edge, and none of them sits near the African or Muslim societies. This map is measured differently from everything else on the page. These frontier models are closed APIs with no answer probabilities to read, so each is scored by rated sampling (rate every option one to five, twelve times, with the option order shuffled; `scripts/wvs_map.py`), and the human positions are approximated from the GlobalOpinionQA question set (axis construction in `src/moralmaps/iw_axes.py`). The steering plots below instead follow one open model we can push, Qwen3-4B.
 
 What happens when we steer them? Below we steer models with `authority-respecting` versus `authority-disregarding` personas.
 
+## Can we steer models toward human values?
+
+Model's ahve generally been trained to follow the instructions of the company that made them, and the user. This make them most deferential to authority than most human cultures. Can we steer them away from that, toward a more human-like balance of values? The plots below show a draft experiment with a tiny model.
+
 ### Value maps: where a model sits, on named axes
 
-The nicest plots are the value ("quadrant") map. Each has two named axes borrowed from the psychology that built the survey, the human societies drawn as cultural regions, and the model as a black dot with a coloured path showing where steering takes it. Steering here is activation steering, not prompting: a vector built by [steering-lite](https://github.com/wassname/steering-lite) from contrastive persona pairs and added to the model's hidden state at inference, toward the authority-respecting side (red, more Authority) or away from it (blue, less), without retraining. Every map keeps one orientation, the cultural West to the west and the global South to the south, so they all read the same way.
+Below are the ("quadrant") maps. Each has two named axes borrowed from psychology papers build of the survey, the human societies are drawn as cultural regions, and the model as a black dot with a coloured path showing where steering takes it. Steering here is activation steering, not prompting: a vector built by [steering-lite](https://github.com/wassname/steering-lite) from contrastive persona pairs and added to the model's hidden state at inference, toward the authority-respecting side (red, more Authority) or away from it (blue, less), without retraining. Every map keeps one orientation, the cultural West to the west and the global South to the south, so they all read the same way.
+
 
 ![MFQ-2 value map: individual-first vs group-first morality, with the Authority steer path](docs/img/showcase/mfq2/map_value.png)
 
@@ -44,7 +49,7 @@ A range plot takes one survey at a time, factor by factor: the spread of human s
 
 ![MFV range plot: foundation emphasis beside Authority steering](docs/img/showcase/mfv/range.png)
 
-MFV (moral-foundation vignettes, the repo's namesake) hands the model a short story about someone breaking a moral rule and asks which kind of wrong it is: cruelty, cheating, betrayal, defiance of authority, or defiling the sacred. Pushed toward Authority, the model does what steering should: it flags the authority violations far more often and the others less. The grey dot per foundation is a pooled human reference; the base model already flags authority violations well above the pooled human rate, and the steer pushes it further still. That human dot is pooled on purpose: MFV country norms fail cross-country measurement invariance ([Jimenez-Leal et al. 2025](https://doi.org/10.1525/collabra.128178)) and are stitched from five different studies, so MFV gets no culture map here, only this range against one pooled reference (details in [`src/tinymfv/data/human/MFV_country_norms_NOTE.md`](src/tinymfv/data/human/MFV_country_norms_NOTE.md)).
+MFV (moral-foundation vignettes, the repo's namesake) hands the model a short story about someone breaking a moral rule and asks which kind of wrong it is: cruelty, cheating, betrayal, defiance of authority, or defiling the sacred. Pushed toward Authority, the model does what steering should: it flags the authority violations far more often and the others less. The grey dot per foundation is a pooled human reference; the base model already flags authority violations well above the pooled human rate, and the steer pushes it further still. That human dot is pooled on purpose: MFV country norms fail cross-country measurement invariance ([Jimenez-Leal et al. 2025](https://doi.org/10.1525/collabra.128178)) and are stitched from five different studies, so MFV gets no culture map here, only this range against one pooled reference (details in [`src/moralmaps/data/human/MFV_country_norms_NOTE.md`](src/moralmaps/data/human/MFV_country_norms_NOTE.md)).
 
 ![MFQ-2 range plot: human society ranges beside Authority steering](docs/img/showcase/mfq2/range.png)
 
@@ -54,35 +59,23 @@ MFV (moral-foundation vignettes, the repo's namesake) hands the model a short st
 
 The surveys echo their maps: MFQ-2's binding foundations (loyalty, authority, purity) climb under the steer, while Big Five and humor stay flat.
 
-### Maps with data-picked axes
-
-As a cross-check on the value maps, we let the data pick the axes instead: find the two directions along which human societies differ most, and place the model in them. A small compass shows which traits each axis is built from, and an inset shows where the zoomed-in frame sits within the full crowd of human respondents. (MFV has no map here: its country norms are not comparable across societies, so it stays a range plot against a pooled reference.)
-
-![MFQ-2 culture map: Authority steering against human societies](docs/img/showcase/mfq2/map_pca_ipsative.png)
-
-![Big Five culture map: Authority steering against human societies](docs/img/showcase/big5/map_pca_ipsative.png)
-
-![Humor Styles culture map: Authority steering against human societies](docs/img/showcase/humor_styles/map_pca_ipsative.png)
-
-
-
 ## Install
 
 ```bash
-uv pip install git+https://github.com/wassname/tinymfv
+uv pip install git+https://github.com/wassname/moral-maps
 ```
 
 For maps:
 
 ```bash
-uv pip install "tiny-mfv[maps] @ git+https://github.com/wassname/tinymfv"
+uv pip install "moral-maps[maps] @ git+https://github.com/wassname/moral-maps"
 ```
 
 For repo development:
 
 ```bash
-git clone https://github.com/wassname/tinymfv
-cd tinymfv
+git clone https://github.com/wassname/moral-maps
+cd moral-maps
 uv sync --extra maps --dev
 just smoke
 ```
@@ -91,18 +84,18 @@ just smoke
 
 | dataset | bundled data | human reference | profile used in plots |
 |---|---|---|---|
-| WVS (Inglehart-Welzel axes) | items resolved at runtime from [GlobalOpinionQA](https://huggingface.co/datasets/Anthropic/llm_global_opinions); axis battery in [`src/tinymfv/iw_axes.py`](src/tinymfv/iw_axes.py) | per-country answer distributions in the same dataset | mean positiveness (0-1) per axis |
-| MFV classic | [132 moral vignettes, other](src/tinymfv/data/vignettes_classic_other_violate.jsonl) / [self](src/tinymfv/data/vignettes_classic_self_violate.jsonl) | per-vignette human foundation labels in the JSONL | forced-choice foundation probability profile |
-| MFV scifi | [same items rewritten as sci-fi, other](src/tinymfv/data/vignettes_scifi_other_violate.jsonl) / [self](src/tinymfv/data/vignettes_scifi_self_violate.jsonl) | inherited labels from classic MFV | forced-choice foundation probability profile |
-| MFV ai-actor | [same items rewritten with an AI actor, other](src/tinymfv/data/vignettes_ai-actor_other_violate.jsonl) / [self](src/tinymfv/data/vignettes_ai-actor_self_violate.jsonl) | inherited labels from classic MFV | forced-choice foundation probability profile |
-| MFQ-2 | [36 items](src/tinymfv/data/surveys/mfq2/forward.json), plus inverted and negated frames | [country means](src/tinymfv/data/human/mfq2_country_foundations.csv), plus [raw respondents](src/tinymfv/data/atari_study2_raw.csv) | expected 1-5 score per foundation |
-| Big Five | [50 items](src/tinymfv/data/surveys/big5/questionnaire.json), plus inverted and negated frames | [country means](src/tinymfv/data/human/big5_country_factors.csv) | expected 1-5 score per trait |
-| 16PF | [162 items](src/tinymfv/data/surveys/16pf/questionnaire.json), plus inverted and negated frames | [country means](src/tinymfv/data/human/16pf_country_factors.csv) | expected 1-5 score per factor |
-| Humor Styles | [32 items](src/tinymfv/data/surveys/humor_styles/questionnaire.json), plus inverted and negated frames | [country means](src/tinymfv/data/human/humor_styles_country_factors.csv), originally 1-7 | expected 1-5 score per style |
+| WVS (Inglehart-Welzel axes) | items resolved at runtime from [GlobalOpinionQA](https://huggingface.co/datasets/Anthropic/llm_global_opinions); axis battery in [`src/moralmaps/iw_axes.py`](src/moralmaps/iw_axes.py) | per-country answer distributions in the same dataset | mean positiveness (0-1) per axis |
+| MFV classic | [132 moral vignettes, other](src/moralmaps/data/vignettes_classic_other_violate.jsonl) / [self](src/moralmaps/data/vignettes_classic_self_violate.jsonl) | per-vignette human foundation labels in the JSONL | forced-choice foundation probability profile |
+| MFV scifi | [same items rewritten as sci-fi, other](src/moralmaps/data/vignettes_scifi_other_violate.jsonl) / [self](src/moralmaps/data/vignettes_scifi_self_violate.jsonl) | inherited labels from classic MFV | forced-choice foundation probability profile |
+| MFV ai-actor | [same items rewritten with an AI actor, other](src/moralmaps/data/vignettes_ai-actor_other_violate.jsonl) / [self](src/moralmaps/data/vignettes_ai-actor_self_violate.jsonl) | inherited labels from classic MFV | forced-choice foundation probability profile |
+| MFQ-2 | [36 items](src/moralmaps/data/surveys/mfq2/forward.json), plus inverted and negated frames | [country means](src/moralmaps/data/human/mfq2_country_foundations.csv), plus [raw respondents](src/moralmaps/data/atari_study2_raw.csv) | expected 1-5 score per foundation |
+| Big Five | [50 items](src/moralmaps/data/surveys/big5/questionnaire.json), plus inverted and negated frames | [country means](src/moralmaps/data/human/big5_country_factors.csv) | expected 1-5 score per trait |
+| 16PF | [162 items](src/moralmaps/data/surveys/16pf/questionnaire.json), plus inverted and negated frames | [country means](src/moralmaps/data/human/16pf_country_factors.csv) | expected 1-5 score per factor |
+| Humor Styles | [32 items](src/moralmaps/data/surveys/humor_styles/questionnaire.json), plus inverted and negated frames | [country means](src/moralmaps/data/human/humor_styles_country_factors.csv), originally 1-7 | expected 1-5 score per style |
 
 MFV uses categorical answers: the answer is the foundation. The surveys use ordinal answers: the answer is a scale point.
 
-Each MFV item is asked in two perspectives, `other_violate` and `self_violate`. Each survey item is asked three ways, forward, scale-inverted, and content-negated. tinymfv canonicalizes these frames before averaging, so the profile is less tied to one wording.
+Each MFV item is asked in two perspectives, `other_violate` and `self_violate`. Each survey item is asked three ways, forward, scale-inverted, and content-negated. moralmaps canonicalizes these frames before averaging, so the profile is less tied to one wording.
 
 ## API
 
@@ -110,7 +103,7 @@ Run MFV vignettes with `evaluate`:
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from tinymfv import evaluate, load_vignettes
+from moralmaps import evaluate, load_vignettes
 
 tok = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B")
 model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-4B").cuda()
@@ -126,7 +119,7 @@ Run surveys with `administer`:
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from tinymfv import administer, get_instrument
+from moralmaps import administer, get_instrument
 
 tok = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B")
 model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-4B").cuda()
@@ -155,7 +148,7 @@ The plotting code keeps only coefficients that every plotted dataset can still r
 
 ## Measurement
 
-Steering is an intervention, so we judge it like surgery: did the intended thing move a lot, did everything else move as little as possible, and is the model still coherent? tinymfv reads three quantities that answer those, in rising order of steer-sensitivity.
+Steering is an intervention, so we judge it like surgery: did the intended thing move a lot, did everything else move as little as possible, and is the model still coherent? moralmaps reads three quantities that answer those, in rising order of steer-sensitivity.
 
 Coherence is the gate. `pmass` is the share of probability the model puts on the valid answer tokens, and entropy is how spread-out the answer is within them:
 
@@ -192,11 +185,11 @@ where:
 - $k - \tfrac{M+1}{2}$ is the midpoint-centered weight (for $M=5$: $-2,-1,0,1,2$)
 - $\Delta_f$ contrasts the full positive and negative steers, $c=+1$ vs $c=-1$ The intended change is $C$ (or $\Delta_f$) on the steered factor; the unintended change is $C$ moving on the other factors. A surgical steer has large intended change and small off-target change, at unchanged coherence.
 
-We call the combined measurement surgical informedness: reward intended change, penalize unintended change, gate on coherence. tinymfv reports the pieces (pmass, entropy, per-factor profile and $C$, and for MFV a nominal informedness, the Youden's J of the model's top foundation against the human top foundation); steering-lite folds them into the single base-anchored surgical informedness score it uses to rank steers.
+We call the combined measurement surgical informedness: reward intended change, penalize unintended change, gate on coherence. moralmaps reports the pieces (pmass, entropy, per-factor profile and $C$, and for MFV a nominal informedness, the Youden's J of the model's top foundation against the human top foundation); steering-lite folds them into the single base-anchored surgical informedness score it uses to rank steers.
 
 ## Scope
 
-tinymfv is for fast paired steering comparisons, not full moral reasoning evaluation. It is useful when you want to compare base, positive-steer, and negative-steer runs against the same human reference plots.
+moralmaps is for fast paired steering comparisons, not full moral reasoning evaluation. It is useful when you want to compare base, positive-steer, and negative-steer runs against the same human reference plots.
 
 For behavior-heavy moral evals, see [machiavelli](https://huggingface.co/datasets/wassname/machiavelli), [AIRiskDilemmas](https://huggingface.co/datasets/kellycyy/AIRiskDilemmas), and [ethics_expression_preferences](https://huggingface.co/datasets/wassname/ethics_expression_preferences).
 
@@ -205,10 +198,10 @@ Used in [steering-lite](https://github.com/wassname/steering-lite), [lora-lite](
 ## Citation
 
 ```bibtex
-@misc{clark2026tinymfv,
-  title = {tinymfv: moral and value maps for LLMs},
+@misc{clark2026moralmaps,
+  title = {moralmaps: moral and value maps for LLMs},
   author = {Michael Clark},
   year = {2026},
-  url = {https://github.com/wassname/tinymfv/}
+  url = {https://github.com/wassname/moral-maps/}
 }
 ```
