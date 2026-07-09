@@ -1,6 +1,6 @@
-# tinymfv
+# tinymfv: moral and value maps for LLMs
 
-tinymfv is a small set of fast value evals for LLM steering work. It asks moral vignettes and survey questions, reads answer-token probabilities (or rated samples, for API models without logprobs), and turns them into model profiles that you can compare to humans.
+tinymfv is a small set of fast value evals for LLM steering work. It asks survey questions and moral vignettes, reads answer-token probabilities (or rated samples, for API models without logprobs), and turns them into model profiles that you can compare to humans.
 
 When comparing models or checkpoints you can use it to check three things: did the intended value move?, what else moved?, how does this compare to human responses? The evals are quick and sensitive enough to show probability shifts.
 
@@ -91,6 +91,7 @@ just smoke
 
 | dataset | bundled data | human reference | profile used in plots |
 |---|---|---|---|
+| WVS (Inglehart-Welzel axes) | items resolved at runtime from [GlobalOpinionQA](https://huggingface.co/datasets/Anthropic/llm_global_opinions); axis battery in [`src/tinymfv/iw_axes.py`](src/tinymfv/iw_axes.py) | per-country answer distributions in the same dataset | mean positiveness (0-1) per axis |
 | MFV classic | [132 moral vignettes, other](src/tinymfv/data/vignettes_classic_other_violate.jsonl) / [self](src/tinymfv/data/vignettes_classic_self_violate.jsonl) | per-vignette human foundation labels in the JSONL | forced-choice foundation probability profile |
 | MFV scifi | [same items rewritten as sci-fi, other](src/tinymfv/data/vignettes_scifi_other_violate.jsonl) / [self](src/tinymfv/data/vignettes_scifi_self_violate.jsonl) | inherited labels from classic MFV | forced-choice foundation probability profile |
 | MFV ai-actor | [same items rewritten with an AI actor, other](src/tinymfv/data/vignettes_ai-actor_other_violate.jsonl) / [self](src/tinymfv/data/vignettes_ai-actor_self_violate.jsonl) | inherited labels from classic MFV | forced-choice foundation probability profile |
@@ -205,7 +206,7 @@ Used in [steering-lite](https://github.com/wassname/steering-lite), [lora-lite](
 
 ```bibtex
 @misc{clark2026tinymfv,
-  title = {tinymfv: tiny moral/value eval for local LLMs},
+  title = {tinymfv: moral and value maps for LLMs},
   author = {Michael Clark},
   year = {2026},
   url = {https://github.com/wassname/tinymfv/}
