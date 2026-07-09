@@ -1,0 +1,34 @@
+{
+  "summary": "tinymfv provides a fast way to evaluate the values and personalities of local language models by having them answer standard human survey questions and moral vignettes, then reading the probability distribution over answer tokens to compute factor scores. These scores are compared to human norms from large surveys, and the tool is especially sensitive to small steering interventions that shift the model's internal state without retraining.",
+  "mechanism": "The core mechanism computes, for each survey item, the rank‑centered logit contrast (C) from the model’s answer‑token log probabilities, which yields a steer‑sensitive signal that does not saturate near confident answers, while gating the result on coherence via the probability mass (pmass) the model assigns to valid answer tokens.",
+  "scores": {
+    "clarity": 4,
+    "conciseness": 3,
+    "technical_accuracy": 5
+  },
+  "reason": "The document explains the method and its sensitivity clearly, but some sections are dense with plot descriptions and parameter details that slow reading.",
+  "unclear": [
+    "How the 'rated sampling' procedure works for closed‑API models when answer probabilities are not available",
+    "How the human reference positions are derived from the GlobalOpinionQA dataset for the World Values Survey map",
+    "Exactly how the PCA‑derived axes are constructed and what the inset compass represents"
+  ],
+  "misunderstandings": [],
+  "missing_to_implement": [
+    "A GPU‑enabled environment with the transformers library",
+    "A steering‑lite run directory containing the steering vectors and outputs",
+    "Knowledge of how to generate or obtain the steering coefficient vectors used in the plotting script"
+  ],
+  "questions": [
+    "What effect does the coherence‑frac threshold have on selecting steering vectors, and how is it chosen in practice? – It discards any steering step where the model’s probability mass on valid tokens falls below that fraction of the baseline, ensuring the model remains coherent while still capturing steer‑sensitive changes."
+  ],
+  "suggestions": [
+    "Add a short glossary at the beginning defining key terms such as pmass, entropy, C (rank‑centered logit contrast), and coherence‑frac to help readers unfamiliar with the notation."
+  ],
+  "rewrites": [
+    {
+      "section": "Together that is the surgical-informedness view: reward intended change, penalize unintended change, gate on coherence.",
+      "rewrite": "In short, the approach rewards the intended change, penalizes unintended changes, and requires the model to stay coherent.",
+      "why": "Removes the nominalized phrase \"surgical-informedness view\" and AI‑style abstraction to read like a plain human explanation while keeping the same meaning."
+    }
+  ]
+}

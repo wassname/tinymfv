@@ -1,0 +1,44 @@
+{
+  "summary": "tinymfv provides a fast way to evaluate local language models on human value and moral surveys by presenting standard questionnaire items, reading the model's answer-token probabilities, and comparing the resulting profiles to aggregated human reference data. It bundles several instruments (World Values Survey, MFQ‑2, Big Five, 16PF, Humor Styles, and moral‑foundation vignettes) and is designed to detect subtle probability shifts caused by steering interventions.",
+  "mechanism": "The core mechanism maps each model output to a probability distribution over the valid answer tokens for every survey item, then aggregates these distributions to compute (i) a profile (expected Likert score or foundation probability) and (ii) a rank‑centered logit contrast C, which sums log‑probabilities weighted by their distance from the scale midpoint; C captures steering‑induced shifts even when the model’s answers are highly confident, and the results are compared against human baselines while gating on coherence metrics (pmass and entropy).",
+  "scores": {
+    "clarity": 4,
+    "conciseness": 3,
+    "technical_accuracy": 5
+  },
+  "reason": "The document is well‑structured and technically precise, but its length and occasional verbose phrasing reduce conciseness, and a few implementation details are left vague.",
+  "unclear": [
+    "How the answer‑token set A_i for each Likert‑style item is constructed from the tokenizer.",
+    "The exact formula used to compute Youden's J as the MFV \"informedness\" metric.",
+    "Details of the PCA computation for the data‑picked axes maps (e.g., scaling, centering)."
+  ],
+  "misunderstandings": [
+    "The statement that \"All seventeen frontier models sit outside the cultural mean of nearly every country\" could be read as each model being outside every single country's distribution, while it actually means the models are outliers relative to the majority of countries.",
+    "The claim that the Authority push \"barely moves the base model\" on the Big Five map might lead readers to think personality cannot be steered at all, whereas only this specific factor showed little movement in the example."
+  ],
+  "missing_to_implement": [
+    "A clear recipe for extracting the set of valid answer tokens (A_i) from the model's tokenizer for each questionnaire format.",
+    "The exact computation steps for Youden's J (informedness) for MFV, including any thresholding or normalization.",
+    "Code snippets demonstrating how to calculate the rank‑centered logit contrast C from raw token log‑probs."
+  ],
+  "questions": [
+    "Why does tinymfv use a rank‑centered logit contrast rather than the raw expected score when measuring steering? Because the contrast uses fixed midpoint‑centered weights that remain sensitive to changes even when the model's probability mass is concentrated on a single answer, avoiding the suppression effect that makes the expected score flat near confident predictions.",
+    "What does the pmass metric represent and why is it the first gating condition? pmass is the average probability mass the model assigns to the set of valid answer tokens across items; low pmass indicates the model is not adhering to the expected answer format, so any subsequent steer measurements would be unreliable."
+  ],
+  "suggestions": [
+    "Add a brief paragraph after the \"Measurement\" section that explicitly defines the answer‑token set A_i for Likert items and provides the formula for Youden's J, eliminating the need for readers to infer these steps.",
+    "Replace the vague sentence \"The map is measured differently from everything else on the page\" with a concrete description of the rated‑sampling method used for closed‑API models."
+  ],
+  "rewrites": [
+    {
+      "section": "Steering is an intervention, so we judge it like surgery: did the intended thing move a lot, did everything else move as little as possible, and is the model still coherent?",
+      "rewrite": "We evaluate steering by checking whether the targeted change is large, unintended changes are small, and the model remains coherent.",
+      "why": "Removes the metaphorical \"surgery\" language and gives a direct, human‑draft description."
+    },
+    {
+      "section": "tinymfv reads three quantities that answer those, in rising order of steer-sensitivity.",
+      "rewrite": "tinymfv computes three quantities, listed from least to most sensitive to steering.",
+      "why": "Eliminates the AI‑style phrasing \"in rising order of steer-sensitivity\" and makes the sentence clearer."
+    }
+  ]
+}

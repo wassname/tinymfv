@@ -1,0 +1,43 @@
+```json
+{
+ "summary": "Tinymfv is a tool for quickly evaluating the moral and value alignment of local language models. It uses standard human surveys and vignettes, compares the model's answer probabilities to human norms, and aims to provide a sensitive readout for steering efforts. The tool focuses on providing a fast comparison tool for steering interventions and not full moral reasoning.",
+ "mechanism": "The core mechanism involves administering standard human surveys (like the World Values Survey, MFQ-2, Big Five, and Humor Styles) to a language model, reading the probabilities of the model’s token responses, and comparing these probabilities to reference data representing human norms. This comparison is then visualized on value maps and range plots, revealing how the model's responses differ from human societies and how steering interventions shift these responses.",
+ "scores": {
+  "clarity": "4",
+  "conciseness": "5",
+  "technical_accuracy": "4"
+ },
+ "reason": "The document is well-written and concise, with a clear explanation of the tool's purpose and methodology. The technical details are presented reasonably well, although some aspects of the statistical analysis (e.g., the surgical informedness score) are complex and may require further explanation. The documentation, however, emphasizes that it is targeted towards paired comparisons rather than full moral reasoning.",
+ "unclear": [
+  "The specifics of how the quantile mass (pmass) and entropy metrics are used in conjunction with coherence are not fully explained.",
+  "The methodology behind rating sampling for models without accessible answer probabilities is not detailed.",
+  "What `mundane15` is unclear."
+ ],
+ "misunderstandings": [
+  "The document mentions country norms in MFV failing cross-country measurement invariance and being stitched from five different studies, but it is unclear how the tool addresses this limitation to ensure a consistent comparison."
+ ],
+ "missing_to_implement": [
+  "A more detailed explanation of the statistical methods used to calculate the surgical informedness score would be helpful.",
+  "The tool would benefit from more comprehensive documentation of the various datasets used and their corresponding human reference data.",
+  "Provides a clear best practice usage of `pmass_allowed`."
+ ],
+ "questions": [
+  "How are the survey items adapted or transformed before being presented to the language model?",
+  "What are the specific steps taken to ensure the reliability and validity of the human reference data?",
+  "Given the mentioned limitations with cross-country measurement invariance in MFV, how does tinymfv mitigate potential biases in the comparisons?"
+ ],
+ "suggestions": [
+  "Clarify the roles of `pmass` and entropy in coherence, linking each to model behavior.",
+  "Add a concise explanation of 'quantile mass' in lay terms.",
+  "Include a visual representation of the different value maps.",
+  "Explicitly state that both survey and vignettes are translated into numerical vectors, with instructions of methodology."
+ ],
+ "rewrites": [
+  {
+   "section": "The base model sits in the Western, individual-first corner, and pushing it toward Authority walks it clear across to the group-first corner shared by the African-Islamic and East-Asian societies.",
+   "rewrite": "The base model initially aligns with Western, individualistic values, and steering toward an 'Authority' persona shifts its responses toward those of group-oriented societies found in Africa, Islamic, and East-Asian regions.",
+   "why": "This version reduces heavy phrasing with simpler sentence construction."
+  }
+ ]
+}
+```

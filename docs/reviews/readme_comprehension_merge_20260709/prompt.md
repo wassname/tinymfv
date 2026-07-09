@@ -1,3 +1,20 @@
+You are reading the document below for the FIRST time (a cold reader).
+Answer ONLY from what it says; where something is unstated or ambiguous, say so.
+Output ONE JSON object, no prose, no fences:
+{
+ "summary": "<2-3 sentences: restate the thesis/method in your OWN words>",
+ "mechanism": "<the doc's single hardest/central mechanism, reconstructed in your OWN words as if to a colleague; say 'unclear' if the doc does not let you rebuild it>",
+ "scores": {"clarity": "<1-5>", "conciseness": "<1-5>", "technical_accuracy": "<1-5>"},
+ "reason": "<one sentence on the scores>",
+ "unclear": ["<what was confusing, ambiguous, or you had to guess>"],
+ "misunderstandings": ["<places the text contradicts itself or invites a misread>"],
+ "missing_to_implement": ["<what a reader still needs to reproduce or act on this>"],
+ "questions": ["<a question the doc left you with, then your best-guess answer>"],
+ "suggestions": ["<concrete edit that would help>"],
+ "rewrites": [{"section": "<quote a sentence/section that reads as AI-written>", "rewrite": "<rewrite it to strip the AI voice and read like a plain, direct human draft -- SAME meaning and facts, do not add claims>", "why": "<which AI tell it removes>"}]
+}
+
+DOCUMENT:
 # tinymfv
 
 Fast value evals for local language models. It asks standard human survey questions and moral vignettes, reads the model's answer-token probabilities, and compares the profile to human norms. Built for steering work: the readout is sensitive enough that a small intervention shows up as a probability shift.
@@ -16,17 +33,17 @@ The clearest single view comes from the World Values Survey, the standard cultur
 
 ![WVS culture map: 17 frontier models among about 90 human societies](docs/img/wvs/wvs_map_iw.png)
 
-Every model sits in the top-left: more secular and more self-expressive than almost any country on earth, deep in the rich-world corner and often past its edge, and none of them sits near the African or Muslim societies. This map is measured differently from everything else on the page. These frontier models are closed APIs with no answer probabilities to read, so each is scored by rated sampling (rate every option one to five, twelve times, with the option order shuffled; `scripts/wvs_map.py`), and the human positions are approximated from the GlobalOpinionQA question set (axis construction in `src/tinymfv/iw_axes.py`). The steering plots below instead follow one open model we can push, Qwen3-4B.
+Every model sits in the top-left: more secular and more self-expressive than almost any country on earth, deep in the rich-world corner and often past its edge, and none of them sits near the African or Muslim societies. This map is measured differently from everything else on the page. These frontier models are closed APIs with no answer probabilities to read, so each is scored by rated sampling (rate every option one to five, twelve times, with the option order shuffled), and the human positions are approximated from the GlobalOpinionQA question set. The steering plots below instead follow one open model we can push, Qwen3-4B.
 
 What happens when we steer them? Below we steer models with `authority-respecting` versus `authority-disregarding` personas.
 
 ### Value maps: where a model sits, on named axes
 
-The nicest plots are the value ("quadrant") map. Each has two named axes borrowed from the psychology that built the survey, the human societies drawn as cultural regions, and the model as a black dot with a coloured path showing where steering takes it. Steering here is activation steering, not prompting: a vector built by [steering-lite](https://github.com/wassname/steering-lite) from contrastive persona pairs and added to the model's hidden state at inference, toward the authority-respecting side (red, more Authority) or away from it (blue, less), without retraining. Every map keeps one orientation, the cultural West to the west and the global South to the south, so they all read the same way.
+The nicest plots are the value ("quadrant") map. Each has two named axes borrowed from the psychology that built the survey, the human societies drawn as cultural regions, and the model as a black dot with a coloured path showing where steering takes it. Steering here means nudging the model's internal state toward the authority-respecting side (red, more Authority) or away from it (blue, less), without retraining. Every map keeps one orientation, the cultural West to the west and the global South to the south, so they all read the same way.
 
 ![MFQ-2 value map: individual-first vs group-first morality, with the Authority steer path](docs/img/showcase/mfq2/map_value.png)
 
-Moral-foundations theory (Jonathan Haidt's) holds that our moral sense runs on a few basic concerns: caring for others, fairness, loyalty to the group, respect for authority, and a sense of the sacred. The MFQ-2 survey (Moral Foundations Questionnaire) scores a person, or a model, on each. On this map, left to right runs from an individual-first morality (care, equality) to a group-first one (loyalty, authority, purity); bottom to top splits fairness into equal-shares versus earned-shares. The base model sits in the Western, individual-first corner, and pushing it toward Authority walks it clear across to the group-first corner shared by the African-Islamic and East-Asian societies.
+Moral-foundations theory (Jonathan Haidt's) holds that our moral sense runs on a few basic concerns: caring for others, fairness, loyalty to the group, respect for authority, and a sense of the sacred. The MFQ-2 survey scores a person, or a model, on each. On this map, left to right runs from an individual-first morality (care, equality) to a group-first one (loyalty, authority, purity); bottom to top splits fairness into equal-shares versus earned-shares. The base model sits in the Western, individual-first corner, and pushing it toward Authority walks it clear across to the group-first corner shared by the African-Islamic and East-Asian societies.
 
 ![Big Five value map: outgoing/open vs even-keeled axes, with the Authority steer path](docs/img/showcase/big5/map_value.png)
 
@@ -42,7 +59,7 @@ A range plot takes an instrument one factor at a time: the spread of human socie
 
 ![MFV range plot: foundation emphasis beside Authority steering](docs/img/showcase/mfv/range.png)
 
-MFV (moral-foundation vignettes, the repo's namesake) hands the model a short story about someone breaking a moral rule and asks which kind of wrong it is: cruelty, cheating, betrayal, defiance of authority, or defiling the sacred. Pushed toward Authority, the model does what steering should: it flags the authority violations far more often and the others less. The grey dot per foundation is a pooled human reference; the base model already flags authority violations well above the pooled human rate, and the steer pushes it further still. That human dot is pooled on purpose: MFV country norms fail cross-country measurement invariance ([Jimenez-Leal et al. 2025](https://doi.org/10.1525/collabra.128178)) and are stitched from five different studies, so MFV gets no culture map here, only this range against one pooled reference (details in [`src/tinymfv/data/human/MFV_country_norms_NOTE.md`](src/tinymfv/data/human/MFV_country_norms_NOTE.md)).
+MFV (moral-foundation vignettes, the repo's namesake) hands the model a short story about someone breaking a moral rule and asks which kind of wrong it is: cruelty, cheating, betrayal, defiance of authority, or defiling the sacred. Pushed toward Authority, the model does what steering should: it flags the authority violations far more often and the others less. The grey dot per foundation is a pooled human reference; the base model already leans on authority well above it, and the steer pushes it further still. That human dot is pooled on purpose: MFV country norms fail cross-country measurement invariance ([Jimenez-Leal et al. 2025](https://doi.org/10.1525/collabra.128178)) and are stitched from five different studies, so MFV gets no culture map here, only this range against one pooled reference (details in [`src/tinymfv/data/human/MFV_country_norms_NOTE.md`](src/tinymfv/data/human/MFV_country_norms_NOTE.md)).
 
 ![MFQ-2 range plot: human society ranges beside Authority steering](docs/img/showcase/mfq2/range.png)
 
@@ -50,7 +67,7 @@ MFV (moral-foundation vignettes, the repo's namesake) hands the model a short st
 
 ![Humor Styles range plot: human society ranges beside Authority steering](docs/img/showcase/humor_styles/range.png)
 
-The surveys echo their maps: MFQ-2's binding foundations (loyalty, authority, purity) climb under the steer, while Big Five and humor stay flat.
+The surveys echo their maps: MFQ-2's binding factors climb under the steer, while Big Five and humor stay flat.
 
 ### Maps with data-picked axes
 
@@ -172,7 +189,7 @@ $$C_d(c) = \mathbb{E}_{i \in d}\sum_{k=1}^{M}\left(k - \tfrac{M+1}{2}\right)\ell
 
 where $\ell$ is the answer-token logprob at coefficient $c$. The intended change is $C$ (or $\Delta_f$) on the steered factor; the unintended change is $C$ moving on the other factors. A surgical steer has large intended change and small off-target change, at unchanged coherence.
 
-In short: reward intended change, penalize unintended change, and require the model to stay coherent. tinymfv reports the pieces (pmass, entropy, per-factor profile and $C$, and for MFV a nominal informedness, the Youden's J of the model's top foundation against the human top foundation); steering-lite folds them into the single base-anchored surgical-informedness score it uses to rank steers.
+Together that is the surgical-informedness view: reward intended change, penalize unintended change, gate on coherence. tinymfv reports the pieces (pmass, entropy, per-factor profile and $C$, and for MFV a nominal informedness, the Youden's J of the model's top foundation against the human top foundation); steering-lite folds them into the single base-anchored surgical-informedness score it uses to rank steers.
 
 ## Scope
 

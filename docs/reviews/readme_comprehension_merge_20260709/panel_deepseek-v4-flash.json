@@ -1,0 +1,39 @@
+{
+  "summary": "Tinymfv is a Python library that evaluates local language models using standard psychological surveys and moral vignettes, extracting answer-token probabilities to produce personality/value profiles comparable to human norms. It is designed for measuring the effect of internal model steering, providing readouts that are sensitive enough to detect small probability shifts from interventions.",
+  "mechanism": "The core mechanism computes two signals from token log-probabilities: the profile (expected score per factor for surveys, mean forced-choice probability per foundation for vignettes) and the steer signal C, the rank-centered logit contrast. C uses midpoint-centered weights so its derivative never vanishes, making it sensitive to tail reallocations that would leave the profile flat. The library gates interpretability on coherence (pmass, the share of probability on valid answer tokens) and entropy, then reports intended vs off-target C change per coefficient.",
+  "scores": {"clarity": 4, "conciseness": 4, "technical_accuracy": 5},
+  "reason": "The measurement equations and plots are well explained, but some terms (e.g., 'binding factors', 'ipsative') and the exact output format of reports are left implicit.",
+  "unclear": [
+    "What 'ipsative' means in the PCA map filenames.",
+    "Whether the profile output for surveys is a dict or array, and the exact keys for vignette reports.",
+    "How the 'survival vs self-expression' WVS axis is derived from the GlobalOpinionQA question set (stated to be approximated).",
+    "The meaning of 'MFV' in the abbreviation 'MFQ-2' vs 'MFV'—the doc uses both but only defines MFV as moral-foundation vignettes."
+  ],
+  "misunderstandings": [
+    "The statement 'The steer signal is C [...] so its derivative is a fixed weight with no p_j suppression' might be read as claiming the profile is useless—the doc later clarifies the profile is needed for human comparison, but the phrasing could mislead.",
+    "The term 'binding factors' under MFQ-2 range plot could be confused with 'bonding' rather than Haidt's 'binding foundations' (loyalty, authority, purity).",
+    "The API shows 16PF as an instrument, but the plots and analysis focus on MFQ-2, Big Five, Humor Styles; a reader might think 16PF is also mapped (it is not, per the scope future-work item)."
+  ],
+  "missing_to_implement": [
+    "Exact structure of the report dictionary for evaluate and administer (keys and value types).",
+    "How to compute the human cross-country SD from the bundled country means for effect size comparison.",
+    "Code to generate any plot other than the specific steer-showcase script (no generic plotting function is exported).",
+    "Example of loading and applying a steer vector alongside the evaluation; steer vector ingestion is relegated to steering-lite."
+  ],
+  "questions": [
+    "How are negated/inverted survey frames canonicalized before averaging? The doc mentions it but gives no detail. Best guess: reverse-keyed items are flipped so higher always means more of the trait, then averaged.",
+    "Does the evaluate function accept a batch size or device argument? Not stated; likely expects the model already on the correct device as in the example."
+  ],
+  "suggestions": [
+    "Add a small table with the exact keys returned by evaluate and administer, e.g., {'profile': dict[str, float], 'mean_pmass_allowed': float, 'dimensions': list[str]}.",
+    "Define 'ipsative' in a parenthetical the first time it appears (e.g., 'ipsative (each profile z-scored across its own dimensions)').",
+    "Provide a one-sentence example of interpreting the C signal: 'A C shift of +2.0 on Authority with pmass unchanged means the steer reallocated logit mass toward Authority tokens without breaking format.'"
+  ],
+  "rewrites": [
+    {
+      "section": "Together that is the surgical-informedness view: reward intended change, penalize unintended change, gate on coherence.",
+      "rewrite": "Surgical-informedness combines these: reward the intended C change, penalize off-target C change, and gate on coherence.",
+      "why": "Removes the AI-tell phrasing 'view: reward... penalize... gate' for a more direct list of actions."
+    }
+  ]
+}

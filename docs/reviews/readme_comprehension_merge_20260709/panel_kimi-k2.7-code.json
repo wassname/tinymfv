@@ -1,0 +1,50 @@
+ {
+  "summary": "tinymfv is a local-LLM evaluation tool that scores models on standard human survey and moral-vignette items by reading next-token probabilities over valid answer tokens and comparing the resulting profiles to human norms. The attached plan then uses tinymfv to fix a persona-template-library sampling bug (pooled sampling) and rebuild an honesty-by-credulity steering map via stratified all-template validation, strict-pass scenario selection, per-axis vector training, and a 2-D grid readout.",
+  "mechanism": "The central mechanism is probability-weighted survey scoring: for each item the model outputs a distribution over the allowed response tokens; this is converted to an expected factor score (or forced-choice foundation probability for MFV), then compared with human country norms. The steering layer attaches persona pairs to standard scenarios, uses a bounded LLM judge to select 'strict-pass' pairs that isolate one axis, trains a steering vector for each axis, and evaluates their combination on the same instruments.",
+  "scores": {
+    "clarity": "4",
+    "conciseness": "3",
+    "technical_accuracy": "4"
+  },
+  "reason": "The README explains the scoring pipeline with equations and file paths, and the plan has explicit goals, discriminators, and tasks; it is slowed by dense logs and undefined terms like strict-pass and the bounded judge, and the README mixes levels of detail.",
+  "unclear": [
+    "The exact definition of 'strict-pass' is only partially described (axis_delta and off-axis/confound/style gates are listed but not consolidated).",
+    "What the bounded-thinking judge evaluates and how it assigns axis/off-axis/style/echo/refusal/nocommit scores.",
+    "How the per-axis steering vectors are computed inside steering-lite (beyond a target KL and reported C value).",
+    "The meaning of reported dS cosine, flat-tensor cosine, and symmetric projection vs true Gram-Schmidt in the combine step.",
+    "Whether the 2-D grid uses raw or orthogonalized vectors and how multi-instrument coherence filtering maps to final plots.",
+    "Why honesty and credulity are expected to be orthogonal psychological axes."
+  ],
+  "misunderstandings": [
+    "Goal 1 says Stage B should be n-per-source ~30-50, but Goal 2 actually runs n-per-source 100; the plan evolved but the earlier wording remains.",
+    "The log reports both dS cosine ≈ -0.02 and a transient flat-tensor cosine of 1.0, plus a future-work mention of cos ≈ -0.15; a hurried reader could mix them up.",
+    "The README says frontier models are scored by rated sampling on closed APIs, while the steering work uses an open model (Qwen3-4B); this is noted but easy to skim past.",
+    "The final log says honesty moves 'Social Norms / Fairness / Liberty' and credulity moves 'Social Norms / Authority / Sanctity', but the MFV section earlier lists only Care, Fairness, Loyalty, Authority, Sanctity; 'Social Norms' is not in that list."
+  ],
+  "missing_to_implement": [
+    "Setup and install instructions for the persona-steering-template-library and steering-lite repositories, not just tinymfv.",
+    "API keys, model endpoints, and cost estimates for the OpenRouter/LLM judge stage.",
+    "A single end-to-end shell script that runs Stage A, Stage B, export, training, grid, and plotting from the clean repo state.",
+    "Code-level definitions of the bounded judge, strict-pass gates, and overall_score recomputation.",
+    "How to obtain or prepare the scenario source files and the 100-template catalog.",
+    "The exact command and code that combines the two per-axis vectors into the 2-D grid."
+  ],
+  "questions": [
+    "What does 'strict-pass' mean exactly? Best guess: a scenario-template pair where the bounded judge reports axis_delta ≥ 2.0, off-axis and confound/style/echo/refusal/nocommit scores are all below separate thresholds, and the model's answer mass remains high; the doc gives the pieces but never states a single consolidated rule.",
+    "Why is the honesty steer much weaker than the credulity steer despite the same pipeline? Best guess: honesty is more entangled with truthfulness, praise, and sycophancy dimensions in the available scenarios, so the strict-pass filter leaves only low-axis-delta pairs (mean 0.68 vs 2.87), limiting the learned vector's effect size."
+  ],
+  "suggestions": [
+    "Add a 'Definitions' appendix that consolidates strict-pass, overall_score, bounded judge, KL target, and dS cosine in one place.",
+    "Move the detailed daily log out of the plan file into a separate RESEARCH_JOURNAL.md and keep the plan as actionable current state only.",
+    "Provide one copy-paste end-to-end command block at the top of the plan for reproducing the v2 map from a fresh clone.",
+    "Include a final cross-instrument effect-size table in the evidence section, not just the max single-foundation values.",
+    "Add a note in the README that the steering-map examples use Qwen3-4B and open probabilities, so readers don't conflate them with the closed-API rated-sampling WVS map."
+  ],
+  "rewrites": [
+    {
+      "section": "Fast value evals for local language models. It asks standard human survey questions and moral vignettes, reads the model's answer-token probabilities, and compares the profile to human norms. Built for steering work: the readout is sensitive enough that a small intervention shows up as a probability shift.",
+      "rewrite": "tinymfv scores local LLMs on standard human surveys and moral vignettes. It reads the probabilities the model assigns to each allowed answer token, converts them to factor scores, and plots those against human baselines. The scores are sensitive to small steer-induced shifts.",
+      "why": "Removes generic marketing cadence ('Built for steering work: ...') and abstract claims, replacing them with direct descriptions of what the tool actually does."
+    }
+  ]
+}

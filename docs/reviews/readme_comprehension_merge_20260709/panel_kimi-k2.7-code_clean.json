@@ -1,0 +1,44 @@
+ ```json
+{
+  "summary": "tinymfv is a small evaluation toolkit that administers standard human psychology surveys and moral vignettes to local language models, reads the probability distribution over answer tokens, and compares the resulting profile to human norms. It is designed to be sensitive enough that small steering interventions show up as probability shifts, which are visualized as range plots and culture maps.",
+  "mechanism": "The core mechanism is a rank-centered logit contrast, C, computed per factor as a weighted sum of answer-token log-probabilities centered around the scale midpoint. Because it lives in log-space, C can detect probability redistributions even when the expected-score profile is pinned near a confident answer. This signal is gated on coherence metrics—probability mass on valid answer tokens (pmass) and entropy over valid answers—so a steer that breaks format or flattens answers is flagged rather than trusted. The intended-versus-unintended movement in C, at unchanged coherence, is the basis for judging a surgical steer.",
+  "scores": {"clarity": "4", "conciseness": "4", "technical_accuracy": "4"},
+  "reason": "The document is well-organized and technically dense, but it assumes familiarity with activation steering and steering-lite, and it leaves several implementation details underspecified.",
+  "unclear": [
+    "What the steering intervention actually is technically—prompt persona, activation addition, or something else.",
+    "The precise form of the 'single base-anchored surgical-informedness score' steering-lite uses.",
+    "How the WVS country positions are approximated from GlobalOpinionQA question items.",
+    "What 'inverted and negated frames' specifically look like for the survey items.",
+    "The format of the steering-lite run directory and how it is produced."
+  ],
+  "misunderstandings": [
+    "The document mentions steering by 'authority-respecting versus authority-disregarding personas' but also refers to 'steering-lite' and 'nudging the model's internal state,' which invites conflating prompt-based personas with activation-vector steering.",
+    "Saying 'the base model already leans on authority well above it' could be misread as the model being more authoritarian overall rather than more likely to flag authority violations in MFV vignettes.",
+    "The strong MFQ-2 sweep is highlighted early, but Big Five and Humor Styles barely move under the same steer; a reader might overgeneralize the effect size across instruments."
+  ],
+  "missing_to_implement": [
+    "Instructions for generating steering vectors or positive/negative steer pairs.",
+    "A complete API schema listing all return keys of `evaluate` and `administer` reports.",
+    "Dependency and environment details beyond `uv pip install`.",
+    "A minimal end-to-end example from raw model to plotted map.",
+    "How to interpret or reproduce the 'PCA ipsative' maps as a user."
+  ],
+  "questions": [
+    "What kind of steering produces the red-to-blue steer paths? Best guess: contrastive activation steering via steering-lite, possibly with prompt persona variants.",
+    "Does the tinymfv package itself perform steering, or only evaluate steered runs? Best guess: it only evaluates and plots; steering is done by steering-lite or a similar external tool."
+  ],
+  "suggestions": [
+    "Add a short 'What counts as steering here' paragraph distinguishing prompt personas from activation vectors and stating which one ships in this repo.",
+    "Document the full report dictionary returned by `evaluate` and `administer`.",
+    "Provide a minimal reproduction script that starts from a huggingface model and ends with the showcase figures.",
+    "Clarify the relationship to steering-lite and what inputs must come from it."
+  ],
+  "rewrites": [
+    {
+      "section": "The nicest plots are the value (\"quadrant\") map. Each has two named axes borrowed from the psychology that built the survey, the human societies drawn as cultural regions, and the model as a black dot with a coloured path showing where steering takes it. Steering here means nudging the model's internal state toward the authority-respecting side (red, more Authority) or away from it (blue, less), without retraining.",
+      "rewrite": "The quadrant maps label two axes from the survey psychology, draw human societies as regions, and show the model as a black dot with a colored path for the steer. Steering nudges the model's internal state toward authority-respecting (red) or away from it (blue), without retraining.",
+      "why": "Removes filler like 'nicest' and 'where steering takes it,' drops the redundant 'each has' structure, and reads more like a direct human draft."
+    }
+  ]
+}
+```

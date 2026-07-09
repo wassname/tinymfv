@@ -1,0 +1,52 @@
+```json
+{
+ "summary": "This document details the process of fixing a persona library and re-validating axes for a steering system, after identifying flaws in the initial implementation. The fixes involve stratified per-source sampling, explicit documentation of testing procedures, and a revised workflow to prevent errors and ensure rigorous evaluation. This leads to the retraining and replotting of an honesty vs. credulity map with clean vectors and honest effect size assessments.",
+ "mechanism": "The core mechanism involves using a curated set of persona templates and moral vignettes to evaluate and steer language models. The process involves stratified sampling of these items across different sources, rigorous evaluation using a 'strict-pass' criterion, and iterative refinement of the steering vectors based on these evaluations.  The touchstone is 'surgical steering': maximizing desired changes while minimizing off-target change and maintaining coherence.",
+ "scores": {
+  "clarity": 4,
+  "conciseness": 3,
+  "technical_accuracy": 5
+ },
+ "reason": "The document demonstrates strong technical accuracy with detailed procedures and metrics. However, it suffers from density and some verbose explanations, impacting conciseness. Clarity is generally high, though the sheer amount of information can be overwhelming.",
+ "unclear": [
+  "The specific reasons for the 'circularity bug' involving the confound judge are not fully explained.",
+  "It's not entirely clear why the failure of the grid computing step necessitated punishing a single component (MFV), instead of all instrument depends (big5, humor/MFQ2).",
+  "The choice of specific error thresholds and criteria (e.g., maximum dS cosine) are not explicitly justified.",
+  "The expectations against human or authority norms are not as specific as they could be."
+ ],
+ "misunderstandings": [
+  "The document implies that achieving a cosine between retrained vectors near 0 is desirable; it's presented as a pass but it should be treated as interesting.",
+  "Frequency of KL divergence should be explained, it's not standard terminology."
+ ],
+ "missing_to_implement": [
+  "A detailed explanation of how the 'bounded judge' works and its limitations.",
+  "A discussion of the trade-offs between different persona template selection strategies.",
+  "A section outlining the criteria used for choosing which foundations to exclude; rationale to de-circularize the steer."
+ ],
+ "questions": [
+  "What is the rationale behind using a 'strict-pass' criterion, and how might it be biased?",
+  "Why use pueue rather than standard python multiprocessing?",
+  "How representative are the 6-12 'sources' of the broader persona landscape?",
+  "The document refers to authority "benchmarks" but lacks concrete comparisons beyond effect size dimensions, why?"
+ ],
+ "suggestions": [
+  "Consolidate the task list into a more structured format, such as a table.",
+  "Provide diagrams or flowcharts to illustrate the workflow and decision-making process.",
+  "Add context or rationale for the fixed endpoints of cos, KL drift.",
+  "Include a glossary of terms for acronyms (e.g., dS, KL) and specialized concepts (e.g., surgical steering).",
+  "Condense summarizing sentence from verbous write-up, example: replace 'occurred as expected' with 'passed' with a citation."
+ ],
+ "rewrites": [
+  {
+   "section": "“The short10 catalog was a wrong turn (deleted).”",
+   "rewrite": "The short10 catalog was unsuitable and was removed.",
+   "why": "Removes the slightly awkward phrasing and reduces unnecessary detail."
+  },
+  {
+   "section": "“Honesty moves Social Norms/Fairness/Liberty; Credulity moves Social Norms/Authority/Sanctity.”",
+   "rewrite": "Honesty steered primarily towards Social Norms, Fairness, and Liberty, while Credulity steered towards Social Norms, Authority, and Sanctity.",
+   "why": "More grammatical, clarifies the primary influence."
+  }
+ ]
+}
+```

@@ -1,0 +1,35 @@
+{
+ "summary": "tinymfv is an evaluation tool that maps the moral and personality profile of local LLMs by analyzing their token probabilities against standard human survey datasets. It visualizes how steering interventions shift a model's 'position' on established cultural and psychological continua, such as the World Values Survey or Moral Foundations Theory.",
+ "mechanism": "The tool calculates a profile for the model based on the log-probabilities of answer tokens for survey items. It then maps this profile to a coordinate in a pre-defined psychological space (derived from human norms) and tracks the movement of that coordinate when applying steering interventions, gating the results for coherence and off-target probability leakage.",
+ "scores": {
+  "clarity": "4",
+  "conciseness": "4",
+  "technical_accuracy": "5"
+ },
+ "reason": "The documentation is technically precise and provides a clear methodology, though it presumes significant familiarity with steering research and psychometric concepts.",
+ "unclear": [
+  "The exact definition of 'valid' tokens in scenarios where the model is not forced into a specific answer set.",
+  "The meaning of the phrase 'cultural West to the west' when describing the axes of the value maps.",
+  "How the 'steering-lite' ecosystem dependency changes the user's workflow compared to using tinymfv in isolation."
+ ],
+ "misunderstandings": [
+  "The definition of 'surgical-informedness' is mentioned as a composite metric, but its exact calculation formula is not fully broken out, potentially leading users to interpret it as a pure performance score rather than a signal-to-noise ratio."
+ ],
+ "missing_to_implement": [
+  "A clear setup guide for the steering vector itself; the doc focuses on measurement/plotting after the steer exists, but doesn't explain how to produce the steering input.",
+  "Threshold guidelines for 'surgical-informedness' or coherence scores to determine if a steer is 'failed' or 'successful'."
+ ],
+ "questions": [
+  "Does tinymfv support chat-tuned models with complex system prompts, or is it strictly for base completion models? Best guess: Strictly for completion models given it relies on reading raw token probabilities from specific survey items."
+ ],
+ "suggestions": [
+  "Add a 'Quick Start' section that includes a full pipeline example: generating a steering vector, applying it, and then running the evaluation."
+ ],
+ "rewrites": [
+  {
+   "section": "The nicest plots are the value (\"quadrant\") map. Each has two named axes borrowed from the psychology that built the survey, the human societies drawn as cultural regions, and the model as a black dot with a coloured path showing where steering takes it.",
+   "rewrite": "We visualize model positioning using 'quadrant' maps. These use the original survey's psychological axes to plot human societies as reference regions, while showing the model as a black dot with a colored path representing its movement throughout the steering process.",
+   "why": "Removes subjective filler like 'The nicest plots are' and awkward phrasing like 'drawn as', making the description more professional and direct."
+  }
+ ]
+}

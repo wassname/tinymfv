@@ -1,0 +1,47 @@
+```json
+{
+ "summary": "This document details a redesign of a persona library for steering language models, addressing issues found in a previous version. The redesign focuses on stratified sampling per data source in the validator, clear documentation on testing all templates and handling scenarios with zero strict-pass results, and rigorous re-validation of the axes using a new sampling strategy. The ultimate goal is to create a more reliable and user-friendly library for steering language models along axes of honesty and credulity, culminating in a retrained and re-evaluated 2D map.",
+ "mechanism": "The primary mechanism is a stratified sampling approach within the persona library validator. Instead of pooling all scenarios, the validator now samples an equal number of scenarios from each source dataset. This ensures a more balanced representation of scenarios from diverse sources, preventing bias towards the most prevalent datasets. Additionally, the implementation of a `--n-per-source` flag offers greater control to users.",
+ "scores": {
+  "clarity": 4,
+  "conciseness": 3,
+  "technical_accuracy": 5
+ },
+ "reason": "The document is generally clear and TECHNICAL in its descriptions, but suffers slight redundancy in describing certain errors/failures and their corrections. Overall, it provides a good account of the technical changes made.",
+ "unclear": [
+  "The document briefly mentions field error 'Care' during grid generation; root cause a different capitalisation. What was the full source-code context?",
+  "The 'dS' metric and its cosine calculation appears frequently without deep explanation – what does 'dS' stand for, and why is a cosine value near 0.0 considered desirable?",
+  "What constitutes an 'honest assessment' of the effect size compared to human variation? How was this communicated to the user in the journal entry?"
+ ],
+ "misunderstandings": [
+  "The document states “circularity bug: confound judge scores honesty_truthfulness as off-axis dim, but for honesty axis that IS on-axis”. Would a quick diagram help illustrates a circularity effect?",
+   "The narrative frequently contrasts 'strong' vs 'weak' steering - clarity would improve with some measurable criteria for 'strength', beyond just cross-country variability."
+ ],
+ "missing_to_implement": [
+  "Code references to 'scripts/run_2d_grid_showcase.py' and functions are not readable without the actual code; minimal code samples would improve understanding.",
+  "A chart summarizing the various datasets and the number of scenarios from each helps understanding the impact of sampling strategies.",
+  "Details on the final judgements/designations/selections vs training runs is scattered within diverse, separate code segments; moving to a shared location would help maintain consistency & reveal decisions."
+ ],
+ "questions": [
+  "The document mentions hourly cron jobs being disabled - what was the original purpose of the cron jobs?",
+  "What are the exact implementations or configurations of the 'bounded judge' and what error does it aim to avoid?"
+ ],
+ "suggestions": [
+  "Add a visual representation of data flow for the validation and training stages",
+  "Consolidate descriptions of testing steps in a single table or diagram",
+  "Reduce narrative repetition regarding debugging and fixes along the way."
+ ],
+ "rewrites": [
+  {
+   "section": "stages A/B started before debugging fixes. unclear if any work was lost.",
+   "rewrite": "Prior to fully implementing the stratified sampling approach, initial runs of stages A/B were performed using existing pooled sampling logic. This preliminary work emphasized the importance of stratified sampling avoiding biases.",
+   "why": "Reduces the sense that a complete failed run and means initializing the next task"
+  },
+  {
+   "section": "Stage B honesty: 24 strict-pass at thr 2.0 + on-axis dim exclusion (up from 8 at thr 3.0). Top-50 exported. Stage B credulity: 24 strict-pass at thr 2.0 with NO on-axis dim exclusion (none circular for credulity).",
+   "rewrite": "Stage B of the honesty axis yielded 24 strict-pass results when filtering to items with an axis delta greater than 2.0 and excluding dimensions related to honesty in accord with preliminary findings. Credulity achieved 24 strict-pass with axis deltas greater than 2.0, without needing to exclude any dimensions because they did not indicate circularity.",
+   "why": "Substitute informal language with technical and explicit phrasing"
+  }
+ ]
+}
+```
