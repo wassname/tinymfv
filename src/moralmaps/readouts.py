@@ -1,4 +1,4 @@
-"""Ordinal Likert readouts: pure functions of the raw answer-token logprobs.
+"""Ordinal Likert + categorical readouts: pure functions of the raw answer-token logprobs.
 
 One primitive (`lp`, the full-vocab logprobs at the M scale tokens) -> many summaries. The split
 matters because the summaries answer different questions and have very different steer-sensitivity:
@@ -59,6 +59,27 @@ def logodds_agree(lp: np.ndarray, scale_max: int) -> float:
     lp = np.asarray(lp, dtype=float)
     n_side = scale_max // 2
     return _logsumexp(lp[-n_side:]) - _logsumexp(lp[:n_side])
+
+
+def clr(score: np.ndarray) -> np.ndarray:
+    """Centered log-ratio of a categorical evidence vector: clr_f = score_f - mean_j score_j.
+
+    The nominal-category analog of `logit_contrast` for a K-way forced choice (e.g. the
+    moral foundations), where there is no rank to weight by. `score` is the pre-softmax
+    per-category evidence (nats); subtracting the mean is the compositional-data CLR
+    transform. Like C it kills the softmax normalizer (constant offsets on `score` cancel,
+    weights sum to 0), so it is gauge-free and sensitive (no p_j suppression).
+
+    Use clr deltas -- not one-vs-rest log-odds `score_f - logsumexp(score_{j != f})` -- for
+    per-category selectivity. The one-vs-rest logsumexp is dominated by the top category, so a
+    steer that concentrates evidence on ONE category mechanically depresses every other
+    category's one-vs-rest log-odds and fabricates off-axis collateral: a real, selective steer
+    then scores as LESS selective than a diffuse random poke (jsteer authority gate, job 95).
+    clr spreads a single-category shift as +(1 - 1/K) on that category and -1/K on each other,
+    so genuine selectivity survives. -- added 2026-07-15 for the jsteer selectivity gate
+    """
+    s = np.asarray(score, dtype=float)
+    return s - s.mean()
 
 
 def entropy(p: np.ndarray, scale_max: int | None = None) -> float:
