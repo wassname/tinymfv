@@ -148,46 +148,40 @@ The plotting code keeps only coefficients that every plotted dataset can still r
 
 ## Measurement
 
-Steering is an intervention, so we judge it like surgery: did the intended thing move a lot, did everything else move as little as possible, and is the model still coherent? moralmaps reads three quantities that answer those, in rising order of steer-sensitivity.
+Steering is an intervention, so we judge it like surgery: did the intended factor move a lot, did everything else move as little as possible, and is the model still coherent? Four quantities, gated by coherence, in rising order of steer-sensitivity.
 
-Coherence is measured with `pmass` is the share of probability the model puts on the valid answer tokens, and entropy is how spread-out the answer is within them:
+**Coherence — `pmass`** (the gate). The share of probability the model puts on the valid answer tokens (entropy is how spread-out the answer is within them):
 
 $$m(c) = \mathbb{E}_i \sum_{a \in A_i} P_c(a \mid i)$$
 
-where:
+where $c$ is the steering coefficient ($c=0$ is the base model), $i$ indexes items (a vignette or survey question), $A_i$ is the valid answer first-tokens for item $i$ (the seven foundation words, or scale points 1-5), and $P_c(a \mid i)$ is the model's next-token probability of answer token $a$ under steer $c$. A steer that drives `pmass` toward zero, or answers toward uniform, has broken the format — anything read off it is noise. It matters most on the *unintended* side: a steer that quietly turns answers to mush can look like change when it is really damage.
 
-- $c$ is the steering coefficient ($c=0$ is the base model), and $m(c)$ is `pmass` at that coefficient
-- $i$ indexes items (a vignette or survey question)
-- $A_i$ is the set of valid answer first-tokens for item $i$ (the seven foundation words, or the scale points 1-5)
-- $P_c(a \mid i)$ is the model's next-token probability of answer token $a$ under steer $c$
-
-A steer that drives `pmass` toward zero, or the answers toward uniform, has broken the format, and any value read off it is noise. Coherence matters most on the unintended side: a strong steer that quietly turns answers to mush can look like change when it is really damage.
-
-The profile is what the maps plot: the human-comparable score per factor. For a survey it is the expected 1-5 answer (after reverse-keying); for MFV the mean forced-choice probability per foundation:
+**Profile** — what the maps plot: the human-comparable score per factor (expected 1-5 answer after reverse-keying for a survey, mean forced-choice probability per foundation for MFV):
 
 $$\mathrm{profile}_d = \mathbb{E}_{i \in d}\sum_{k=1}^{M} k\,P(k \mid i) \qquad \mathrm{profile}_f = \mathbb{E}_i P(f \mid i)$$
 
-where:
+($d$ a survey factor and $i \in d$ its items; $f$ an MFV foundation; $k$ a scale point $1..M$; $P(k \mid i)$ renormalized over $A_i$). It lands the model against human norms but *hides* steering: near a confident answer $E = \sum_k k\,p_k$ sits in a flat spot ($\partial E/\partial \ell_j = p_j (j - E) \to 0$ as $p_j$ concentrates), so a steer that only reallocates the tails barely moves it.
 
-- $d$ is a survey factor (e.g. openness) and $i \in d$ its items; $f$ is an MFV foundation
-- $k$ is a scale point, from 1 to $M$ (here $M=5$)
-- $P(k \mid i)$ is the probability of answering scale point $k$ on item $i$, renormalized over $A_i$; $P(f \mid i)$ likewise for foundation $f$
+**Signal — $\Delta$** (the rank-centered logit contrast; `C` / `logit_contrast` in code, written $\Delta$ here to keep it off the coefficient $c$). Profile-shaped but in log-space with midpoint-centered weights, so its derivative is a fixed weight with no $p_j$ suppression — it still sees the steer when the profile is pinned:
 
-This lands the model against human norms, but it hides steering: near a confident answer the expected score $E = \sum_k k\,p_k$ sits in a flat spot (its sensitivity to the answer logits, $\partial E/\partial \ell_j = p_j (j - E)$, vanishes as $p_j$ concentrates), so a steer that only reallocates the tails barely moves it. In the showcase CSVs this is the `mean` column; for MFV, model and human units differ, so the maps plot relative emphasis (each profile z-scored across foundations).
+$$\Delta_d(c) = \mathbb{E}_{i \in d}\sum_{k=1}^{M}\left(k - \tfrac{M+1}{2}\right)\ell_{i,k}^{(c)} \qquad \Delta_f = \mathbb{E}_i\left(\ell_{i,f}^{(+1)} - \ell_{i,f}^{(-1)}\right)$$
 
-The steer signal is `C`, the rank-centered logit contrast: the same shape as the profile but in log-space with midpoint-centered weights, so its derivative is a fixed weight with no $p_j$ suppression and it still sees the steer when the profile is pinned:
+($\ell_{i,k}^{(c)}$ the logprob of scale-point $k$'s answer token at coefficient $c$, nats; $\ell_{i,f}$ likewise per foundation; $\Delta_f$ contrasts $c=+1$ vs $c=-1$).
 
-$$C_d(c) = \mathbb{E}_{i \in d}\sum_{k=1}^{M}\left(k - \tfrac{M+1}{2}\right)\ell_{i,k}^{(c)} \qquad \Delta_f = \mathbb{E}_i\left(\ell_{i,f}^{(+1)} - \ell_{i,f}^{(-1)}\right)$$
+**Gated selectivity — `sel_gated`** (the headline). One base-anchored score that rewards the intended change, softly penalizes the unintended, and gates on coherence. Defined once in `moralmaps.metrics.gated_selectivity` and imported by every consumer (steering-lite, j-steer) so it cannot silently fork. On the per-foundation clr shift $\Delta_f = \mathrm{clr}_f(+C) - \mathrm{clr}_f(-C)$:
 
-where:
+$$\mathrm{sel\_gated} = \Big(\underbrace{\tfrac{1}{|I|}\textstyle\sum_{f \in I} s_f\,\Delta_f}_{\text{on}} \;-\; \lambda\underbrace{\tfrac{1}{|O|}\textstyle\sum_{f \in O} |\Delta_f|}_{\text{off}}\Big)\cdot \mathrm{coh}^2, \qquad \mathrm{coh} = \min\!\Big(1,\ \frac{\min(\mathrm{pmass}_{+C},\,\mathrm{pmass}_{-C})}{\mathrm{pmass}_{\text{base}}}\Big)$$
 
-- $\ell_{i,k}^{(c)}$ is the logprob of scale point $k$'s answer token on item $i$ at steering coefficient $c$ (nats); $\ell_{i,f}$ likewise for foundation $f$
-- $k - \tfrac{M+1}{2}$ is the midpoint-centered weight (for $M=5$: $-2,-1,0,1,2$)
-- $\Delta_f$ contrasts the full positive and negative steers, $c=+1$ vs $c=-1$
+where $I$ is the intended on-axis with signs $s_f \in \{+1,-1\}$ (e.g. $\{\text{authority}:-1,\ \text{care}:+1\}$ for an Authority-down / Care-up steer, or $\{\text{authority}:+1\}$ for a single clean axis), and $O$ is every other foundation (off-axis collateral, incl. social).
 
-The intended change is $C$ (or $\Delta_f$) on the steered factor; the unintended change is $C$ moving on the other factors. A surgical steer has large intended change and small off-target change, at unchanged coherence.
+- **on** and **off** are both per-foundation-scale means, so $\lambda$ is a clean per-foundation trade.
+- $\lambda = 0.1$ (`OFF_WEIGHT`): off-axis is a soft *preference*, not co-equal. Moving the target the wrong way is a negative **on** at full weight; collateral is $|\Delta|$ at weight $\lambda$. At $\lambda=1$ the argmax-best "steer" is doing nothing (on$\approx$off$\approx$0 beats any real intervention with side effects).
+- **coherence** is a one-sided *squared* barrier on the worst arm: $=1$ when the format holds in both directions, $\to 0$ when steering turns answers to mush. It never rewards exceeding base coherence.
+- 95% bootstrap CI over vignette rows (2000×, seed 0), gated to match the point estimate.
 
-We call the combined measurement surgical informedness: reward intended change, penalize unintended change, threshold on coherence. moralmaps reports the pieces (pmass, entropy, per-factor profile and $C$, and for MFV a nominal informedness, the Youden's J of the model's top foundation against the human top foundation); steering-lite folds them into the single base-anchored surgical informedness score it uses to rank steers.
+Because clr is pre-softmax nats, `sel_gated` is a direction-and-selectivity anchor for matched-KL comparison — **not** a behavioral effect size (a logit $8\to10$ at $p\approx1$ moves clr but changes no behavior).
+
+**Flip informedness — `si_flips`** (the behavioral cross-check). The softmax-space companion `sel_gated` cannot give: the signed change in the model's forced-choice *pick* rate (argmax over clr, i.e. the actual answer) for the on-axis foundations, $\tfrac{1}{|I|}\sum_{f\in I} s_f\,[\Pr(\text{pick}=f\mid +C) - \Pr(\text{pick}=f\mid -C)]$. Bounded $[-1,1]$, Youden-J-style, and it saturates where clr does not — so it reports whether behavior, not just internal evidence, moved. (`moralmaps.metrics.si_flips`.)
 
 ## Scope
 

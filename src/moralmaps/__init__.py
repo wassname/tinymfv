@@ -28,6 +28,7 @@ from .instrument import Instrument, InstrItem, per_item_categorical, reduce_nomi
 from .instruments import get as get_instrument, INSTRUMENTS, build_instrument
 from .read import read_items, resolve_answer_ids, build_user_content
 from .readouts import expected_score, logit_contrast, logodds_agree, entropy
+from .metrics import gated_selectivity, si_flips, clr_per_row, OFF_WEIGHT
 from .administer import administer
 
 
@@ -48,6 +49,8 @@ __all__ = [
     "evaluate", "administer", "get_instrument", "read_items",
     # ordinal readouts (pure functions of the raw answer-token logprobs)
     "expected_score", "logit_contrast", "logodds_agree", "entropy",
+    # headline steering metrics (shared canonical defs; imported by steering-lite + j-steer)
+    "gated_selectivity", "si_flips", "clr_per_row", "OFF_WEIGHT",
     # types consumers build / subset
     "Instrument", "InstrItem", "EvalResult", "EvalRow", "EvalInfo", "reduce_nominal", "reduce_ordinal",
     # data API
