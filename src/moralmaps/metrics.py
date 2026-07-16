@@ -57,6 +57,16 @@ def _delta_per_f(pos_clr, neg_clr, keys) -> dict[str, float]:
     return {f: sum(pos_clr[k][f] - neg_clr[k][f] for k in keys) / n for f in FOUNDATIONS}
 
 
+def _paired_keys(pos_clr: dict, neg_clr: dict) -> list[str]:
+    pos_keys, neg_keys = set(pos_clr), set(neg_clr)
+    assert pos_keys == neg_keys, (
+        f"pos/neg row keys differ: pos_only={sorted(pos_keys - neg_keys)}, "
+        f"neg_only={sorted(neg_keys - pos_keys)}"
+    )
+    assert pos_keys, "pos/neg clr rows are empty"
+    return list(pos_clr)
+
+
 def _on_off(delta: dict[str, float], intent: dict[str, int], off_set, off_weight) -> tuple[float, float, float]:
     """on = mean_f∈intent intent[f]*Delta_f ; off = mean_f∉intent |Delta_f| ; sel = on - w*off.
 
@@ -86,8 +96,12 @@ def gated_selectivity(
     clr is pre-softmax nats: sel_gated is a direction+selectivity anchor, NOT a behavioral effect
     size. Pair it with si_flips for the behavioral claim.
     """
-    keys = [k for k in pos_clr if k in neg_clr]
+    keys = _paired_keys(pos_clr, neg_clr)
     off_set = [f for f in FOUNDATIONS if f not in intent]
+    pmasses = np.asarray([pmass_pos, pmass_neg, pmass_base], dtype=float)
+    assert np.isfinite(pmasses).all(), f"pmass inputs must be finite, got {pmasses.tolist()}"
+    assert (0 <= pmasses).all(), f"pmass inputs must be nonnegative, got {pmasses.tolist()}"
+    assert pmass_base > 0, f"pmass_base must be positive, got {pmass_base}"
     coh = min(1.0, min(pmass_pos, pmass_neg) / pmass_base)
     coh2 = coh ** 2
 
@@ -127,7 +141,7 @@ def si_flips(pos_clr: dict, neg_clr: dict, intent: dict[str, int]) -> dict:
     Range [-1, 1]. Youden-J-style (a difference of rates); saturates where clr does not, which is
     exactly why it is the behavioral cross-check to the unbounded clr selectivity.
     """
-    keys = [k for k in pos_clr if k in neg_clr]
+    keys = _paired_keys(pos_clr, neg_clr)
     n = len(keys)
     per_f: dict[str, float] = {}
     for f, s in intent.items():

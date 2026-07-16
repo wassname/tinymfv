@@ -7,6 +7,7 @@ si_flips is a bounded behavioral pick-rate change. -- Claude
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from moralmaps.metrics import FOUNDATIONS, gated_selectivity, si_flips, clr_per_row
 
@@ -71,6 +72,30 @@ def test_coherence_barrier_squared():
     # exceeding base coherence never rewards (clamped at 1).
     r2 = gated_selectivity(pos, neg, INTENT, pmass_pos=0.99, pmass_neg=0.99, pmass_base=0.9)
     assert r2["coherence"] == 1.0
+
+
+@pytest.mark.parametrize("invalid_pmass", [float("nan"), float("inf"), -0.1])
+def test_coherence_inputs_must_be_valid(invalid_pmass):
+    pos, neg = _sweep(auth_p=-2.0, care_p=+2.0, auth_n=+2.0, care_n=-2.0)
+    with pytest.raises(AssertionError, match="pmass inputs"):
+        gated_selectivity(
+            pos, neg, INTENT,
+            pmass_pos=invalid_pmass, pmass_neg=0.9, pmass_base=0.9,
+        )
+
+
+def test_metrics_require_exact_nonempty_row_pairing():
+    pos, neg = _sweep(auth_p=-2.0, care_p=+2.0, auth_n=+2.0, care_n=-2.0)
+    neg.pop(next(iter(neg)))
+    with pytest.raises(AssertionError, match="row keys differ"):
+        gated_selectivity(pos, neg, INTENT, pmass_pos=0.9, pmass_neg=0.9, pmass_base=0.9)
+    with pytest.raises(AssertionError, match="row keys differ"):
+        si_flips(pos, neg, INTENT)
+
+    with pytest.raises(AssertionError, match="rows are empty"):
+        gated_selectivity({}, {}, INTENT, pmass_pos=0.9, pmass_neg=0.9, pmass_base=0.9)
+    with pytest.raises(AssertionError, match="rows are empty"):
+        si_flips({}, {}, INTENT)
 
 
 def test_si_flips_behavioral_bounded():
