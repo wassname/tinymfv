@@ -1,5 +1,41 @@
 # tiny-mcf-vignettes research journal
 
+## 2026-07-17 (a) -- random-baseline confound and whether the shared clr metric should emit raw per-choice output
+
+This entry records a measurement question raised while re-running the steering-lite method sweep on the shared moralmaps clr readout: whether "authority went down" reflects specific steering or generic disruption, and what the metric would have to output to tell those apart. No random baseline has been run in steering-lite yet, so the load-bearing evidence is one method sweep here plus another agent's j-steer numbers I have not reproduced.
+
+Definitions on first use. clr = centered log-ratio of the model's forced-choice "how wrong is this" readout, per moral foundation. sel_gated = gated selectivity = `(on - 0.1*off)*coh^2`, where on = mean signed Δclr on the intent axes (Authority down, Care up), off = mean absolute Δclr over the other five foundations, coh = min(1, min-arm answer-probability-mass / base). The metric lives in tinymfv at `src/moralmaps/metrics.py` and is imported by both steering-lite (`scripts/results.py:38`) and j-steer, so it is the shared researched method, not steering-lite's to fork.
+
+Evidence 1, the steering-lite sweep at iso-KL 0.8 (run_id 35cd03ebf93e), top two and bottom row of the sel_gated ranking:
+
+| method | sel_gated | CI95 |
+|---|---|---|
+| pca[+] | 3.40 | [+2.63,+4.27] |
+| sspace_pca[+] | 3.30 | [+2.48,+4.17] |
+| prompt_only | -1.80 | [-2.30,-1.30] |
+
+Table 1. sel_gated per method, iso-KL 0.8, coh=1 for every row (no coherence discount). Source: `just results outputs/sweep_rms08_full classic` over `steering-lite/outputs/sweep_rms08_full` (run_id 35cd03ebf93e), regenerated this session.
+
+prompt_only is scored on a different contrast than the steering rows. Steering is bidirectional, aligned arm minus opposite arm (`scripts/results.py:84-98`); prompt_only is single-sided, persona minus bare (`scripts/results.py:107-111`). Its per-foundation Δclr is ΔCare=+1.85 (intent wants Care up, right direction) and ΔAuth=+5.17 (intent wants Auth down, wrong direction), so on = mean(+1.85, -5.17) = -1.66.
+
+My read: prompt_only's negative score is very probably an artifact of the weaker one-sided contrast plus a genuine backfire on the Authority axis under this readout, not evidence that prompting fails to produce the persona in generated text. The two row types are not comparable until prompt_only is also scored bidirectionally (pos-persona vs neg-persona). Confidence about 0.85 that making it bidirectional moves it up substantially.
+
+Evidence 2, from another agent working in j-steer, pasted by wassname this session and not reproduced here: a random steering vector reportedly lowers authority-wrongness more than a real method by flooding probability mass into the "not wrong" answer.
+
+| -C run | p(not_wrong) | logodds(auth vs not-wrong) |
+|---|---|---|
+| bare | 0.099 | +2.44 |
+| jacobian_delta | 0.250 | -0.81 |
+| random | 0.373 | -1.50 |
+
+Table 2. Source: pasted by wassname from a j-steer agent's analysis; uniform over the answer set is about 0.14 per that agent. I have not run a random vector in steering-lite.
+
+My read: if this replicates in steering-lite, then "authority down" is partly non-specific, since any perturbation of equal magnitude defaults the model toward "not wrong". That agent's own point is that the off-axis subtraction in sel_gated (the `0.1*off` term) is already a crude common-mode correction, so the decisive question is whether 0.1 is enough to pull sel_gated(random) down to about zero. Plausible, roughly 0.6, that it is, given the off term already exists; if not, the metric needs a stronger correction (authority shift net of the across-foundation common shift). Untested until a random vector is run at iso-KL 0.8 in steering-lite.
+
+Design implication, my interpretation. The reason we keep re-running the model to try metric variants is that moralmaps returns summarised clr, not the raw per-choice probabilities. If the eval emitted raw per-answer mass, including an explicit "not wrong" option and an invalid/refuse bucket, then p_any_choice (mass on any offered answer including invalid), p_any_foundation (mass on a real foundation judgment, excluding not-wrong and invalid), per-direction scores, and any common-mode correction could all be computed offline without the GPU. My read: emitting raw output is higher leverage than any single metric tweak, and it belongs in the shared tinymfv source so steering-lite and j-steer stay comparable. One survey-design question I cannot settle from here: whether every moral-survey item should always carry an explicit "no answer" / "not wrong" option, so the not-wrong mass is always measured rather than inferred.
+
+Takeaway: the sweep produced a ranking whose top methods clear zero, but a single random-vector run plus a raw-output change to the shared metric are what would tell us whether that ranking measures specific steering or generic disruption.
+
 ## 2026-04-30 — actor-archetype bug in airisk `self_violate` (and fix)
 
 ### Setup
